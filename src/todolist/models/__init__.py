@@ -7,6 +7,7 @@ package to fill `Base.metadata`.
 from todolist.models.agent import Agent
 from todolist.models.invitation import Invitation, InvitationRole
 from todolist.models.organization import Membership, MembershipRole, Organization
+from todolist.models.project import Project
 from todolist.models.user import User, normalize_email
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "Membership",
     "MembershipRole",
     "Organization",
+    "Project",
     "User",
     "normalize_email",
 ]

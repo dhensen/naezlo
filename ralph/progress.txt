@@ -48,6 +48,9 @@
 - 409 from a unique constraint: change + flush inside `async with session.begin_nested()`, catch
   `IntegrityError`, raise `ConflictError` (services/agents.py). Assignments go inside the block.
 - A PATCH that returns `updated_at` needs `await session.refresh(obj)` after the flush.
+- Projects: services/projects.py (`list_projects`, `get_project_membership`, `create_project`,
+  `update_project`, `delete_project`). Project-scoped route (`/api/projects/{project_id}...`):
+  `ctx: ProjectContextDep` (todolist.api.deps; 404 `Project not found` when the caller can't see it).
 
 ---
 
@@ -292,4 +295,31 @@
     rows in `agents` for the organization.
   - All statements of a test share one transaction, so `updated_at` equals `created_at` there
     (`now()` is the transaction's start time); don't assert that it changed.
+---
+
+## 2026-11-14 - US-010
+- Projects: `projects` table (model `Project`; cascade with the organization, index on
+  organization_id, `created_by` SET NULL) and its migration; `POST` (201) and
+  `GET /api/orgs/{org_id}/projects` for any organization member; `GET`, `PATCH` and `DELETE` (204)
+  `/api/projects/{project_id}` through the new `ProjectContextDep`, for now limited to members of
+  the project's organization. Non-members get 404 on all five routes.
+- Files changed: src/todolist/models/{__init__,project}.py, src/todolist/services/projects.py,
+  src/todolist/api/{__init__,deps,projects}.py, migrations/versions/*_add_projects.py,
+  tests/test_projects.py, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+- Checked by hand on the dev database: `alembic upgrade head`, `downgrade base`, `upgrade head`,
+  `alembic check` (no drift).
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - US-011: `project_context` (api/deps.py) is the one place where "may the caller see this
+    project" is decided; it calls `get_project_membership` (project joined with the caller's
+    membership). Replace that with the permission service and build `require_project_role(...)`
+    on it. `ctx.principal` is already there. `list_projects` returns all projects of the
+    organization and needs filtering by role; `create_project` must add the creator's admin grant.
+  - `tests/test_projects.py::test_any_member_can_do_everything` asserts the temporary rule (a plain
+    member may patch and delete someone else's project); US-011 has to rewrite it.
+  - Project names are not unique, so there is no savepoint / 409 handling as in agents.
+  - `api/projects.py` has two routers: `org_router` (`/orgs/{org_id}/projects`) and `router`
+    (`/projects/{project_id}`). Lists (US-013) can follow the same split.
+  - `alembic downgrade base` on the dev database deletes the local dev data (users created with
+    dev-login); that is accepted for the round-trip check.
 ---

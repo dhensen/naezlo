@@ -105,3 +105,12 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **Descriptions** are trimmed, at most 2000 characters; an empty one is stored as null.
 - **Shape**: `{id, name, description, created_by, created_at, updated_at}`, `created_by` being a user id or null; listed oldest first. `POST` answers 201, `DELETE` 204. `PATCH` changes only the fields that are sent: `description: null` clears it, `name: null` is a 422. There is no `GET` for a single agent (no story needs one yet).
 - **Order of answers**: not a member → 404 `Organization not found`; member but not owner or admin → 403 (also for an agent id that does not exist); unknown agent or one of another organization → 404 `Agent not found`.
+
+## Projects (2026-11-14, US-010)
+
+- **Table**: `projects` with `organization_id` (cascade, indexed), `name` (200), `description` (text, nullable), `created_by` (the user; becomes null when that user is deleted) and timestamps.
+- **Names** are trimmed, 1 to 200 characters, and need not be unique: two projects in one organization can have the same name. Descriptions are trimmed, at most 2000 characters; an empty one is stored as null.
+- **Routes**: `POST` (201) and `GET /api/orgs/{org_id}/projects` create and list; `GET`, `PATCH` and `DELETE` (204) `/api/projects/{project_id}` address a project by its own id, without the organization in the path.
+- **Shape**: `{id, organization_id, name, description, created_by, created_at, updated_at}`, `created_by` being a user id or null; listed oldest first. `PATCH` changes only the fields that are sent: `description: null` clears it, `name: null` is a 422. A project cannot move to another organization.
+- **Access until US-011**: every member of the organization can create, see, change and delete its projects. Someone who is not a member gets 404 `Project not found`, the same body as for an id that does not exist (and 404 `Organization not found` on the two org-scoped routes).
+- **`ProjectContextDep`** (`todolist.api.deps`) resolves `{project_id}` for the signed-in user and gives `ctx.project`, `ctx.membership`, `ctx.user` and `ctx.principal`. US-011 puts the permission service behind it.

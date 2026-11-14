@@ -115,3 +115,7 @@ uv run pytest
   `async with session.begin_nested()` and turn `IntegrityError` into a `ConflictError` (see
   `services/agents.py`). Assign the attributes inside the block: `begin_nested()` flushes first.
 - After an UPDATE, `updated_at` is expired; `await session.refresh(obj)` before returning it.
+- Project-scoped routes (`/api/projects/{project_id}...`) take `ctx: ProjectContextDep` (from
+  `todolist.api.deps`): it gives `ctx.project`, `ctx.membership`, `ctx.user` and `ctx.principal`, and
+  answers 404 `Project not found` to anyone who can't see the project. A router file can export two
+  routers (`org_router` and `router` in `api/projects.py`); include both in `api/__init__.py`.
