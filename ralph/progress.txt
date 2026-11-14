@@ -5,7 +5,7 @@
 (Reusable patterns go here. Keep this section short and current.)
 
 - Stack and domain rules: see DECISIONS.md.
-- There is no git remote named origin: commit, don't push.
+- A git remote named origin exists (since US-018): commit, then `git push origin main`.
 - pnpm is not installed; use npm for the frontend.
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
@@ -559,7 +559,7 @@
   items,project_grants,list_grants}.py, api/{projects,lists,project_grants,list_grants}.py,
   migrations/versions/20261114_2253_b82bcf0756e0_add_audit_events.py, tests/test_audit.py (new),
   DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt
-- Pushed: no (there is no remote named origin)
+- Pushed: yes (origin exists now; earlier entries say it did not)
 - **Learnings for future iterations:**
   - "A failed request records nothing" is tested two ways: failing API calls leave the event list
     unchanged, and an event recorded inside a savepoint disappears on rollback. The test app's
