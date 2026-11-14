@@ -94,3 +94,8 @@ uv run pytest
 - Absolute URLs of this app are built from `Settings.public_base_url`, not from the request.
 - Tests sign in with `await sign_in(client, email, name)` from `tests/helpers.py`. The test
   settings have `dev_login=True`; a second user in one test needs a second `AsyncClient` on `app`.
+- Org-scoped routes (`/api/orgs/{org_id}/...`) take `org: OrgContextDep` (from `todolist.api.deps`):
+  it gives `org.organization`, `org.membership`, `org.role` and `org.user`, and answers 404 to
+  non-members. Use `org: OrgAdminContextDep` when the action needs an owner or admin (403 for a
+  member). Don't compare roles in a route; add a rule function to the service and a dependency.
+- 404 means "you can't see it", 403 (`ForbiddenError`) means "you can see it but may not do this".

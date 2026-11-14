@@ -31,6 +31,10 @@
   calls with `httpx2.MockTransport`. Google login tests: `FakeGoogle` in tests/test_auth_google.py.
 - `Settings.public_base_url` (PUBLIC_BASE_URL) exists since US-005; build absolute URLs from it.
 - Routes opened by browser navigation redirect to `/login?error=<code>` instead of returning JSON.
+- Org-scoped route: `org: OrgContextDep` (todolist.api.deps; 404 for non-members) or
+  `org: OrgAdminContextDep` (also 403 unless owner/admin). Role rule: `can_manage_organization`.
+- Second user in a test: copy the `other_client` fixture and `add_member` helper from
+  tests/test_orgs.py (move them to conftest.py / helpers.py when a second module needs them).
 - Testing a constraint: add the bad row, then flush inside `async with session.begin_nested()`
   under `pytest.raises(IntegrityError)` (see tests/test_models_tenancy.py); the session stays usable.
 
@@ -172,4 +176,27 @@
     the fake ID token or validation fails.
   - The frontend login page (US-028) should link to `/api/auth/google/login?next=<path>` and show
     a message for `/login?error=<code>` (codes in DECISIONS.md).
+---
+
+## 2026-11-14 - US-006
+- Organization API: `GET /api/orgs` (my organizations with my role), `POST /api/orgs` (201, unique
+  slug, creator becomes owner), `GET /api/orgs/{org_id}` (404 for non-members and unknown ids),
+  `PATCH /api/orgs/{org_id}` (owner and admin; member 403). Reusable dependencies `OrgContextDep`
+  and `OrgAdminContextDep` in `todolist/api/deps.py`, `ForbiddenError`, and the service functions
+  `get_organization_membership`, `can_manage_organization` and `rename_organization`.
+- No schema change, so no migration.
+- Files changed: src/todolist/api/{__init__,deps,orgs}.py, src/todolist/services/organizations.py,
+  src/todolist/errors.py, tests/test_orgs.py, CLAUDE.md, DECISIONS.md, ralph/prd.json,
+  ralph/progress.txt.
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - The org endpoints reuse `MyOrganizationOut` from api/me.py as their response model.
+  - `OrganizationName` (api/orgs.py) is a trimmed 1-200 character string type; the same
+    `Annotated[str, StringConstraints(...)]` pattern fits project, list and agent names.
+  - US-007 can build on `OrgContextDep` / `OrgAdminContextDep`; the owner-only rules (granting or
+    removing the owner role, last owner) belong in services/organizations.py, not in the route.
+  - A path parameter typed `uuid.UUID` answers 422 for a malformed id before the dependency runs.
+  - The Postman plugin's session hook asks to load a Postman skill for API work; it was not used:
+    the server needs authorization that this non-interactive loop cannot give, and the project's
+    own conventions cover the work.
 ---

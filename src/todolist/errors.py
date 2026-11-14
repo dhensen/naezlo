@@ -27,6 +27,13 @@ class NotFoundError(AppError):
         super().__init__(404, "not_found", detail)
 
 
+class ForbiddenError(AppError):
+    """The caller can see the resource, but the action needs a higher role."""
+
+    def __init__(self, detail: str = "Not allowed") -> None:
+        super().__init__(403, "forbidden", detail)
+
+
 async def _handle_app_error(_request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)
     return JSONResponse(

@@ -70,3 +70,11 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **`next`** must start with a single `/` and contain no backslash or control character; anything else is ignored and the user lands on `/`. It lives in the session under `login_next` and is forgotten when a new login starts without it.
 - **Email linked to another Google account**: when the ID token's `sub` is unknown but its email belongs to a user who already has a different `google_sub`, the sign-in is refused (`google_account_conflict`). The address was probably reassigned; signing in would hand over someone else's account.
 - **Profile data**: a returning user keeps their stored name and email even when Google reports new ones (found by `sub`). The picture is refreshed on every Google sign-in. `email_verified` must be the JSON value `true`.
+
+## Organization API (2026-11-14, US-006)
+
+- **Shape**: every organization endpoint returns `{id, name, slug, role}`, where `role` is the caller's own role (the same object as in `/api/me`). `POST /api/orgs` answers 201.
+- **Names** are trimmed and must be 1 to 200 characters (422 otherwise). Names need not be unique; slugs are.
+- **Renaming keeps the slug**, so links that contain it keep working. v1 has no way to change a slug.
+- **Not a member means 404**, with the same body as an id that does not exist. A member whose role is too low gets 403 with code `forbidden` (`ForbiddenError`).
+- **Organization-level role checks** live in one place: `can_manage_organization(role)` in `services/organizations.py`, applied by the `OrgAdminContextDep` dependency. Routes don't compare roles themselves. The permission service of US-011 (projects and lists, with a `Principal`) should build on this function rather than repeat the rule.

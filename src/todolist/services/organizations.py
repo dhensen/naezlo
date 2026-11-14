@@ -67,3 +67,32 @@ async def list_user_organizations(
         .order_by(Membership.id)
     )
     return [(organization, role) for organization, role in rows]
+
+
+async def get_organization_membership(
+    session: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID
+) -> tuple[Organization, Membership] | None:
+    """The organization and the user's membership in it; None when the user is not a member
+    (or the organization does not exist: callers must not tell these apart)."""
+    row = (
+        await session.execute(
+            select(Organization, Membership)
+            .join(Membership, Membership.organization_id == Organization.id)
+            .where(Organization.id == organization_id, Membership.user_id == user_id)
+        )
+    ).one_or_none()
+    return None if row is None else (row[0], row[1])
+
+
+def can_manage_organization(role: MembershipRole) -> bool:
+    """Owners and admins manage an organization: its name, members and everything in it."""
+    return role in (MembershipRole.OWNER, MembershipRole.ADMIN)
+
+
+async def rename_organization(
+    session: AsyncSession, organization: Organization, name: str
+) -> Organization:
+    """Change the name. The slug stays what it is, so links keep working."""
+    organization.name = name
+    await session.flush()
+    return organization
