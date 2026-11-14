@@ -7,7 +7,7 @@ Stack, domain model and rules: `DECISIONS.md` (it wins over personal preference)
 
 - `src/todolist/`: backend package (`app.py` has the `create_app()` factory, `config.py` the
   `Settings`, `db.py` the SQLAlchemy `Base`, mixins, engine and `get_session`, `models/` the ORM models,
-  `services/` the domain logic, `api/` the routers under `/api`, `auth.py` the session helpers and
+  `services/` the domain logic, `principals.py` the `Principal` actor type, `api/` the routers under `/api`, `auth.py` the session helpers and
   `current_user`, `google.py` the Google OpenID Connect client, `errors.py` the API errors)
 - `migrations/`: Alembic environment and `versions/`
 - `docker-compose.yml`: PostgreSQL 18 on host port 5435 with the databases `todolist` and `todolist_test`
@@ -107,4 +107,11 @@ uv run pytest
 - Invitations live in `services/invitations.py`; `get_or_create_user` accepts the pending ones on
   every sign-in. An enum that is a subset of another (`InvitationRole`) gets its own PostgreSQL type.
 - Testing a constraint: `begin_nested()` flushes pending objects before the savepoint starts, so add
-  the bad row inside it (see `add_in_savepoint` in `tests/test_invitations.py`).
+  the bad row inside it (use `add_in_savepoint` from `tests/helpers.py`).
+- The actor type is `todolist.principals.Principal` (kind `user | agent`, id, organization_id, name).
+  Permission checks and audit events take a `Principal`; `org.principal` gives the caller's in an
+  org-scoped route, `Principal.for_agent(agent)` an agent's.
+- A 409 that comes from a unique constraint: make the change and flush inside
+  `async with session.begin_nested()` and turn `IntegrityError` into a `ConflictError` (see
+  `services/agents.py`). Assign the attributes inside the block: `begin_nested()` flushes first.
+- After an UPDATE, `updated_at` is expired; `await session.refresh(obj)` before returning it.

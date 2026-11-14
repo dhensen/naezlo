@@ -8,7 +8,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import add_member, sign_in
+from tests.helpers import add_in_savepoint, add_member, sign_in
 from todolist.models import Invitation, InvitationRole, MembershipRole, Organization, User
 from todolist.services.users import get_or_create_user
 
@@ -22,16 +22,6 @@ async def ada_org(client: AsyncClient) -> tuple[str, str]:
 
 async def invitation_count(session: AsyncSession) -> int:
     return await session.scalar(select(func.count()).select_from(Invitation)) or 0
-
-
-async def add_in_savepoint(session: AsyncSession, instance: object) -> None:
-    """Add and flush inside a savepoint, so a failure leaves the session usable.
-
-    The add has to happen inside it: `begin_nested()` first flushes whatever is pending.
-    """
-    async with session.begin_nested():
-        session.add(instance)
-        await session.flush()
 
 
 async def test_inviting_an_existing_user_adds_them_right_away(

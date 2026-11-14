@@ -14,6 +14,7 @@ from todolist.auth import CurrentUser
 from todolist.db import SessionDep
 from todolist.errors import ForbiddenError, NotFoundError
 from todolist.models import Membership, MembershipRole, Organization, User
+from todolist.principals import Principal
 from todolist.services.organizations import can_manage_organization, get_organization_membership
 
 
@@ -28,6 +29,11 @@ class OrgContext:
     @property
     def role(self) -> MembershipRole:
         return self.membership.role
+
+    @property
+    def principal(self) -> Principal:
+        """The caller as the actor for permission checks and audit events."""
+        return Principal.for_user(self.user, self.organization.id)
 
 
 async def org_context(org_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> OrgContext:

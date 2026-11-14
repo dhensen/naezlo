@@ -31,3 +31,13 @@ async def add_member(
         )
     )
     await session.flush()
+
+
+async def add_in_savepoint(session: AsyncSession, instance: object) -> None:
+    """Add and flush inside a savepoint, so a failure leaves the session usable.
+
+    The add has to happen inside it: `begin_nested()` first flushes whatever is pending.
+    """
+    async with session.begin_nested():
+        session.add(instance)
+        await session.flush()

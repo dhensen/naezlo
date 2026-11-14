@@ -38,10 +38,16 @@
 - Rules that depend on the target live in the service, which raises ForbiddenError / NotFoundError /
   `ConflictError(code, detail)` itself (see `change_member_role`, `remove_member`).
 - Testing a constraint: add the bad row and flush, both inside `async with session.begin_nested()`
-  (`add_in_savepoint` in tests/test_invitations.py), under `pytest.raises(IntegrityError)`. Adding
+  (`add_in_savepoint` in tests/helpers.py), under `pytest.raises(IntegrityError)`. Adding
   before `begin_nested()` fails outside the savepoint and leaves the session unusable.
 - Invitations: services/invitations.py (`invite`, `list_invitations`, `revoke_invitation`,
   `accept_pending_invitations`, called by `get_or_create_user` on every sign-in).
+- Actor type: `Principal` (todolist.principals; kind user | agent, id, organization_id, name).
+  `org.principal` in org-scoped routes, `Principal.for_agent(agent)` for agents. Agents:
+  services/agents.py (`list_agents`, `get_agent`, `create_agent`, `update_agent`, `delete_agent`).
+- 409 from a unique constraint: change + flush inside `async with session.begin_nested()`, catch
+  `IntegrityError`, raise `ConflictError` (services/agents.py). Assignments go inside the block.
+- A PATCH that returns `updated_at` needs `await session.refresh(obj)` after the flush.
 
 ---
 
@@ -257,4 +263,33 @@
   - An invite and a first sign-in for the same email at the same moment can leave an invitation
     for an existing user; it is accepted on that user's next sign-in (covered by a test).
   - Members listing reuses `MemberOut` from api/members.py for the `added` case.
+---
+
+## 2026-11-14 - US-009
+- Agents: `agents` table (model `Agent`; unique (organization_id, name), cascade with the
+  organization, `created_by` SET NULL) and its migration; `GET /api/orgs/{org_id}/agents` for any
+  member; `POST` (201), `PATCH /{agent_id}` and `DELETE /{agent_id}` (204) for owner and admin
+  (member 403, non-member 404); a taken name is 409 `agent_name_taken`. The `Principal` value type
+  (`todolist.principals`: kind user | agent, id, organization_id, name) with `for_user` /
+  `for_agent`, exposed as `OrgContext.principal`, documented in DECISIONS.md.
+- Files changed: src/todolist/principals.py, src/todolist/models/{__init__,agent}.py,
+  src/todolist/services/agents.py, src/todolist/api/{__init__,agents,deps}.py,
+  migrations/versions/*_add_agents.py, tests/{test_agents,test_invitations,helpers}.py, CLAUDE.md,
+  DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+- Checked by hand on the dev database: `alembic upgrade head`, `downgrade base`, `upgrade head`,
+  `alembic check` (no drift).
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - `begin_nested()` flushes dirty objects too, not only new ones: an attribute assigned before
+    the savepoint is updated outside it, and a constraint failure then breaks the whole session
+    (PendingRollbackError). Assign inside the `async with`.
+  - `add_in_savepoint` moved from tests/test_invitations.py to tests/helpers.py.
+  - ruff PT012 wants a single statement inside `pytest.raises`; that is what the helper is for.
+  - `Principal` is not used by a permission check yet. US-011 builds the permission service on
+    it; the agent routes use the organization-level `OrgAdminContextDep`, like members.
+  - `Principal.name` is there for the audit log's actor name snapshot (US-018).
+  - Nothing sets a list's default mode from "the organization has an agent" yet (US-013): count
+    rows in `agents` for the organization.
+  - All statements of a test share one transaction, so `updated_at` equals `created_at` there
+    (`now()` is the transaction's start time); don't assert that it changed.
 ---
