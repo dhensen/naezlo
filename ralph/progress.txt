@@ -809,3 +809,33 @@
   - Tool calls in a test share `db_session` with the `client`, so the HTTP API shows what a tool
     changed right away (also inside the `mcp_client` block).
 ---
+
+## 2026-11-15 01:20 - US-026
+- One integration test of the complete agent onboarding, `tests/test_mcp_oauth_e2e.py`, on the ASGI
+  app with the SDK's own client side (`OAuthClientProvider` + `Client`): 401 challenge, both
+  metadata documents, dynamic registration, /authorize with PKCE through the login redirect
+  (dev-login) and the consent API (approve for an agent), code exchange, `whoami`, `add_item`,
+  `complete_item`, an expired access token that the SDK refreshes before `get_list`, revocation of
+  the refresh token (RFC 7009), then: both tokens refused, and a reconnecting client is sent back
+  to the browser, where the user denies.
+- Asserts the item (done, created and completed by the agent) through `GET /api/lists/{id}/items`
+  as the user, and the list's audit log through `GET /api/lists/{id}/audit` (user: list.created,
+  list_grant.set; agent: item.created, item.completed).
+- No defect found in US-020 to US-025: the SDK client completed the flow against the server unchanged.
+- Files: tests/test_mcp_oauth_e2e.py (new), CLAUDE.md, ralph/prd.json, ralph/progress.txt
+- Pushed: yes
+- **Learnings for future iterations:**
+  - `http.auth = OAuthClientProvider(server_url, OAuthClientMetadata(...), storage, redirect_handler,
+    callback_handler)` on the `mcp_http` client makes the SDK run the whole flow on the first 401.
+    The redirect handler gets the absolute /authorize URL; play the browser with the user's `client`
+    (path + query only) and return the callback's `code`, `state` and `iss` from the callback handler.
+  - Response event hooks on that client see every request of the flow (`(method, path, status)`).
+  - Force a refresh by expiring the row and setting `provider.context.token_expiry_time` in the past.
+  - An exception from a handler ends the SDK client's task group: it comes out of the
+    `async with Client(...)` block as an `ExceptionGroup`, not out of `call_tool`. Put the failing
+    connection in its own function under `pytest.raises(ExceptionGroup)`.
+  - httpx2 does not accept `auth=None` per request (pyright); use a second client without auth.
+  - The SDK has no revocation call; post to `provider.context.oauth_metadata.revocation_endpoint`.
+  - The audit action of a new list grant is `list_grant.set`.
+  - Next is US-027 (frontend scaffold): npm, not pnpm.
+---

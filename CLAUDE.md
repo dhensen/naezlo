@@ -270,3 +270,7 @@ uv run pytest
 - MCP write-tool tests: `tests/test_mcp_write_tools.py` (`shared_list(client, db_session, role, mode)`
   gives `(authorized, token, list_id)`, `events_since`, `assert_by_agent`).
 
+- The end-to-end onboarding test is `tests/test_mcp_oauth_e2e.py`: the SDK's `OAuthClientProvider`
+  as `auth` on the `mcp_http` client, with a `Browser` (the user's `client`) as its redirect and
+  callback handlers. A change to the OAuth endpoints, the consent API or the /mcp challenge must
+  keep it passing; extend it rather than adding a second full-flow test.

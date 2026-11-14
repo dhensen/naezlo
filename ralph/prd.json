@@ -460,8 +460,8 @@
         "Typecheck passes"
       ],
       "priority": 26,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "The test (tests/test_mcp_oauth_e2e.py) drives the flow with the SDK's own OAuthClientProvider and Client. It found no defect in US-020 to US-025."
     },
     {
       "id": "US-027",
