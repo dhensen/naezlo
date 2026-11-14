@@ -185,3 +185,9 @@ uv run pytest
   (`changes: {field: {old, new}}` for updates) and a test in `tests/test_audit.py`. No event when
   nothing changed.
 - In tests all rows share one `created_at` (one transaction): order events by `AuditEvent.id` (UUIDv7).
+- Reading the audit log: `project_events` / `list_events` in `services/audit.py` (an `EventPage` with
+  `events` and `next_cursor`, filters in an `EventFilter`), routes in `api/audit.py`
+  (`GET /api/projects/{id}/audit`, `GET /api/lists/{id}/audit`, admins only). Another paged list
+  follows this shape: keyset on `(created_at, id)`, opaque cursor, `limit` 1 to 200 (default 50).
+- Several query parameters: a pydantic model taken as `query: Annotated[MyQuery, Query()]`
+  (see `AuditQuery` in `api/audit.py`).

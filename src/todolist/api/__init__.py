@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from todolist.api import (
     agents,
+    audit,
     auth,
     config,
     invitations,
@@ -33,5 +34,7 @@ api_router.include_router(lists.router)
 api_router.include_router(list_grants.router)
 api_router.include_router(items.list_router)
 api_router.include_router(items.router)
+api_router.include_router(audit.project_router)
+api_router.include_router(audit.list_router)
 
 __all__ = ["api_router"]

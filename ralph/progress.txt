@@ -95,6 +95,9 @@
   list_id=, details=)` (services/audit.py), called by the services after the change. All changing
   service functions take the acting Principal (`actor` in the grant services). Tests:
   tests/test_audit.py (`all_events`, `last_event`, `actions`); order events by id, not created_at.
+- Audit log API: `GET /api/projects/{id}/audit` and `GET /api/lists/{id}/audit` (admins) answer
+  `{events, next_cursor}`; params `limit`, `cursor`, `actor_kind`, `actor_id`, `action` (prefix).
+  Service: `project_events` / `list_events` (services/audit.py). Tests: tests/test_audit_api.py.
 
 ## 2026-11-14 - US-001
 - Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
@@ -571,4 +574,25 @@
     audited in v1.
   - The item service looks up the list's `project_id` for update / move / delete events (one small
     query); `create_item` gets it from the `todo_list` it is given.
+---
+
+## 2026-11-14 - US-019
+- Audit log API: `GET /api/projects/{project_id}/audit` (project admin) and
+  `GET /api/lists/{list_id}/audit` (list admin), newest first, keyset cursor pagination (limit
+  default 50, max 200, `next_cursor`), filters `actor_kind`, `actor_id` and `action` (prefix).
+  The project log leaves out events of lists the caller cannot see (list grant `none`) and keeps
+  those of deleted lists. No schema change.
+- Files changed: src/todolist/services/audit.py, src/todolist/api/{audit,__init__}.py,
+  tests/test_audit_api.py, DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - Query parameters as a pydantic model: `query: Annotated[AuditQuery, Query()]` with `Field(...)`
+    constraints; a bad value is the usual 422.
+  - Keyset paging in SQLAlchemy: `tuple_(Model.created_at, Model.id) < (created_at, id)`; fetch
+    `limit + 1` rows to know whether a next page exists.
+  - `column.startswith(prefix, autoescape=True)` makes `%` and `_` in user input literal.
+  - `select(visible_lists(principal, project).subquery().c.id)` turns the visible-lists query into
+    an `IN` subquery.
+  - The event shape has `actor.name` (snapshot) and `details` with the target's name/title and
+    `changes`; the Activity UI (US-038) can build its sentences from those alone.
 ---
