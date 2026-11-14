@@ -8,7 +8,7 @@ Stack, domain model and rules: `DECISIONS.md` (it wins over personal preference)
 - `src/todolist/`: backend package (`app.py` has the `create_app()` factory, `config.py` the
   `Settings`, `db.py` the SQLAlchemy `Base`, mixins, engine and `get_session`, `models/` the ORM models,
   `services/` the domain logic, `api/` the routers under `/api`, `auth.py` the session helpers and
-  `current_user`, `errors.py` the API errors)
+  `current_user`, `google.py` the Google OpenID Connect client, `errors.py` the API errors)
 - `migrations/`: Alembic environment and `versions/`
 - `docker-compose.yml`: PostgreSQL 18 on host port 5435 with the databases `todolist` and `todolist_test`
 - `tests/`: pytest tests
@@ -88,5 +88,9 @@ uv run pytest
   from `settings: SettingsDep` (from `todolist.config`), never from `get_settings()` in a route.
 - Errors: raise `todolist.errors.AppError(status, code, detail)` or a subclass (`NotFoundError`,
   `NotAuthenticatedError`). The body is `{"detail": ..., "code": ...}`. Don't raise `HTTPException`.
+- Google login goes through `todolist.google.GoogleClient` (`app.state.google`, `None` when not
+  configured). Tests never reach Google: they put a `GoogleClient(..., transport=httpx2.MockTransport(...))`
+  on `app.state.google` (see `FakeGoogle` in `tests/test_auth_google.py`).
+- Absolute URLs of this app are built from `Settings.public_base_url`, not from the request.
 - Tests sign in with `await sign_in(client, email, name)` from `tests/helpers.py`. The test
   settings have `dev_login=True`; a second user in one test needs a second `AsyncClient` on `app`.

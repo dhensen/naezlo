@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     # Enables POST /api/auth/dev-login, which signs in as any email without a password.
     dev_login: bool = False
 
+    # The URL people reach the app on in their browser (no path). Absolute URLs that leave the
+    # app, such as the Google redirect URI, are built from it and never from the Host header.
+    public_base_url: str = "http://localhost:8000"
+
+    # Google OAuth client ("Web application" type). Google login is on when both are set.
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+
     @property
     def session_cookie_secure(self) -> bool:
         """The session cookie is HTTPS-only everywhere except local development and tests."""
@@ -39,8 +47,13 @@ class Settings(BaseSettings):
 
     @property
     def google_login_enabled(self) -> bool:
-        # US-005 adds the Google client settings; until then Google login is never available.
-        return False
+        """Google login needs both halves of the OAuth client."""
+        return bool(self.google_client_id and self.google_client_secret)
+
+    @property
+    def google_redirect_uri(self) -> str:
+        """The callback URL registered with Google as an authorized redirect URI."""
+        return f"{self.public_base_url.rstrip('/')}/api/auth/google/callback"
 
     @model_validator(mode="after")
     def _refuse_unsafe_production(self) -> Self:

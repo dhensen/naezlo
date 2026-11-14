@@ -27,6 +27,10 @@
 - `obj.id` is None until the first flush: link new rows through relationships or flush first.
 - New organization: `create_organization(session, name, owner)` (services/organizations.py) gives
   it a unique slug and an owner membership.
+- Outbound HTTP uses `httpx2` (Authlib needs it); the test client is still `httpx`. Mock outbound
+  calls with `httpx2.MockTransport`. Google login tests: `FakeGoogle` in tests/test_auth_google.py.
+- `Settings.public_base_url` (PUBLIC_BASE_URL) exists since US-005; build absolute URLs from it.
+- Routes opened by browser navigation redirect to `/login?error=<code>` instead of returning JSON.
 - Testing a constraint: add the bad row, then flush inside `async with session.begin_nested()`
   under `pytest.raises(IntegrityError)` (see tests/test_models_tenancy.py); the session stays usable.
 
@@ -131,4 +135,41 @@
     pattern matches the shell itself. Start it with `&`, keep `$!` and `kill` that.
   - `Result.tuples()` is deprecated in SQLAlchemy 2.1; iterate the result rows directly.
   - pyright strict: `request.session` values are `Any`; narrow with `isinstance` (see auth.py).
+---
+
+## 2026-11-14 - US-005
+- Google OAuth login: `GoogleClient` (Authlib OpenID Connect, discovery, state + nonce + PKCE),
+  settings `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `PUBLIC_BASE_URL`, `google_login_enabled`
+  true only when id and secret are both set, `GET /api/auth/google/login` (keeps a relative `next`
+  in the session) and `GET /api/auth/google/callback` (validates state and the ID token, rejects
+  unverified emails, signs in through `get_or_create_user`, redirects to `next` or `/`). Both are
+  404 when Google is not configured. `get_or_create_user` now takes `avatar_url` and raises
+  `GoogleAccountConflictError` when the email is linked to another Google account.
+- Tests run Authlib's real validation against a mocked Google (discovery, JWKS and token endpoint
+  on an `httpx2.MockTransport`, ID tokens signed with a test RSA key): new user, returning user,
+  linking by email, unverified email, absolute `next` ignored, wrong / foreign / replayed state,
+  wrong nonce, wrong audience, wrong signing key, refusal at Google, failed token exchange,
+  unreachable Google, 404 when not configured, /api/config.
+- Not checked against the real Google: the loop has no Google OAuth client. A human should try
+  one real sign-in after setting GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET.
+- Files changed: src/todolist/{google,config,app,auth}.py, src/todolist/api/auth.py,
+  src/todolist/services/users.py, tests/test_auth_google.py, pyproject.toml, uv.lock (authlib,
+  httpx2), .env.example, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - Authlib 1.9 imports `httpx2` and only falls back to `httpx` with a deprecation warning.
+    Its `client_kwargs` are passed to the httpx2 client, which is how the mock transport gets in.
+  - Authlib and its Starlette client are untyped: import with
+    `# pyright: ignore[reportMissingTypeStubs]` and hold the objects as `Any` in one module.
+  - Authlib stores state, nonce and code_verifier in `request.session` under `_state_google_<state>`
+    and removes it in `authorize_access_token`; `sign_in()` clears the session anyway, so read
+    anything you need from the session (`login_next`) before calling it.
+  - Errors from `authorize_access_token`: `AuthlibBaseError` (state mismatch, error from Google,
+    token endpoint error), `joserfc.errors.JoseError` (signature, claims), `httpx2.HTTPError`.
+  - joserfc (installed with Authlib) signs test tokens: `jwt.encode({"alg": "RS256", "kid": ...},
+    claims, RSAKey.generate_key(2048, parameters={"kid": ...}))`. US-020+ can reuse this for JWTs.
+  - The login redirect's query string holds `state` and `nonce`; a test must copy the nonce into
+    the fake ID token or validation fails.
+  - The frontend login page (US-028) should link to `/api/auth/google/login?next=<path>` and show
+    a message for `/login?error=<code>` (codes in DECISIONS.md).
 ---

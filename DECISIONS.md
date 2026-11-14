@@ -60,3 +60,13 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **`get_or_create_user`** finds a user by `google_sub` when one is given, otherwise by email. An existing user keeps their stored name and email; a missing `google_sub` is filled in. Only creation makes a default organization.
 - **`/api/me` and dev-login** return `{"user": {...}, "organizations": [{id, name, slug, role}]}`, organizations in the order the user joined them.
 - **Correction to "Primary keys" above**: the UUIDv7 default is applied by SQLAlchemy at flush time, so `obj.id` is `None` until the first flush. Link new objects through relationships (`Membership(organization=org, ...)`) or flush first.
+
+## Google login (2026-11-14, US-005)
+
+- **Client**: Authlib's Starlette OpenID Connect client behind `todolist.google.GoogleClient` (Authlib has no type information). Endpoints and signing keys come from Google's discovery document; the flow uses state, nonce and PKCE (S256), all kept in the session cookie. Scope: `openid email profile`.
+- **HTTP library**: `httpx2` is a runtime dependency because Authlib 1.9 uses it and deprecates plain `httpx`. `httpx` stays a dev dependency for the test client.
+- **`PUBLIC_BASE_URL`** (default `http://localhost:8000`) is the URL people open in their browser. The Google redirect URI is `<PUBLIC_BASE_URL>/api/auth/google/callback`, never derived from the Host header. US-020 uses the same setting for the OAuth issuer.
+- **Failures redirect, they don't return JSON**: both Google routes are opened by browser navigation, so a failed sign-in goes to `/login?error=<code>` with code `google_login_failed` (bad or reused state, refusal at Google, invalid ID token), `email_not_verified`, `google_account_conflict` or `google_unavailable`. The login page (US-028) should show a message for these. When Google login is not configured both routes answer a JSON 404 like any unknown route.
+- **`next`** must start with a single `/` and contain no backslash or control character; anything else is ignored and the user lands on `/`. It lives in the session under `login_next` and is forgotten when a new login starts without it.
+- **Email linked to another Google account**: when the ID token's `sub` is unknown but its email belongs to a user who already has a different `google_sub`, the sign-in is refused (`google_account_conflict`). The address was probably reassigned; signing in would hand over someone else's account.
+- **Profile data**: a returning user keeps their stored name and email even when Google reports new ones (found by `sub`). The picture is refreshed on every Google sign-in. `email_verified` must be the JSON value `true`.

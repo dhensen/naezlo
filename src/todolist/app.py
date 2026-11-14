@@ -10,6 +10,7 @@ from todolist.api import api_router
 from todolist.config import Settings, get_settings
 from todolist.db import create_engine, create_session_factory
 from todolist.errors import install_error_handlers
+from todolist.google import GoogleClient
 
 health_router = APIRouter(tags=["health"])
 
@@ -33,6 +34,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
+    # None when Google login is not configured; the Google routes then answer 404.
+    app.state.google = (
+        GoogleClient(settings.google_client_id, settings.google_client_secret)
+        if settings.google_client_id and settings.google_client_secret
+        else None
+    )
     # Signed cookie session. Starlette always sets HttpOnly on it.
     app.add_middleware(
         SessionMiddleware,

@@ -94,7 +94,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "No real Google credentials are available to the loop. Never call Google in tests."
     },
     {

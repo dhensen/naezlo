@@ -22,6 +22,19 @@ def sign_out(request: Request) -> None:
     request.session.clear()
 
 
+def safe_next_path(value: str | None) -> str | None:
+    """`value` when it is a path inside this app, otherwise None.
+
+    Used for "return here after signing in" parameters, which must never send someone to
+    another site: `//host` and `/\\host` are read as absolute URLs by browsers.
+    """
+    if value is None or not value.startswith("/") or value.startswith("//"):
+        return None
+    if "\\" in value or any(ord(char) < 32 or ord(char) == 127 for char in value):
+        return None
+    return value
+
+
 def _session_user_id(request: Request) -> uuid.UUID | None:
     value: Any = request.session.get(_SESSION_USER_KEY)
     if not isinstance(value, str):
