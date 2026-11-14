@@ -12,7 +12,13 @@
   `react-router` 8, Tailwind 4 (`@tailwindcss/vite`), vitest + Testing Library, TypeScript 6.0 (not 7:
   typescript-eslint). Product name: `APP_NAME` in frontend/src/config.ts. Pages: src/pages/<Name>Page.tsx,
   routes in src/App.tsx, tests `*.test.tsx` next to the code (render `<App />` in a `MemoryRouter`).
-- Backend-owned paths are listed in frontend/vite.config.ts (`BACKEND_PATHS`, dev proxy) and
+- Frontend API (since US-028): after any route or API model change run `npm --prefix frontend run
+  gen:api` (writes frontend/openapi.json + src/api/schema.d.ts, both committed; tests/test_openapi.py
+  fails otherwise). Calls: `unwrap(api.GET('/api/...'))` (src/api/client.ts) inside TanStack Query
+  hooks; errors are `ApiError`, shown with `<ErrorMessage error={...} />`. Auth: src/auth/ (`useMe`,
+  `RequireAuth`, `safeNextPath`); new pages go inside the guard + `AppLayout` in App.tsx. Tests:
+  `mockApi({...})` (src/test/api.ts) then `renderApp('/path')` (src/test/render.tsx).
+- Backend-owned paths are listed in frontend/src/backendPaths.ts (`BACKEND_PATHS`, dev proxy) and
   src/todolist/frontend.py (`BACKEND_PREFIXES`, never answered by the SPA fallback); keep them equal.
   FastAPI serves frontend/dist when it exists at startup (`FRONTEND_DIST`); tests have it off.
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
@@ -884,4 +890,44 @@
     say Naezlo; a human or a later story may want to align it.
   - Next is US-028 (API client, login page, auth guard): add TanStack Query and the generated API
     types there.
+---
+
+## 2026-11-15 00:05 - US-028
+- Generated API types: `npm --prefix frontend run gen:api` (`python -m todolist.openapi` →
+  frontend/openapi.json → openapi-typescript → frontend/src/api/schema.d.ts, both committed);
+  tests/test_openapi.py fails when the saved schema is behind the backend.
+- Typed fetch wrapper: openapi-fetch client `api` + `unwrap()` / `ApiError` (src/api/client.ts).
+- TanStack Query: `createQueryClient()` (src/api/queryClient.ts, a 401 anywhere signs the UI out),
+  hooks `useMe`, `useAppConfig`, `useDevLogin`, `useSignOut` (src/auth/hooks.ts).
+- /login (src/pages/LoginPage.tsx): Google button and/or dev-login form from /api/config, explains
+  `?error=<code>`, returns to `next` (full page load for backend paths such as /authorize).
+- Guard `RequireAuth` around every other route (also unknown paths → NotFoundPage), `AppLayout`
+  with the `UserMenu` (name, email, sign out), shared `ErrorMessage` component.
+- Tests: 28 vitest tests (guard redirect, login variants, sign-in/return, user menu, sign-out,
+  client errors); 673 pytest tests.
+- Browser check done with Chrome DevTools on the built frontend served by uvicorn (port 8011,
+  DEV_LOGIN=true, test database): /projects/7?tab=x → /login?next=..., dev-login → back on that
+  path, reload stays signed in, menu shows name + email, sign out → /login, / → /login again.
+- Files: frontend/package.json, package-lock.json, openapi.json, eslint.config.js, vite.config.ts,
+  tsconfig.node.json, src/{App,main}.tsx, src/backendPaths.ts, src/api/*, src/auth/*,
+  src/components/*, src/pages/{Login,NotFound,Home}Page*, src/test/{api.ts,render.tsx};
+  src/todolist/openapi.py, tests/test_openapi.py, tests/test_frontend.py, CLAUDE.md, DECISIONS.md,
+  ralph/prd.json, ralph/progress.txt
+- Pushed: yes
+- **Learnings for future iterations:**
+  - `Settings.model_validate({...})` reads the environment too (like `Settings()`); only
+    `Settings.model_construct(...)` gives plain defaults.
+  - openapi-typescript 7 peers on TypeScript 5: the `overrides` block in frontend/package.json
+    makes npm accept TypeScript 6. Don't remove it.
+  - openapi-fetch needs an absolute `baseUrl` (`window.location.origin`) and a `fetch` that looks
+    up `globalThis.fetch` per call, or jsdom tests can't stub it. It calls `fetch(Request)`:
+    the mock reads `request.method` / `request.url`.
+  - After a dev-login the guard refetches /api/me: a test's mock must answer signed-in from then on.
+  - vite.config.ts imports need the `.ts` extension (`./src/backendPaths.ts`, nodenext).
+  - A file that exports a component and a function fails `react-refresh/only-export-components`
+    (off for src/test/**).
+  - Port 8000 was taken by another process on this machine; for a browser check run uvicorn on
+    another port with `PUBLIC_BASE_URL` set to it and the built frontend (`npm run build`).
+    Don't `pkill -f` with a pattern that also matches the shell's own command line.
+  - Next is US-029 (Playwright e2e harness).
 ---

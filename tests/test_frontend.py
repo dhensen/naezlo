@@ -166,7 +166,9 @@ def test_backend_paths() -> None:
 
 def test_vite_proxies_every_backend_path_of_the_story() -> None:
     """The dev server and the production fallback must agree on what the backend owns."""
-    config = (Path(__file__).resolve().parent.parent / "frontend" / "vite.config.ts").read_text()
+    config = (
+        Path(__file__).resolve().parent.parent / "frontend" / "src" / "backendPaths.ts"
+    ).read_text()
 
     for path in ("/api", "/authorize", "/token", "/register", "/revoke", "/.well-known", "/mcp"):
         assert f"'{path}'" in config

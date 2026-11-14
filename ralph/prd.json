@@ -496,8 +496,8 @@
         "Verify in a browser if browser tools are available (dev-login, reload stays signed in, sign out)"
       ],
       "priority": 28,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Verified in a browser (Chrome DevTools) against the built frontend served by uvicorn: redirect to /login?next=, dev-login, return to the path, reload stays signed in, user menu, sign out."
     },
     {
       "id": "US-029",

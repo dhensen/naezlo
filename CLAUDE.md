@@ -66,6 +66,7 @@ npm --prefix frontend run build      # type-checks and writes frontend/dist (git
 npm --prefix frontend run lint       # eslint
 npm --prefix frontend run typecheck  # tsc -b --noEmit
 npm --prefix frontend run test       # vitest run
+npm --prefix frontend run gen:api    # after an API change: frontend/openapi.json + src/api/schema.d.ts
 ```
 
 `lint`, `typecheck` and `test` must pass before a commit, like the backend checks. With the
@@ -299,9 +300,29 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
   Library with the jest-dom matchers (`src/test/setup.ts`). The vitest config is in `vite.config.ts`.
 - TypeScript stays on 6.0 until typescript-eslint supports 7 (its peer range ends below 6.1).
 - Paths the backend owns are listed twice and must stay equal: `BACKEND_PATHS` in
-  `frontend/vite.config.ts` (the dev proxy) and `BACKEND_PREFIXES` in `src/todolist/frontend.py`
-  (what the SPA fallback never answers). A new backend path outside `/api` goes in both.
+  `frontend/src/backendPaths.ts` (the dev proxy in `vite.config.ts`, and `isBackendPath`) and
+  `BACKEND_PREFIXES` in `src/todolist/frontend.py` (what the SPA fallback never answers). A new
+  backend path outside `/api` goes in both.
 - `install_frontend(app, settings.frontend_dist)` (`src/todolist/frontend.py`) is the last route of
   `create_app`: GET/HEAD outside the backend paths get a file of the build or `index.html`. The test
   settings have `frontend_dist=None`; a test that wants a build overrides the `settings` fixture
   (see `tests/test_frontend.py`).
+- API types: `npm --prefix frontend run gen:api` writes `frontend/openapi.json` (from
+  `python -m todolist.openapi`) and `frontend/src/api/schema.d.ts` (openapi-typescript); both are
+  committed, never edited by hand. Run it after every change to a route or an API model:
+  `tests/test_openapi.py` fails when the saved schema is behind.
+- Frontend API calls: `unwrap(api.GET('/api/...', { params, body }))` from `src/api/client.ts`
+  (openapi-fetch on the generated `paths`): the body, or a thrown `ApiError` (`status`, `code`,
+  `message` = the backend's `detail`). Body types: `Schemas['MeOut']`. Use it inside TanStack Query
+  hooks (`useQuery` / `useMutation`); the client comes from `createQueryClient()`
+  (`src/api/queryClient.ts`), which also signs the user out of the UI on any 401.
+- Frontend auth: `src/auth/hooks.ts` (`useMe` (data null = signed out), `useAppConfig`,
+  `useDevLogin`, `useSignOut`), `src/auth/RequireAuth.tsx` (the guard: every route except `/login`
+  goes inside it in `App.tsx`, within `AppLayout`), `src/auth/next.ts` (`safeNextPath`, `loginPath`,
+  `leaveTo` for a full page load to a backend path such as `/authorize`).
+- Show every error with `<ErrorMessage error={...} />` (`src/components/ErrorMessage.tsx`,
+  `role="alert"`); it takes an `ApiError`, any `Error`, a string, or null (renders nothing).
+- Frontend tests with the API: `mockApi({'GET /api/me': json(ADA), ...})` (`src/test/api.ts`, also
+  `apiError`, `NOT_SIGNED_IN`, `config`) and then `renderApp('/path')` (`src/test/render.tsx`: the
+  whole app, fresh query client, current location in `screen.getByTestId('location')`). The routes
+  object may be changed during the test (after a sign-in, `routes['GET /api/me'] = json(ADA)`).

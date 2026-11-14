@@ -20,4 +20,9 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Test helpers are never hot-reloaded, so they may mix components and functions.
+    files: ['src/test/**'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ])

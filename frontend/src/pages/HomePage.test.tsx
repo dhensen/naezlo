@@ -1,16 +1,14 @@
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
-import { App } from '../App'
 import { APP_NAME } from '../config'
+import { ADA, json, mockApi } from '../test/api'
+import { renderApp } from '../test/render'
 
-test('the home page shows the app name', () => {
-  render(
-    <MemoryRouter initialEntries={['/']}>
-      <App />
-    </MemoryRouter>,
-  )
+test('the home page shows the app name', async () => {
+  mockApi({ 'GET /api/me': json(ADA) })
 
-  expect(screen.getByRole('heading', { level: 1, name: APP_NAME })).toBeInTheDocument()
+  renderApp('/')
+
+  expect(await screen.findByRole('heading', { level: 1, name: APP_NAME })).toBeInTheDocument()
 })

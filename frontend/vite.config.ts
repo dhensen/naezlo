@@ -2,21 +2,10 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
+import { BACKEND_PATHS } from './src/backendPaths.ts'
+
 // Where the FastAPI backend listens in development.
 const BACKEND = 'http://localhost:8000'
-
-// Everything the backend serves itself: the JSON API, the OAuth endpoints for MCP clients,
-// the well-known metadata documents and the MCP endpoint. All other paths belong to the SPA.
-// Keep this in step with `BACKEND_PREFIXES` in src/todolist/frontend.py.
-const BACKEND_PATHS = [
-  '/api',
-  '/authorize',
-  '/token',
-  '/register',
-  '/revoke',
-  '/.well-known',
-  '/mcp',
-]
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -29,5 +18,6 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
+    unstubGlobals: true,
   },
 })
