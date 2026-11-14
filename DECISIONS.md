@@ -78,3 +78,11 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **Renaming keeps the slug**, so links that contain it keep working. v1 has no way to change a slug.
 - **Not a member means 404**, with the same body as an id that does not exist. A member whose role is too low gets 403 with code `forbidden` (`ForbiddenError`).
 - **Organization-level role checks** live in one place: `can_manage_organization(role)` in `services/organizations.py`, applied by the `OrgAdminContextDep` dependency. Routes don't compare roles themselves. The permission service of US-011 (projects and lists, with a `Principal`) should build on this function rather than repeat the rule.
+
+## Organization members (2026-11-14, US-007)
+
+- **Shape**: a member is `{user_id, email, name, role}`, listed in the order people joined. `PATCH` returns the changed member, `DELETE` answers 204. The path id is the user's id, not the membership's.
+- **Who may change what**: owners and admins change roles and remove members. Any change that involves the owner role (granting it, demoting an owner, removing an owner) needs an owner; an admin gets 403. Admins can demote and remove other admins. Everyone can remove themselves (leave).
+- **Last owner**: demoting or removing the only owner answers 409 with code `last_owner`, also when that owner is the only member. An owner who wants out makes someone else owner first. The owner rows are locked (`FOR UPDATE`) during the check, so two owners can't leave at the same moment.
+- **Order of answers**: not a member of the organization → 404; target is not a member → 404 `Member not found`; not allowed → 403; last owner → 409. A member (not owner or admin) who patches gets 403 before the target is looked up.
+- **Rules live in the service**: `can_change_member_role` and `can_remove_member` in `services/organizations.py`; `change_member_role` and `remove_member` apply them and raise the `AppError`s themselves, because whether a removal is allowed depends on the target and can't be a route dependency. Conflicts use `ConflictError(code, detail)` with a specific code.

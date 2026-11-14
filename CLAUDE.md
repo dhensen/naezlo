@@ -99,3 +99,8 @@ uv run pytest
   non-members. Use `org: OrgAdminContextDep` when the action needs an owner or admin (403 for a
   member). Don't compare roles in a route; add a rule function to the service and a dependency.
 - 404 means "you can't see it", 403 (`ForbiddenError`) means "you can see it but may not do this".
+- A rule that depends on the target (who may remove whom) lives in the service function, which
+  raises `ForbiddenError` / `NotFoundError` / `ConflictError(code, detail)` itself (see
+  `change_member_role` and `remove_member` in `services/organizations.py`). 409s get a specific code.
+- Tests with more users: the `other_client` and `third_client` fixtures (`tests/conftest.py`) and
+  `add_member(db_session, org_id, user_id, role)` from `tests/helpers.py`.

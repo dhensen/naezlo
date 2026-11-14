@@ -33,8 +33,10 @@
 - Routes opened by browser navigation redirect to `/login?error=<code>` instead of returning JSON.
 - Org-scoped route: `org: OrgContextDep` (todolist.api.deps; 404 for non-members) or
   `org: OrgAdminContextDep` (also 403 unless owner/admin). Role rule: `can_manage_organization`.
-- Second user in a test: copy the `other_client` fixture and `add_member` helper from
-  tests/test_orgs.py (move them to conftest.py / helpers.py when a second module needs them).
+- More users in a test: `other_client` / `third_client` fixtures (tests/conftest.py) and
+  `add_member(db_session, org_id, user_id, role)` (tests/helpers.py).
+- Rules that depend on the target live in the service, which raises ForbiddenError / NotFoundError /
+  `ConflictError(code, detail)` itself (see `change_member_role`, `remove_member`).
 - Testing a constraint: add the bad row, then flush inside `async with session.begin_nested()`
   under `pytest.raises(IntegrityError)` (see tests/test_models_tenancy.py); the session stays usable.
 
@@ -199,4 +201,28 @@
   - The Postman plugin's session hook asks to load a Postman skill for API work; it was not used:
     the server needs authorization that this non-interactive loop cannot give, and the project's
     own conventions cover the work.
+---
+
+## 2026-11-14 - US-007
+- Member management: `GET /api/orgs/{org_id}/members` (any member; `{user_id, email, name, role}`),
+  `PATCH /api/orgs/{org_id}/members/{user_id}` (owner and admin; anything involving the owner role
+  needs an owner), `DELETE /api/orgs/{org_id}/members/{user_id}` (owner and admin, only an owner
+  removes an owner, everyone can leave; 204). Demoting or removing the last owner is 409 `last_owner`.
+  New: `ConflictError`, service functions `list_members`, `can_change_member_role`,
+  `can_remove_member`, `change_member_role`, `remove_member`.
+- No schema change, so no migration.
+- Files changed: src/todolist/api/{__init__,members}.py, src/todolist/services/organizations.py,
+  src/todolist/errors.py, tests/{conftest,helpers,test_orgs,test_org_members}.py, CLAUDE.md,
+  DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - `other_client` and `add_member` moved out of tests/test_orgs.py into conftest.py / helpers.py;
+    `third_client` is new.
+  - The last-owner check locks the owner rows with `with_for_update()`. The lock itself is not
+    covered by a test (the test session is a single connection).
+  - The DELETE route uses `OrgContextDep`, not the admin one, because a plain member may leave.
+  - US-008 invitations take role admin | member only, so they never touch the owner rule; reuse
+    `MemberOut` (api/members.py) when an invite adds an existing user right away.
+  - US-011: `can_change_member_role` / `can_remove_member` take roles, not a `Principal`; agents
+    are not organization members, so that is enough here.
 ---

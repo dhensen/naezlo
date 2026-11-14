@@ -34,6 +34,13 @@ class ForbiddenError(AppError):
         super().__init__(403, "forbidden", detail)
 
 
+class ConflictError(AppError):
+    """The request is valid but the current state does not allow it. Give a specific code."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(409, code, detail)
+
+
 async def _handle_app_error(_request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)
     return JSONResponse(

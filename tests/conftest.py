@@ -101,3 +101,17 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+@pytest.fixture
+async def other_client(app: FastAPI) -> AsyncIterator[AsyncClient]:
+    """A second browser, for a second user."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
+
+
+@pytest.fixture
+async def third_client(app: FastAPI) -> AsyncIterator[AsyncClient]:
+    """A third browser, for a third user."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client

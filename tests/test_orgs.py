@@ -1,34 +1,14 @@
 """Organization API: list, create, read, rename."""
 
 import uuid
-from collections.abc import AsyncIterator
 
 import pytest
-from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import sign_in
+from tests.helpers import add_member, sign_in
 from todolist.models import Membership, MembershipRole, Organization
-
-
-@pytest.fixture
-async def other_client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    """A second browser, for a second user."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        yield client
-
-
-async def add_member(
-    session: AsyncSession, organization_id: str, user_id: str, role: MembershipRole
-) -> None:
-    session.add(
-        Membership(
-            organization_id=uuid.UUID(organization_id), user_id=uuid.UUID(user_id), role=role
-        )
-    )
-    await session.flush()
 
 
 async def test_list_returns_my_organizations_with_role(
