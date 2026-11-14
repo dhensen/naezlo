@@ -1,0 +1,33 @@
+# Ralph Progress Log
+
+## Codebase Patterns
+
+(Reusable patterns go here. Keep this section short and current.)
+
+- Stack and domain rules: see DECISIONS.md.
+- There is no git remote named origin: commit, don't push.
+- pnpm is not installed; use npm for the frontend.
+- Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
+
+---
+
+## 2026-11-14 - US-001
+- Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
+  FastAPI app factory `create_app()` with `GET /healthz`, pydantic-settings `Settings`
+  (`app_name`, `environment`), ruff lint + format, pyright (strict on `src/`), pytest with
+  pytest-asyncio and an httpx `AsyncClient` fixture, tests for `/healthz` and settings.
+- Files changed: pyproject.toml, uv.lock, .python-version, .gitignore, .env.example,
+  CLAUDE.md, src/todolist/{__init__,app,config}.py, src/todolist/py.typed,
+  tests/{__init__,conftest,test_health,test_config}.py, ralph/prd.json, ralph/progress.txt.
+  Also first commit of DECISIONS.md and ralph/ (they were untracked setup files, not leftovers
+  of a story).
+- Checked by hand: `uv run uvicorn todolist.app:create_app --factory` serves /healthz with 200.
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - Runtime deps go in with `uv add`, dev tools with `uv add --dev` (dependency group `dev`).
+  - pytest-asyncio is in auto mode with a session-scoped loop for both fixtures and tests,
+    so session-scoped async fixtures (engine, migrations in US-002) can share the loop.
+  - `Settings(_env_file=None)` needs `# pyright: ignore[reportCallIssue]`; pyright doesn't
+    know that pydantic-settings init argument.
+  - `create_app(settings)` stores the settings on `app.state.settings`.
+---

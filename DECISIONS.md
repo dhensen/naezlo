@@ -1,0 +1,35 @@
+# Decisions
+
+Decisions that `README.md` does not cover. Append new ones at the bottom with a date and the story ID.
+
+## Stack (2026-11-14, before US-001)
+
+- **Backend** lives at the repo root: Python 3.14, uv, FastAPI, SQLAlchemy 2 (async) with asyncpg, Alembic, pydantic-settings, Authlib for Google login, the official `mcp` Python SDK for the MCP server. Package in `src/todolist/`.
+- **Database**: PostgreSQL 18 through `docker compose`. Tests run against a real Postgres test database, each test inside a transaction that is rolled back. No SQLite.
+- **Frontend** lives in `frontend/`: Vite, React, TypeScript (strict), React Router, TanStack Query, Tailwind CSS. API types are generated from FastAPI's OpenAPI schema. Package manager is npm (pnpm is not installed on this machine).
+- **Serving**: in development Vite proxies to the backend; in production FastAPI serves `frontend/dist`.
+- **Quality checks**
+  - Backend: `uv run ruff check`, `uv run ruff format --check`, `uv run pyright`, `uv run pytest`
+  - Frontend (once `frontend/` exists, US-027): `npm --prefix frontend run lint`, `npm --prefix frontend run typecheck`, `npm --prefix frontend run test`
+  - End to end (once US-029 exists): `npm --prefix frontend run e2e`
+- **Login without Google credentials**: the loop has no Google OAuth client. Google is mocked in tests. A dev-login endpoint, enabled only when `DEV_LOGIN=true`, is used for local runs and end-to-end tests. It must be off by default.
+- **Secrets** come from environment variables. `.env` is git-ignored; `.env.example` documents every variable with safe placeholder values.
+
+## Domain (2026-11-14, before US-001)
+
+- **Tenancy**: `User`, `Organization`, `Membership` with role `owner | admin | member`. A new user gets a default organization on first sign-in. Invitations are by email and are accepted automatically on the invitee's next sign-in; v1 sends no email.
+- **Agents**: an `Agent` belongs to one organization and is a principal like a user. Code that checks permissions or records audit events takes a `Principal` (kind `user | agent`), never a bare user.
+- **Hierarchy**: `Organization` → `Project` → `TodoList` → `Item`. An item has a title, notes, status `open | done` and a position.
+- **ACL**
+  - Grants exist on projects and on lists, for a user or an agent, with role `viewer | editor | admin`. List grants also allow `none`.
+  - Effective role on a list: the list grant if there is one, otherwise the project grant.
+  - Organization owners and admins are admin on everything in their organization.
+  - No role means the resource does not exist for that principal: respond 404, not 403. Use 403 when the principal can see the resource but the action needs a higher role.
+- **List mode**: `human_only | ai_only | mixed`.
+  - Default for a new list: `mixed` when the organization has at least one agent, otherwise `human_only`.
+  - `human_only`: agents have no access, whatever their grants.
+  - `ai_only`: humans can read according to their role but cannot change items. List admins can still rename the list, change its mode and manage its grants.
+  - `mixed`: both act according to their role.
+- **Audit log**: one `audit_events` table with organization, project, list (nullable), actor kind, actor id, actor name snapshot, action, target and JSON details. Events are written in the same transaction as the change and survive deletion of their target.
+- **MCP**: streamable HTTP at `/mcp`. The app is its own OAuth 2.1 authorization server (metadata discovery, dynamic client registration, PKCE with S256, refresh token rotation, revocation). On the consent screen the signed-in user picks which agent the client acts as; that requires being owner or admin of the agent's organization. Tokens are stored hashed and resolve to that agent. MCP tools and the HTTP API share the same service functions.
+- **Not in v1**: billing, sending email, password login. The product name ("needs a better name" in the README) is a human decision; keep `todolist` as the working name and keep it in one place per layer (a setting in the backend, a constant in the frontend).
