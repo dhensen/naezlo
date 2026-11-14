@@ -123,6 +123,9 @@
   (`ctx.principal`, `ctx.session`). Tests: tests/test_mcp.py has `agent_token`, `mcp_client`,
   `mcp_http`, `running`, `whoami`, `make_list`, `grant_agent` to import. All lists of a principal:
   `accessible_lists(principal)` (permissions.py).
+- MCP tools: `register_tools` in mcp_server/tools.py. Raise `AppError`s inside `agent_context()`
+  (they become the SDK's `ToolError`); load a list with `_accessible_list(ctx, list_id, ListAction.X)`.
+  Tests: `call` / `error_of` and the setup helpers in tests/test_mcp_read_tools.py.
 
 ## 2026-11-14 - US-001
 - Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
@@ -752,4 +755,32 @@
     and leaves the path as it is; it does not show up in the OpenAPI schema.
   - pyright strict: an `@asynccontextmanager` function must be annotated `-> AsyncGenerator[T]`, and a
     function registered by a decorator inside another function needs `# pyright: ignore[reportUnusedFunction]`.
+---
+
+## 2026-11-15 00:20 - US-024
+- MCP tools `list_projects`, `list_lists(project_id?)` and `get_list(list_id, include_done=false)`,
+  all with descriptions and described, typed parameters, returning pydantic models.
+- Permission service: new `projects_with_accessible_lists(principal)`; the tools use it,
+  `accessible_lists`, `effective_project_role` and `list_access` with the agent `Principal`.
+- Services: `list_projects_with_lists`, `list_accessible_lists`, `count_items` / `ItemCounts`,
+  `list_items(..., include_done=)`.
+- `agent_context()` turns an `AppError` into the SDK's `ToolError`, so an unknown or inaccessible
+  id is a readable tool error (`is_error`), not a crash.
+- Files: src/todolist/mcp_server/{tools,context}.py, src/todolist/permissions.py,
+  src/todolist/services/{items,lists,projects}.py, tests/test_mcp_read_tools.py (new),
+  tests/test_mcp.py, DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt
+- Pushed: yes
+- **Learnings for future iterations:**
+  - The SDK always puts `Error executing tool <name>: ` in front of a `ToolError`'s message; a
+    crash gives only `Error executing tool <name>`. Tests compare the whole string.
+  - `mcp.call_tool(name, {...})` returns the failure as `result.is_error` with one text content;
+    it does not raise. A malformed uuid argument is refused by the SDK before the tool runs.
+  - A tool parameter typed `uuid.UUID` shows up as `{"type": "string", "format": "uuid"}`; an
+    optional one as `anyOf` with null and `default: null`, and is not in `required`.
+  - `accessible_lists(principal).join(Project, ...).add_columns(Project)` types as
+    `Select[TodoList, Project]` under pyright strict; `.with_only_columns(TodoList.project_id)`
+    makes it usable in `IN (...)`.
+  - US-025: for the write tools use `_accessible_list(ctx, list_id, ListAction.CHANGE_ITEMS)`; an
+    item tool needs the same for an item (load the item, then its list). `ForbiddenError`'s detail
+    ("This needs the editor role on the list") reaches the agent as is.
 ---

@@ -5,6 +5,8 @@ the list and the list mode (`list_access` in `todolist.permissions`).
 """
 
 import uuid
+from collections.abc import Collection
+from dataclasses import dataclass
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,12 +76,48 @@ async def _record(
     )
 
 
-async def list_items(session: AsyncSession, todo_list: TodoList) -> list[Item]:
-    """The items of the list in their order (position, then age)."""
-    items = await session.scalars(
-        select(Item).where(Item.list_id == todo_list.id).order_by(Item.position, Item.id)
-    )
+async def list_items(
+    session: AsyncSession, todo_list: TodoList, *, include_done: bool = True
+) -> list[Item]:
+    """The items of the list in their order (position, then age); only the open ones
+    without `include_done`."""
+    query = select(Item).where(Item.list_id == todo_list.id)
+    if not include_done:
+        query = query.where(Item.status == ItemStatus.OPEN)
+    items = await session.scalars(query.order_by(Item.position, Item.id))
     return list(items)
+
+
+@dataclass(frozen=True)
+class ItemCounts:
+    """How many items of a list are open and how many are done."""
+
+    open: int = 0
+    done: int = 0
+
+
+async def count_items(
+    session: AsyncSession, list_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, ItemCounts]:
+    """The open and done item counts of each of the lists (zeros for a list without items).
+
+    The caller has checked that the principal can read these lists.
+    """
+    counts = {list_id: ItemCounts() for list_id in list_ids}
+    if not counts:
+        return counts
+    rows = await session.execute(
+        select(
+            Item.list_id,
+            func.count().filter(Item.status == ItemStatus.OPEN),
+            func.count().filter(Item.status == ItemStatus.DONE),
+        )
+        .where(Item.list_id.in_(counts))
+        .group_by(Item.list_id)
+    )
+    for list_id, open_count, done_count in rows:
+        counts[list_id] = ItemCounts(open=open_count, done=done_count)
+    return counts
 
 
 async def create_item(

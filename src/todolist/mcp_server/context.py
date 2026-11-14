@@ -14,9 +14,11 @@ from dataclasses import dataclass
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken
+from mcp.server.mcpserver.exceptions import ToolError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.db import SessionScope
+from todolist.errors import AppError
 from todolist.principals import Principal
 from todolist.services.oauth import MCP_SCOPE
 from todolist.services.oauth_tokens import resolve_access_token
@@ -72,9 +74,17 @@ def agent_context_factory(session_scope: SessionScope) -> AgentContextFactory:
     @asynccontextmanager
     async def agent_context() -> AsyncGenerator[AgentContext]:
         """The calling agent and a session whose transaction is committed when the block
-        ends and rolled back when it raises."""
+        ends and rolled back when it raises. An `AppError` raised inside the block becomes
+        the SDK's `ToolError` with the same message."""
         principal = current_principal()
-        async with session_scope() as session:
-            yield AgentContext(principal=principal, session=session)
+        try:
+            async with session_scope() as session:
+                yield AgentContext(principal=principal, session=session)
+        except AppError as error:
+            # An error the services and the permission service raise on purpose (not found,
+            # not allowed, conflict): the agent gets its message as the tool's error. The
+            # transaction is rolled back by now. Anything else is a crash, which the SDK
+            # logs and reports without details.
+            raise ToolError(error.detail) from error
 
     return agent_context

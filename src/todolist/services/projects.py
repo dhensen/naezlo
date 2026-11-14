@@ -7,7 +7,7 @@ The callers check the acting principal's role on the project (`require_project_r
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.models import AuditAction, Project, ProjectGrant, ProjectRole
-from todolist.permissions import visible_projects
+from todolist.permissions import projects_with_accessible_lists, visible_projects
 from todolist.principals import Principal
 from todolist.services.audit import changes, record_event
 
@@ -23,6 +23,12 @@ async def list_projects(session: AsyncSession, principal: Principal) -> list[Pro
     """The projects of the principal's organization that the principal has a role on, oldest
     first."""
     projects = await session.scalars(visible_projects(principal).order_by(Project.id))
+    return list(projects)
+
+
+async def list_projects_with_lists(session: AsyncSession, principal: Principal) -> list[Project]:
+    """The projects in which the principal can see at least one list, oldest first."""
+    projects = await session.scalars(projects_with_accessible_lists(principal).order_by(Project.id))
     return list(projects)
 
 

@@ -289,6 +289,17 @@ def visible_lists(principal: Principal, project: Project) -> Select[TodoList]:
     return accessible_lists(principal).where(TodoList.project_id == project.id)
 
 
+def projects_with_accessible_lists(principal: Principal) -> Select[Project]:
+    """A query for the projects in which the principal can see at least one list
+    (`accessible_lists`), in no order.
+
+    Not the same as `visible_projects`: a list grant alone puts a project in here, and a role
+    on a project whose lists are all hidden from the principal (or that has none) does not.
+    """
+    project_ids = accessible_lists(principal).with_only_columns(TodoList.project_id)
+    return select(Project).where(Project.id.in_(project_ids))
+
+
 def visible_projects(principal: Principal) -> Select[Project]:
     """A query for the projects of the principal's organization that the principal has a role on.
 

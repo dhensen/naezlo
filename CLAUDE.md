@@ -247,3 +247,16 @@ uv run pytest
   never in a fixture (the task group must start and stop in the same task). Raw requests:
   `mcp_http(app, token)`, an `httpx2` client on `http://localhost:8000` (the only allowed `Host`).
   Give the agent a list with `grant_agent(db_session, list_id, agent_id, ListRole.X)` on a `mixed` list.
+- MCP tool errors: raise an `AppError` (`NotFoundError`, `ForbiddenError`, `access.require(action)`)
+  inside `agent_context()`; it becomes the SDK's `ToolError` with the error's `detail`, which the
+  agent reads as `Error executing tool <name>: <detail>`. Write the detail for a model (say what to
+  call instead). Load a list in a tool with `_accessible_list(ctx, list_id, ListAction.X)`
+  (`mcp_server/tools.py`): the list, its project and the `ListAccess`, or the not-found error.
+- MCP tools return a pydantic model with a named array (`ListList(lists=[...])`), never a bare list;
+  parameters are `Annotated[uuid.UUID, Field(description=...)]`.
+- Read helpers for the tools: `list_accessible_lists(session, principal, project=None)`
+  (`services/lists.py`, lists with their project), `count_items(session, list_ids)` and
+  `list_items(session, todo_list, include_done=...)` (`services/items.py`),
+  `list_projects_with_lists` (`services/projects.py`, on `projects_with_accessible_lists`).
+- MCP tool tests: `call(mcp, tool, **arguments)` and `error_of(mcp, tool, **arguments)` in
+  `tests/test_mcp_read_tools.py`, with `grant_agent_project`, `add_list`, `add_item`, `project_of`.

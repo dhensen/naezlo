@@ -178,7 +178,7 @@ async def test_whoami_returns_the_agent_of_the_token(
         tools = await mcp.list_tools()
         result = await mcp.call_tool("whoami")
 
-    assert [tool.name for tool in tools.tools] == ["whoami"]
+    assert "whoami" in [tool.name for tool in tools.tools]
     assert not result.is_error, result.content
     expected = {
         "agent_id": authorized.agent["id"],

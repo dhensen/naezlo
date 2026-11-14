@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.models import Agent, AuditAction, ListMode, PrincipalKind, Project, TodoList
-from todolist.permissions import visible_lists
+from todolist.permissions import accessible_lists, visible_lists
 from todolist.principals import Principal
 from todolist.services.audit import changes, record_event
 
@@ -40,6 +40,23 @@ async def list_lists(
         visible_lists(principal, project).order_by(TodoList.position, TodoList.id)
     )
     return list(todo_lists)
+
+
+async def list_accessible_lists(
+    session: AsyncSession, principal: Principal, project: Project | None = None
+) -> list[tuple[TodoList, Project]]:
+    """The lists the principal can see with their project: in all projects of the
+    principal's organization, or in `project` only. Ordered by project (oldest first), then
+    as within a project (position, then age)."""
+    query = (
+        accessible_lists(principal)
+        .join(Project, Project.id == TodoList.project_id)
+        .add_columns(Project)
+        .order_by(Project.id, TodoList.position, TodoList.id)
+    )
+    if project is not None:
+        query = query.where(TodoList.project_id == project.id)
+    return [(todo_list, its_project) for todo_list, its_project in await session.execute(query)]
 
 
 async def create_list(
