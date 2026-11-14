@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.models import User, normalize_email
+from todolist.services.invitations import accept_pending_invitations
 from todolist.services.organizations import create_organization
 
 _ORGANIZATION_NAME_SUFFIX = "'s organization"
@@ -37,7 +38,8 @@ async def get_or_create_user(
     A user is found by `google_sub` when given, otherwise by email. A new user also gets a
     default organization ("<name>'s organization") with themselves as owner. An existing user
     without a `google_sub` is linked to the given one; their name and email are left as they
-    are. A given `avatar_url` replaces the stored one.
+    are. A given `avatar_url` replaces the stored one. Pending invitations for the user's email
+    become memberships, for new and existing users alike.
 
     Raises `GoogleAccountConflictError` when the email belongs to a user who is linked to
     another Google account.
@@ -60,6 +62,7 @@ async def get_or_create_user(
         if avatar_url is not None:
             user.avatar_url = avatar_url
         await session.flush()
+        await accept_pending_invitations(session, user)
         return user
 
     name = name[:_NAME_MAX_LENGTH]
@@ -67,4 +70,6 @@ async def get_or_create_user(
     session.add(user)
     await session.flush()
     await create_organization(session, default_organization_name(name), user, slug_source=name)
+    # After the default organization, so that one stays first in the user's list.
+    await accept_pending_invitations(session, user)
     return user

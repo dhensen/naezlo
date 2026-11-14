@@ -104,3 +104,7 @@ uv run pytest
   `change_member_role` and `remove_member` in `services/organizations.py`). 409s get a specific code.
 - Tests with more users: the `other_client` and `third_client` fixtures (`tests/conftest.py`) and
   `add_member(db_session, org_id, user_id, role)` from `tests/helpers.py`.
+- Invitations live in `services/invitations.py`; `get_or_create_user` accepts the pending ones on
+  every sign-in. An enum that is a subset of another (`InvitationRole`) gets its own PostgreSQL type.
+- Testing a constraint: `begin_nested()` flushes pending objects before the savepoint starts, so add
+  the bad row inside it (see `add_in_savepoint` in `tests/test_invitations.py`).

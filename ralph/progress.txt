@@ -37,8 +37,11 @@
   `add_member(db_session, org_id, user_id, role)` (tests/helpers.py).
 - Rules that depend on the target live in the service, which raises ForbiddenError / NotFoundError /
   `ConflictError(code, detail)` itself (see `change_member_role`, `remove_member`).
-- Testing a constraint: add the bad row, then flush inside `async with session.begin_nested()`
-  under `pytest.raises(IntegrityError)` (see tests/test_models_tenancy.py); the session stays usable.
+- Testing a constraint: add the bad row and flush, both inside `async with session.begin_nested()`
+  (`add_in_savepoint` in tests/test_invitations.py), under `pytest.raises(IntegrityError)`. Adding
+  before `begin_nested()` fails outside the savepoint and leaves the session unusable.
+- Invitations: services/invitations.py (`invite`, `list_invitations`, `revoke_invitation`,
+  `accept_pending_invitations`, called by `get_or_create_user` on every sign-in).
 
 ---
 
@@ -225,4 +228,33 @@
     `MemberOut` (api/members.py) when an invite adds an existing user right away.
   - US-011: `can_change_member_role` / `can_remove_member` take roles, not a `Principal`; agents
     are not organization members, so that is enough here.
+---
+
+## 2026-11-14 - US-008
+- Invitations by email: `invitations` table (model `Invitation`, enum `InvitationRole` admin | member,
+  unique (organization_id, email), lowercased email with a check constraint, `invited_by` SET NULL)
+  and its migration; `POST /api/orgs/{org_id}/invitations` (201; an existing user is added as a
+  member right away, otherwise an invitation is stored; 409 `already_member` / `already_invited`),
+  `GET` (pending invitations) and `DELETE .../{id}` (204), all for owner and admin;
+  `get_or_create_user` turns pending invitations into memberships on sign-in, after the default
+  organization. The POST response has `status` (`added` | `invited`) and a `message` that says no
+  email is sent and the person joins on their next sign-in.
+- Files changed: src/todolist/models/{__init__,invitation}.py, src/todolist/services/{invitations,
+  users}.py, src/todolist/api/{__init__,invitations}.py,
+  migrations/versions/20261114_2209_42f58e703737_add_invitations.py, tests/test_invitations.py,
+  CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+- Checked by hand on the dev database: `alembic upgrade head`, `downgrade base`, `upgrade head`,
+  `alembic check` (no drift).
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - `Session.begin_nested()` flushes pending objects before it creates the savepoint. The
+    `expect_integrity_error` helper in tests/test_models_tenancy.py adds before it, which only
+    works there because those tests end right after; use `add_in_savepoint` when the test goes on.
+  - Deleting a parent through the ORM while the database also cascades gives an SAWarning
+    ("expected to delete 1 row(s); 0 were matched") when children are in the session; tests that
+    check cascades use a core `delete(...)` statement.
+  - The frontend (US-031) can show the POST `message` as is, and branch on `status`.
+  - An invite and a first sign-in for the same email at the same moment can leave an invitation
+    for an existing user; it is accepted on that user's next sign-in (covered by a test).
+  - Members listing reuses `MemberOut` from api/members.py for the `added` case.
 ---
