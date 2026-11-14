@@ -1,7 +1,8 @@
 """Lists: created and listed in a project, then addressed by their own id.
 
 Access follows the caller's role on the list (see `todolist.permissions`): reading needs
-viewer, creating and changing editor, deleting admin.
+viewer, changing editor, deleting admin. Creating needs editor on the project; the index of a
+project gives the lists the caller can see.
 """
 
 import uuid
@@ -15,12 +16,12 @@ from todolist.api.deps import (
     ListAdminContextDep,
     ListContextDep,
     ListEditorContextDep,
-    ProjectContextDep,
     ProjectEditorContextDep,
+    ProjectListsContextDep,
 )
 from todolist.db import SessionDep
-from todolist.models import ListMode, TodoList
-from todolist.services.lists import create_list, delete_list, list_lists, update_list
+from todolist.models import ListMode, Project, TodoList
+from todolist.services.lists import create_list, delete_list, update_list
 
 project_router = APIRouter(prefix="/projects/{project_id}/lists", tags=["lists"])
 router = APIRouter(prefix="/lists/{list_id}", tags=["lists"])
@@ -56,6 +57,8 @@ class ListPatch(BaseModel):
 class ListOut(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
+    # For a caller who can open the list but not its project.
+    project_name: str
     name: str
     description: str | None
     mode: ListMode
@@ -65,10 +68,11 @@ class ListOut(BaseModel):
     updated_at: datetime
 
 
-def _list_out(todo_list: TodoList) -> ListOut:
+def _list_out(todo_list: TodoList, project: Project) -> ListOut:
     return ListOut(
         id=todo_list.id,
         project_id=todo_list.project_id,
+        project_name=project.name,
         name=todo_list.name,
         description=todo_list.description,
         mode=todo_list.mode,
@@ -80,9 +84,8 @@ def _list_out(todo_list: TodoList) -> ListOut:
 
 
 @project_router.get("")
-async def list_lists_route(ctx: ProjectContextDep, session: SessionDep) -> list[ListOut]:
-    todo_lists = await list_lists(session, ctx.project)
-    return [_list_out(todo_list) for todo_list in todo_lists]
+async def list_lists_route(ctx: ProjectListsContextDep) -> list[ListOut]:
+    return [_list_out(todo_list, ctx.project) for todo_list in ctx.todo_lists]
 
 
 @project_router.post("", status_code=201)
@@ -92,12 +95,12 @@ async def create_list_route(
     todo_list = await create_list(
         session, ctx.principal, ctx.project, body.name, body.description, body.mode
     )
-    return _list_out(todo_list)
+    return _list_out(todo_list, ctx.project)
 
 
 @router.get("")
 async def get_list_route(ctx: ListContextDep) -> ListOut:
-    return _list_out(ctx.todo_list)
+    return _list_out(ctx.todo_list, ctx.project)
 
 
 @router.patch("")
@@ -112,7 +115,7 @@ async def update_list_route(
         set_description="description" in body.model_fields_set,
         mode=body.mode,
     )
-    return _list_out(todo_list)
+    return _list_out(todo_list, ctx.project)
 
 
 @router.delete("", status_code=204)

@@ -6,7 +6,15 @@ from typing import Any
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from todolist.models import Membership, MembershipRole, PrincipalKind, ProjectGrant, ProjectRole
+from todolist.models import (
+    ListGrant,
+    ListRole,
+    Membership,
+    MembershipRole,
+    PrincipalKind,
+    ProjectGrant,
+    ProjectRole,
+)
 
 
 async def sign_in(
@@ -40,6 +48,21 @@ async def grant_project_role(
     session.add(
         ProjectGrant(
             project_id=uuid.UUID(project_id),
+            principal_kind=PrincipalKind.USER,
+            user_id=uuid.UUID(user_id),
+            role=role,
+        )
+    )
+    await session.flush()
+
+
+async def grant_list_role(
+    session: AsyncSession, list_id: str, user_id: str, role: ListRole
+) -> None:
+    """Give an existing user a role on a list (ids as the API returns them)."""
+    session.add(
+        ListGrant(
+            list_id=uuid.UUID(list_id),
             principal_kind=PrincipalKind.USER,
             user_id=uuid.UUID(user_id),
             role=role,

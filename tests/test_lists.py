@@ -81,6 +81,7 @@ async def test_create_returns_the_list(client: AsyncClient, db_session: AsyncSes
     assert body["name"] == "Launch"
     assert body["description"] == "Go live."
     assert body["project_id"] == project_id
+    assert body["project_name"] == "Website"
     assert body["created_by"] == ada_id
     assert body["position"] == 1
     assert body["created_at"] is not None
@@ -88,6 +89,7 @@ async def test_create_returns_the_list(client: AsyncClient, db_session: AsyncSes
     assert set(body) == {
         "id",
         "project_id",
+        "project_name",
         "name",
         "description",
         "mode",
@@ -510,7 +512,7 @@ async def test_a_list_created_by_an_agent_has_no_creating_user(
     assert todo_list.position == 2
 
 
-async def test_effective_list_role_is_the_project_role(
+async def test_effective_list_role_is_the_project_role_without_a_list_grant(
     client: AsyncClient, other_client: AsyncClient, db_session: AsyncSession
 ) -> None:
     org_id, project_id, url = await ada_project(client)

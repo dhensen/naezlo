@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.errors import ConflictError, ForbiddenError, NotFoundError
 from todolist.models import (
+    ListGrant,
     Membership,
     MembershipRole,
     Organization,
     Project,
     ProjectGrant,
+    TodoList,
     User,
 )
 
@@ -218,7 +220,17 @@ async def remove_member(
         )
     if membership.role is MembershipRole.OWNER:
         await _ensure_not_last_owner(session, organization.id)
-    # Their project grants go too: someone who joins again later starts without access.
+    # Their project and list grants go too: someone who joins again later starts without access.
+    await session.execute(
+        delete(ListGrant).where(
+            ListGrant.user_id == user_id,
+            ListGrant.list_id.in_(
+                select(TodoList.id)
+                .join(Project, Project.id == TodoList.project_id)
+                .where(Project.organization_id == organization.id)
+            ),
+        )
+    )
     await session.execute(
         delete(ProjectGrant).where(
             ProjectGrant.user_id == user_id,

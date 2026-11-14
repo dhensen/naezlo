@@ -7,6 +7,7 @@ from todolist.api import (
     auth,
     config,
     invitations,
+    list_grants,
     lists,
     me,
     members,
@@ -28,5 +29,6 @@ api_router.include_router(projects.router)
 api_router.include_router(project_grants.router)
 api_router.include_router(lists.project_router)
 api_router.include_router(lists.router)
+api_router.include_router(list_grants.router)
 
 __all__ = ["api_router"]

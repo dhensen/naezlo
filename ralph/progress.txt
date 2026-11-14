@@ -69,6 +69,13 @@
   `ctx: ListContextDep` / `ListEditorContextDep` / `ListAdminContextDep` (todolist.api.deps, made by
   `require_list_role`): `ctx.todo_list`, `ctx.project`, `ctx.role`, `ctx.user`, `ctx.principal`.
   The rule is `effective_list_role(session, principal, todo_list, project)` in permissions.py.
+- List grants: models/list_grant.py (`ListGrant`, `ListRole` with `none`), services/list_grants.py,
+  api/list_grants.py (`/api/lists/{id}/grants`, list admin). A list grant beats the project role
+  (not organization owners/admins). Several lists at once: `visible_lists(principal, project)`
+  (permissions.py); `list_lists(session, principal, project)` uses it. Tests:
+  `grant_list_role(db_session, list_id, user_id, ListRole.X)`. The list shape has `project_name`.
+- Member removal must delete every kind of grant in the organization (`remove_member` in
+  services/organizations.py); extend it when a new grant table appears.
 
 ---
 
@@ -428,4 +435,32 @@
   - A pydantic `field_validator("name", "mode")` that rejects None runs only for fields that are
     sent, which is how PATCH tells "left out" from "null".
   - ruff's PT018 rejects `assert a is not None and b is not None` in tests; write two asserts.
+---
+
+## 2026-11-14 22:45 - US-014
+- List ACL: `list_grants` table (migration a0f9fa30f0c9, new enum type `list_role`, reuses
+  `principal_kind`), `ListGrant` / `ListRole`. `effective_list_role` now applies organization
+  owner/admin → admin, then the list grant (`none` → no access), then the project role.
+  `visible_lists(principal, project)` is the same rule as a query; the project's list index uses
+  it and also works for a principal with only a list grant (404 only when they have no project
+  role and see no list). The list shape gained `project_name`. `GET|PUT /api/lists/{id}/grants`
+  and `DELETE .../grants/{grant_id}` mirror the project grants API and need list admin.
+  Removing a member now deletes their list grants too.
+- Files changed: src/todolist/models/list_grant.py (new), models/__init__.py, permissions.py,
+  services/list_grants.py (new), services/project_grants.py (`find_grantable_principal` shared),
+  services/lists.py, services/organizations.py, api/list_grants.py (new), api/lists.py,
+  api/deps.py, api/__init__.py, migrations/versions/20261114_2233_a0f9fa30f0c9_add_list_grants.py,
+  tests/test_list_grants.py (new), tests/test_lists.py, tests/helpers.py, DECISIONS.md, CLAUDE.md
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - pyright strict types outer-joined columns of a `Row` as non-optional: `cast("X | None", row[i])`
+    before testing for None.
+  - Autogenerate writes `sa.Enum(..., name="principal_kind")` for a reused enum type; replace it
+    with `postgresql.ENUM(..., create_type=False)` or the upgrade fails on "type already exists".
+    It also writes the long check constraint on one line (ruff E501): split the string by hand.
+  - `visible_projects` is unchanged: a list-only principal does not see the project in the
+    organization's project index. US-024 (`list_projects` for agents: projects with at least one
+    visible list) needs its own query on top of `visible_lists`.
+  - The list grants `GET` returns only list-level grants; US-035 wants inherited project access
+    shown separately, which a list admin without project admin cannot read yet.
 ---

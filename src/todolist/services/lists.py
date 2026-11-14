@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.models import Agent, ListMode, PrincipalKind, Project, TodoList
+from todolist.permissions import visible_lists
 from todolist.principals import Principal
 
 
@@ -29,12 +30,13 @@ async def default_list_mode(session: AsyncSession, organization_id: uuid.UUID) -
     return ListMode.HUMAN_ONLY if agent is None else ListMode.MIXED
 
 
-async def list_lists(session: AsyncSession, project: Project) -> list[TodoList]:
-    """The lists of the project in their order (position, then age)."""
+async def list_lists(
+    session: AsyncSession, principal: Principal, project: Project
+) -> list[TodoList]:
+    """The lists of the project that the principal can see, in their order (position, then
+    age). Empty when they can see none; that includes a principal without any access."""
     todo_lists = await session.scalars(
-        select(TodoList)
-        .where(TodoList.project_id == project.id)
-        .order_by(TodoList.position, TodoList.id)
+        visible_lists(principal, project).order_by(TodoList.position, TodoList.id)
     )
     return list(todo_lists)
 

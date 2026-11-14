@@ -142,3 +142,14 @@ uv run pytest
   404 `List not found` without a role, 403 when it is too low. They give `ctx.todo_list`,
   `ctx.project`, `ctx.role`, `ctx.user` and `ctx.principal`. The rule behind them is
   `effective_list_role(session, principal, todo_list, project)` in `permissions.py`.
+- List grants: model `ListGrant` / enum `ListRole` (`none | viewer | editor | admin`,
+  `models/list_grant.py`), `services/list_grants.py` (`list_list_grants`, `set_list_grant`,
+  `revoke_list_grant`), routes in `api/list_grants.py`. A list grant replaces the project role on
+  that list; organization owners and admins stay admin. `ListRole.project_role` maps to a
+  `ProjectRole` (None for `none`).
+- Anything that returns several lists filters with `visible_lists(principal, project)` from
+  `permissions.py` (`list_lists(session, principal, project)` does). The list index route takes
+  `ctx: ProjectListsContextDep`, which also admits a caller with only a list grant.
+- Columns that come from an outer join are typed non-optional in a `Row`; `cast` them before an
+  `is None` check or pyright (strict) reports an unnecessary comparison.
+- Tests give a user a list role with `grant_list_role(db_session, list_id, user_id, ListRole.X)`.

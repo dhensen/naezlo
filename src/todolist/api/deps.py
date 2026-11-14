@@ -5,7 +5,8 @@ when the action needs an owner or admin. Project-scoped routes (`/projects/{proj
 `ctx: ProjectContextDep` (viewer or higher), `ProjectEditorContextDep` or `ProjectAdminContextDep`,
 all built with `require_project_role(...)` on the permission service (`todolist.permissions`).
 List-scoped routes (`/lists/{list_id}...`) take `ctx: ListContextDep`, `ListEditorContextDep` or
-`ListAdminContextDep`, built with `require_list_role(...)`.
+`ListAdminContextDep`, built with `require_list_role(...)`. The list index of a project takes
+`ctx: ProjectListsContextDep`, which also lets in a caller who can only see some of its lists.
 """
 
 import uuid
@@ -29,6 +30,7 @@ from todolist.models import (
 )
 from todolist.permissions import effective_list_role, effective_project_role, role_at_least
 from todolist.principals import Principal
+from todolist.services.lists import list_lists
 from todolist.services.organizations import can_manage_organization, get_organization_membership
 
 
@@ -129,6 +131,36 @@ ProjectEditorContextDep = Annotated[
     ProjectContext, Depends(require_project_role(ProjectRole.EDITOR))
 ]
 ProjectAdminContextDep = Annotated[ProjectContext, Depends(require_project_role(ProjectRole.ADMIN))]
+
+
+@dataclass(frozen=True)
+class ProjectListsContext:
+    """The project in the path and the lists in it that the caller can see."""
+
+    project: Project
+    todo_lists: list[TodoList]
+    user: User
+
+
+async def project_lists_context(
+    project_id: uuid.UUID, user: CurrentUser, session: SessionDep
+) -> ProjectListsContext:
+    """Resolve `{project_id}` for the list index: 404 when the caller has no role on the
+    project and sees none of its lists.
+
+    Someone with only a list grant has no role on the project, but does get their lists here.
+    """
+    project = await session.get(Project, project_id)
+    if project is not None:
+        principal = Principal.for_user(user, project.organization_id)
+        todo_lists = await list_lists(session, principal, project)
+        # A project without visible lists still exists for someone with a role on it.
+        if todo_lists or await effective_project_role(session, principal, project) is not None:
+            return ProjectListsContext(project=project, todo_lists=todo_lists, user=user)
+    raise NotFoundError("Project not found")
+
+
+ProjectListsContextDep = Annotated[ProjectListsContext, Depends(project_lists_context)]
 
 
 @dataclass(frozen=True)

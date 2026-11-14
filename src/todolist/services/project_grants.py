@@ -64,6 +64,31 @@ def _invalid_principal(kind: PrincipalKind) -> AppError:
     return AppError(422, "invalid_principal", detail)
 
 
+async def find_grantable_principal(
+    session: AsyncSession, organization_id: uuid.UUID, kind: PrincipalKind, principal_id: uuid.UUID
+) -> tuple[User | None, Agent | None]:
+    """The user or the agent (one of the two) that a grant in the organization can name.
+
+    422 `invalid_principal` unless the user is a member of the organization or the agent
+    belongs to it. Shared with the list grants.
+    """
+    if kind is PrincipalKind.USER:
+        user = await session.scalar(
+            select(User)
+            .join(Membership, Membership.user_id == User.id)
+            .where(User.id == principal_id, Membership.organization_id == organization_id)
+        )
+        if user is not None:
+            return user, None
+    else:
+        agent = await session.scalar(
+            select(Agent).where(Agent.id == principal_id, Agent.organization_id == organization_id)
+        )
+        if agent is not None:
+            return None, agent
+    raise _invalid_principal(kind)
+
+
 async def _ensure_stays_administrable(
     session: AsyncSession, project: Project, grant: ProjectGrant
 ) -> None:
@@ -97,24 +122,10 @@ async def set_project_grant(
     agent belongs to it; 409 `last_project_admin` when a downgrade would leave the project
     without anyone to administer it.
     """
-    user: User | None = None
-    agent: Agent | None = None
-    if kind is PrincipalKind.USER:
-        user = await session.scalar(
-            select(User)
-            .join(Membership, Membership.user_id == User.id)
-            .where(User.id == principal_id, Membership.organization_id == project.organization_id)
-        )
-        principal_column = ProjectGrant.user_id
-    else:
-        agent = await session.scalar(
-            select(Agent).where(
-                Agent.id == principal_id, Agent.organization_id == project.organization_id
-            )
-        )
-        principal_column = ProjectGrant.agent_id
-    if user is None and agent is None:
-        raise _invalid_principal(kind)
+    user, agent = await find_grantable_principal(
+        session, project.organization_id, kind, principal_id
+    )
+    principal_column = ProjectGrant.user_id if user is not None else ProjectGrant.agent_id
 
     existing = select(ProjectGrant).where(
         ProjectGrant.project_id == project.id, principal_column == principal_id
