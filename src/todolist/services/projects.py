@@ -1,15 +1,16 @@
 """Projects: create, list, change and delete the projects of an organization.
 
-The callers check that the acting user may see the project (`ProjectContextDep`) or is a member
-of the organization (`OrgContextDep`).
+The callers check the acting principal's role on the project (`require_project_role`, see
+`todolist.permissions`) or that the user is a member of the organization (`OrgContextDep`).
 """
 
 import uuid
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from todolist.models import Membership, Project
+from todolist.models import PrincipalKind, Project, ProjectGrant, ProjectRole
+from todolist.permissions import visible_projects
+from todolist.principals import Principal
 
 
 def _clean_description(description: str | None) -> str | None:
@@ -19,27 +20,11 @@ def _clean_description(description: str | None) -> str | None:
     return description.strip() or None
 
 
-async def list_projects(session: AsyncSession, organization_id: uuid.UUID) -> list[Project]:
-    """The projects of an organization, oldest first."""
-    projects = await session.scalars(
-        select(Project).where(Project.organization_id == organization_id).order_by(Project.id)
-    )
+async def list_projects(session: AsyncSession, principal: Principal) -> list[Project]:
+    """The projects of the principal's organization that the principal has a role on, oldest
+    first."""
+    projects = await session.scalars(visible_projects(principal).order_by(Project.id))
     return list(projects)
-
-
-async def get_project_membership(
-    session: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID
-) -> tuple[Project, Membership] | None:
-    """The project and the user's membership in its organization; None when the user is not a
-    member (or the project does not exist: callers must not tell these apart)."""
-    row = (
-        await session.execute(
-            select(Project, Membership)
-            .join(Membership, Membership.organization_id == Project.organization_id)
-            .where(Project.id == project_id, Membership.user_id == user_id)
-        )
-    ).one_or_none()
-    return None if row is None else (row[0], row[1])
 
 
 async def create_project(
@@ -56,6 +41,16 @@ async def create_project(
         created_by=created_by,
     )
     session.add(project)
+    await session.flush()
+    # The creator administers the project, whatever their role in the organization.
+    session.add(
+        ProjectGrant(
+            project_id=project.id,
+            principal_kind=PrincipalKind.USER,
+            user_id=created_by,
+            role=ProjectRole.ADMIN,
+        )
+    )
     await session.flush()
     return project
 

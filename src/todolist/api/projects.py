@@ -1,6 +1,8 @@
 """Projects: created and listed in an organization, then addressed by their own id.
 
-For now every member of the organization can see and change its projects.
+Every member of the organization can create a project and becomes its admin. After that the
+project is visible only to principals with a role on it (see `todolist.permissions`): reading
+needs viewer, changing editor, deleting admin.
 """
 
 import uuid
@@ -10,7 +12,12 @@ from typing import Annotated
 from fastapi import APIRouter
 from pydantic import BaseModel, StringConstraints, field_validator
 
-from todolist.api.deps import OrgContextDep, ProjectContextDep
+from todolist.api.deps import (
+    OrgContextDep,
+    ProjectAdminContextDep,
+    ProjectContextDep,
+    ProjectEditorContextDep,
+)
 from todolist.db import SessionDep
 from todolist.models import Project
 from todolist.services.projects import (
@@ -72,7 +79,7 @@ def _project_out(project: Project) -> ProjectOut:
 
 @org_router.get("")
 async def list_projects_route(org: OrgContextDep, session: SessionDep) -> list[ProjectOut]:
-    projects = await list_projects(session, org.organization.id)
+    projects = await list_projects(session, org.principal)
     return [_project_out(project) for project in projects]
 
 
@@ -93,7 +100,7 @@ async def get_project_route(ctx: ProjectContextDep) -> ProjectOut:
 
 @router.patch("")
 async def update_project_route(
-    body: ProjectPatch, ctx: ProjectContextDep, session: SessionDep
+    body: ProjectPatch, ctx: ProjectEditorContextDep, session: SessionDep
 ) -> ProjectOut:
     project = await update_project(
         session,
@@ -106,5 +113,5 @@ async def update_project_route(
 
 
 @router.delete("", status_code=204)
-async def delete_project_route(ctx: ProjectContextDep, session: SessionDep) -> None:
+async def delete_project_route(ctx: ProjectAdminContextDep, session: SessionDep) -> None:
     await delete_project(session, ctx.project)

@@ -199,8 +199,8 @@
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "effective_project_role takes the database session as its first argument: effective_project_role(session, principal, project)."
     },
     {
       "id": "US-012",

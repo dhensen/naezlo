@@ -4,11 +4,18 @@ import re
 import unicodedata
 import uuid
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.errors import ConflictError, ForbiddenError, NotFoundError
-from todolist.models import Membership, MembershipRole, Organization, User
+from todolist.models import (
+    Membership,
+    MembershipRole,
+    Organization,
+    Project,
+    ProjectGrant,
+    User,
+)
 
 # The column holds 100 characters; this leaves room for a "-<n>" suffix.
 _SLUG_BASE_MAX_LENGTH = 80
@@ -211,5 +218,14 @@ async def remove_member(
         )
     if membership.role is MembershipRole.OWNER:
         await _ensure_not_last_owner(session, organization.id)
+    # Their project grants go too: someone who joins again later starts without access.
+    await session.execute(
+        delete(ProjectGrant).where(
+            ProjectGrant.user_id == user_id,
+            ProjectGrant.project_id.in_(
+                select(Project.id).where(Project.organization_id == organization.id)
+            ),
+        )
+    )
     await session.delete(membership)
     await session.flush()

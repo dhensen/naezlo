@@ -48,9 +48,17 @@
 - 409 from a unique constraint: change + flush inside `async with session.begin_nested()`, catch
   `IntegrityError`, raise `ConflictError` (services/agents.py). Assignments go inside the block.
 - A PATCH that returns `updated_at` needs `await session.refresh(obj)` after the flush.
-- Projects: services/projects.py (`list_projects`, `get_project_membership`, `create_project`,
-  `update_project`, `delete_project`). Project-scoped route (`/api/projects/{project_id}...`):
-  `ctx: ProjectContextDep` (todolist.api.deps; 404 `Project not found` when the caller can't see it).
+- Projects: services/projects.py (`list_projects(session, principal)`, `create_project` (adds the
+  creator's admin grant), `update_project`, `delete_project`).
+- Permissions: src/todolist/permissions.py (`effective_project_role(session, principal, project)`,
+  `role_at_least`, `visible_projects(principal)`). Project-scoped route
+  (`/api/projects/{project_id}...`): `ctx: ProjectContextDep` (viewer), `ProjectEditorContextDep` or
+  `ProjectAdminContextDep` from todolist.api.deps, all made by `require_project_role(ProjectRole.X)`:
+  404 without a role, 403 when the role is too low; `ctx.project`, `ctx.role`, `ctx.user`,
+  `ctx.principal`. For another minimum or a nested resource, wrap `require_project_role(...)` in
+  `Annotated[ProjectContext, Depends(...)]`.
+- Tests: `grant_project_role(db_session, project_id, user_id, role)` (tests/helpers.py). A plain
+  organization member sees no project without a grant.
 
 ---
 
@@ -322,4 +330,37 @@
     (`/projects/{project_id}`). Lists (US-013) can follow the same split.
   - `alembic downgrade base` on the dev database deletes the local dev data (users created with
     dev-login); that is accepted for the round-trip check.
+---
+
+## 2026-11-14 - US-011
+- Project ACL: `project_grants` table (model `ProjectGrant`, enums `PrincipalKind` and
+  `ProjectRole`) with its migration (backfills an admin grant for the creator of existing
+  projects); permission service `src/todolist/permissions.py`; `require_project_role(...)`
+  dependency and the three aliases; project routes enforced (GET viewer, PATCH editor, DELETE
+  admin, 404 without a role, list filtered); creating a project grants the creator admin;
+  removing a member deletes their project grants in that organization.
+- Files changed: src/todolist/permissions.py (new), src/todolist/models/{__init__,project_grant}.py,
+  src/todolist/principals.py, src/todolist/services/{projects,organizations}.py,
+  src/todolist/api/{deps,projects}.py, migrations/versions/*_add_project_grants.py,
+  tests/test_project_permissions.py (new), tests/{test_projects,helpers}.py, CLAUDE.md,
+  DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+- Checked by hand on the dev database: `alembic upgrade head`, `downgrade -1`, `upgrade head`,
+  `alembic check` (no drift). The backfill INSERT ran against a dev database without projects, so
+  it is not exercised with rows.
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - `effective_project_role` takes the session first; the story's signature has no session.
+  - `PrincipalKind` moved to models/project_grant.py (the model needs it and principals.py
+    imports the models); `from todolist.principals import PrincipalKind` still works.
+  - US-014 (`list_grants`) and US-018 (audit actor kind) reuse the PostgreSQL type
+    `principal_kind`: autogenerate will emit `sa.Enum(..., name="principal_kind")`, which tries to
+    create the type again. Change it to `postgresql.ENUM(..., name="principal_kind",
+    create_type=False)` in the migration and don't drop the type in that downgrade.
+  - US-012: there is no grants service yet; `create_project` and the test helper add
+    `ProjectGrant` rows directly. The "last admin" rule there can lean on the fact that an
+    organization always has an owner (`last_owner` 409), who is admin on every project.
+  - `select(Project)` is typed `Select[Project]` by this SQLAlchemy version, not
+    `Select[tuple[Project]]`.
+  - `ProjectContext.membership` is gone; use `ctx.role`.
+  - US-013 lists: the role requirements map directly onto the three project dependencies.
 ---

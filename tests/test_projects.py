@@ -1,4 +1,4 @@
-"""Projects: CRUD for organization members, 404 for everyone else."""
+"""Projects: CRUD as the project's admin, 404 for people outside the organization."""
 
 import uuid
 from typing import Any
@@ -8,8 +8,8 @@ from httpx import AsyncClient
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import add_member, sign_in
-from todolist.models import MembershipRole, Organization, Project, User
+from tests.helpers import add_member, grant_project_role, sign_in
+from todolist.models import MembershipRole, Organization, Project, ProjectRole, User
 
 PROJECT_NOT_FOUND = {"detail": "Project not found", "code": "not_found"}
 
@@ -133,28 +133,18 @@ async def test_get_returns_the_project(client: AsyncClient) -> None:
     assert response.json() == project
 
 
-@pytest.mark.parametrize("role", [MembershipRole.MEMBER, MembershipRole.ADMIN])
-async def test_any_member_can_do_everything(
-    client: AsyncClient, other_client: AsyncClient, db_session: AsyncSession, role: MembershipRole
+async def test_any_member_can_create_a_project(
+    client: AsyncClient, other_client: AsyncClient, db_session: AsyncSession
 ) -> None:
     org_id, url = await ada_org(client)
-    adas = await create(client, url, "Ada's")
-    await join(db_session, other_client, org_id, role)
+    await join(db_session, other_client, org_id, MembershipRole.MEMBER)
     grace_id = (await other_client.get("/api/me")).json()["user"]["id"]
 
     created = await create(other_client, url, "Grace's")
-    listed = await other_client.get(url)
-    fetched = await other_client.get(f"/api/projects/{adas['id']}")
-    patched = await other_client.patch(f"/api/projects/{adas['id']}", json={"name": "Ours"})
-    deleted = await other_client.delete(f"/api/projects/{adas['id']}")
 
     assert created["created_by"] == grace_id
-    assert listed.json() == [adas, created]
-    assert fetched.json() == adas
-    assert patched.status_code == 200, patched.text
-    assert patched.json()["name"] == "Ours"
-    assert deleted.status_code == 204
-    assert (await client.get(url)).json() == [created]
+    # The access rules after creation are in tests/test_project_permissions.py.
+    assert (await other_client.get(url)).json() == [created]
 
 
 async def test_update_changes_only_what_is_sent(client: AsyncClient) -> None:
@@ -250,6 +240,7 @@ async def test_a_removed_member_gets_404(
     project = await create(client, url)
     await join(db_session, other_client, org_id, MembershipRole.MEMBER)
     grace_id = (await other_client.get("/api/me")).json()["user"]["id"]
+    await grant_project_role(db_session, project["id"], grace_id, ProjectRole.ADMIN)
     assert (await other_client.get(f"/api/projects/{project['id']}")).status_code == 200
 
     removed = await client.delete(f"/api/orgs/{org_id}/members/{grace_id}")
@@ -258,6 +249,9 @@ async def test_a_removed_member_gets_404(
     assert removed.status_code == 204
     assert response.status_code == 404
     assert response.json() == PROJECT_NOT_FOUND
+    # Joining again does not bring the old access back.
+    await add_member(db_session, org_id, grace_id, MembershipRole.MEMBER)
+    assert (await other_client.get(f"/api/projects/{project['id']}")).status_code == 404
 
 
 async def test_unknown_project_is_404(client: AsyncClient) -> None:

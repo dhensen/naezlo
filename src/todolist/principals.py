@@ -4,16 +4,12 @@ Code that checks permissions or records audit events takes a `Principal`, never 
 or `Agent`, so both kinds of actor go through the same rules.
 """
 
-import enum
 import uuid
 from dataclasses import dataclass
 
-from todolist.models import Agent, User
+from todolist.models import Agent, PrincipalKind, User
 
-
-class PrincipalKind(enum.StrEnum):
-    USER = "user"
-    AGENT = "agent"
+__all__ = ["Principal", "PrincipalKind"]
 
 
 @dataclass(frozen=True)

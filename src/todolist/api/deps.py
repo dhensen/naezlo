@@ -2,10 +2,12 @@
 
 Org-scoped routes (`/orgs/{org_id}/...`) take `org: OrgContextDep`, or `org: OrgAdminContextDep`
 when the action needs an owner or admin. Project-scoped routes (`/projects/{project_id}...`) take
-`ctx: ProjectContextDep`.
+`ctx: ProjectContextDep` (viewer or higher), `ProjectEditorContextDep` or `ProjectAdminContextDep`,
+all built with `require_project_role(...)` on the permission service (`todolist.permissions`).
 """
 
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -14,10 +16,10 @@ from fastapi import Depends
 from todolist.auth import CurrentUser
 from todolist.db import SessionDep
 from todolist.errors import ForbiddenError, NotFoundError
-from todolist.models import Membership, MembershipRole, Organization, Project, User
+from todolist.models import Membership, MembershipRole, Organization, Project, ProjectRole, User
+from todolist.permissions import effective_project_role, role_at_least
 from todolist.principals import Principal
 from todolist.services.organizations import can_manage_organization, get_organization_membership
-from todolist.services.projects import get_project_membership
 
 
 @dataclass(frozen=True)
@@ -63,10 +65,10 @@ OrgAdminContextDep = Annotated[OrgContext, Depends(org_admin_context)]
 
 @dataclass(frozen=True)
 class ProjectContext:
-    """The project in the path and the caller's membership in the project's organization."""
+    """The project in the path and the caller's effective role on it."""
 
     project: Project
-    membership: Membership
+    role: ProjectRole
     user: User
 
     @property
@@ -78,16 +80,42 @@ class ProjectContext:
 async def project_context(
     project_id: uuid.UUID, user: CurrentUser, session: SessionDep
 ) -> ProjectContext:
-    """Resolve `{project_id}` for the signed-in user; 404 when they can't see the project.
-
-    For now every member of the project's organization can see and change it.
-    """
-    found = await get_project_membership(session, project_id, user.id)
-    if found is None:
+    """Resolve `{project_id}` for the signed-in user; 404 when they have no role on the project."""
+    project = await session.get(Project, project_id)
+    role = (
+        None
+        if project is None
+        # effective_project_role checks the membership itself, so this principal claims nothing.
+        else await effective_project_role(
+            session, Principal.for_user(user, project.organization_id), project
+        )
+    )
+    if project is None or role is None:
         # Same answer for "does not exist" and "not yours": don't reveal which ids exist.
         raise NotFoundError("Project not found")
-    project, membership = found
-    return ProjectContext(project=project, membership=membership, user=user)
+    return ProjectContext(project=project, role=role, user=user)
 
 
-ProjectContextDep = Annotated[ProjectContext, Depends(project_context)]
+def require_project_role(minimum: ProjectRole) -> Callable[..., Awaitable[ProjectContext]]:
+    """A dependency that resolves `{project_id}` and needs at least the role `minimum` on it.
+
+    404 when the caller has no role on the project, 403 when their role is too low. Use the
+    aliases below in route signatures.
+    """
+
+    async def dependency(
+        ctx: Annotated[ProjectContext, Depends(project_context)],
+    ) -> ProjectContext:
+        if not role_at_least(ctx.role, minimum):
+            raise ForbiddenError(f"This needs the {minimum.value} role on the project")
+        return ctx
+
+    return dependency
+
+
+# Any role on the project (viewer or higher).
+ProjectContextDep = Annotated[ProjectContext, Depends(require_project_role(ProjectRole.VIEWER))]
+ProjectEditorContextDep = Annotated[
+    ProjectContext, Depends(require_project_role(ProjectRole.EDITOR))
+]
+ProjectAdminContextDep = Annotated[ProjectContext, Depends(require_project_role(ProjectRole.ADMIN))]

@@ -7,7 +7,7 @@ Stack, domain model and rules: `DECISIONS.md` (it wins over personal preference)
 
 - `src/todolist/`: backend package (`app.py` has the `create_app()` factory, `config.py` the
   `Settings`, `db.py` the SQLAlchemy `Base`, mixins, engine and `get_session`, `models/` the ORM models,
-  `services/` the domain logic, `principals.py` the `Principal` actor type, `api/` the routers under `/api`, `auth.py` the session helpers and
+  `services/` the domain logic, `permissions.py` the permission service, `principals.py` the `Principal` actor type, `api/` the routers under `/api`, `auth.py` the session helpers and
   `current_user`, `google.py` the Google OpenID Connect client, `errors.py` the API errors)
 - `migrations/`: Alembic environment and `versions/`
 - `docker-compose.yml`: PostgreSQL 18 on host port 5435 with the databases `todolist` and `todolist_test`
@@ -115,7 +115,17 @@ uv run pytest
   `async with session.begin_nested()` and turn `IntegrityError` into a `ConflictError` (see
   `services/agents.py`). Assign the attributes inside the block: `begin_nested()` flushes first.
 - After an UPDATE, `updated_at` is expired; `await session.refresh(obj)` before returning it.
-- Project-scoped routes (`/api/projects/{project_id}...`) take `ctx: ProjectContextDep` (from
-  `todolist.api.deps`): it gives `ctx.project`, `ctx.membership`, `ctx.user` and `ctx.principal`, and
-  answers 404 `Project not found` to anyone who can't see the project. A router file can export two
-  routers (`org_router` and `router` in `api/projects.py`); include both in `api/__init__.py`.
+- Project-scoped routes (`/api/projects/{project_id}...`) take `ctx: ProjectContextDep` (viewer or
+  higher), `ProjectEditorContextDep` or `ProjectAdminContextDep` (from `todolist.api.deps`, all built
+  with `require_project_role(ProjectRole.X)`): 404 `Project not found` without a role, 403 when the
+  role is too low. They give `ctx.project`, `ctx.role`, `ctx.user` and `ctx.principal`. A router file
+  can export two routers (`org_router` and `router` in `api/projects.py`); include both in
+  `api/__init__.py`.
+- Permission rules live in `src/todolist/permissions.py` and take a `Principal`:
+  `effective_project_role(session, principal, project)`, `role_at_least(role, minimum)` and
+  `visible_projects(principal)` (a `select` to filter lists). Add new rules there, not in routes.
+- `PrincipalKind` is defined in `models/project_grant.py` (PostgreSQL type `principal_kind`) and
+  re-exported by `todolist.principals`. A table that reuses an existing enum type needs
+  `postgresql.ENUM(..., create_type=False)` in its migration and must not drop the type on downgrade.
+- Tests give a user a project role with `grant_project_role(db_session, project_id, user_id, role)`
+  (`tests/helpers.py`); an organization member without a grant sees no project.
