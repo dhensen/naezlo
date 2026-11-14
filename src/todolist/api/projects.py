@@ -87,9 +87,7 @@ async def list_projects_route(org: OrgContextDep, session: SessionDep) -> list[P
 async def create_project_route(
     body: ProjectIn, org: OrgContextDep, session: SessionDep
 ) -> ProjectOut:
-    project = await create_project(
-        session, org.organization.id, org.user.id, body.name, body.description
-    )
+    project = await create_project(session, org.principal, body.name, body.description)
     return _project_out(project)
 
 
@@ -104,6 +102,7 @@ async def update_project_route(
 ) -> ProjectOut:
     project = await update_project(
         session,
+        ctx.principal,
         ctx.project,
         name=body.name,
         description=body.description,
@@ -114,4 +113,4 @@ async def update_project_route(
 
 @router.delete("", status_code=204)
 async def delete_project_route(ctx: ProjectAdminContextDep, session: SessionDep) -> None:
-    await delete_project(session, ctx.project)
+    await delete_project(session, ctx.principal, ctx.project)

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from todolist.errors import AppError, ConflictError, NotFoundError
 from todolist.models import (
     Agent,
+    AuditAction,
     Membership,
     PrincipalKind,
     Project,
@@ -22,6 +23,8 @@ from todolist.models import (
     User,
 )
 from todolist.permissions import project_stays_administrable
+from todolist.principals import Principal
+from todolist.services.audit import record_event
 
 
 @dataclass(frozen=True)
@@ -41,6 +44,13 @@ def _view(grant: ProjectGrant, user: User | None, agent: Agent | None) -> GrantV
     # The check constraint on project_grants guarantees one of the two.
     assert agent is not None
     return GrantView(grant=grant, principal_id=agent.id, name=agent.name, email=None)
+
+
+def grantee(kind: PrincipalKind, user: User | None, agent: Agent | None) -> dict[str, str]:
+    """Who a grant is for, as the audit log keeps it (with the name at that moment)."""
+    holder = user or agent
+    assert holder is not None
+    return {"kind": kind.value, "id": str(holder.id), "name": holder.name}
 
 
 async def list_project_grants(session: AsyncSession, project: Project) -> list[GrantView]:
@@ -111,12 +121,14 @@ def _is_user_admin_grant(grant: ProjectGrant) -> bool:
 
 async def set_project_grant(
     session: AsyncSession,
+    actor: Principal,
     project: Project,
     kind: PrincipalKind,
     principal_id: uuid.UUID,
     role: ProjectRole,
 ) -> GrantView:
-    """Give the user or agent `role` on the project, replacing the role they had.
+    """Give the user or agent `role` on the project, replacing the role they had. `actor` is
+    who does it, for the audit log (setting the role they already have records nothing).
 
     422 `invalid_principal` unless the user is a member of the project's organization or the
     agent belongs to it; 409 `last_project_admin` when a downgrade would leave the project
@@ -131,6 +143,7 @@ async def set_project_grant(
         ProjectGrant.project_id == project.id, principal_column == principal_id
     )
     grant = await session.scalar(existing)
+    old_role: ProjectRole | None = None if grant is None else grant.role
     if grant is None:
         try:
             async with session.begin_nested():
@@ -146,6 +159,7 @@ async def set_project_grant(
         except IntegrityError:
             # Someone granted the same principal at the same moment: change that grant instead.
             grant = (await session.scalars(existing)).one()
+            old_role = grant.role
     if grant.role is not role:
         if _is_user_admin_grant(grant):
             await _ensure_stays_administrable(session, project, grant)
@@ -153,21 +167,49 @@ async def set_project_grant(
         await session.flush()
     # updated_at is set by the database.
     await session.refresh(grant)
+    if old_role is not role:
+        await record_event(
+            session,
+            actor,
+            AuditAction.PROJECT_GRANT_SET,
+            target_kind="project_grant",
+            target_id=grant.id,
+            project_id=project.id,
+            details={
+                "principal": grantee(kind, user, agent),
+                "role": {"old": None if old_role is None else old_role.value, "new": role.value},
+            },
+        )
     return _view(grant, user, agent)
 
 
 async def revoke_project_grant(
-    session: AsyncSession, project: Project, grant_id: uuid.UUID
+    session: AsyncSession, actor: Principal, project: Project, grant_id: uuid.UUID
 ) -> None:
-    """Delete a grant of this project. 404 for an unknown id or a grant of another project."""
-    grant = await session.scalar(
-        select(ProjectGrant).where(
-            ProjectGrant.id == grant_id, ProjectGrant.project_id == project.id
+    """Delete a grant of this project, on behalf of `actor`. 404 for an unknown id or a grant
+    of another project."""
+    row = (
+        await session.execute(
+            select(ProjectGrant, User, Agent)
+            .outerjoin(User, User.id == ProjectGrant.user_id)
+            .outerjoin(Agent, Agent.id == ProjectGrant.agent_id)
+            .where(ProjectGrant.id == grant_id, ProjectGrant.project_id == project.id)
         )
-    )
-    if grant is None:
+    ).one_or_none()
+    if row is None:
         raise NotFoundError("Grant not found")
+    grant, user, agent = row
     if _is_user_admin_grant(grant):
         await _ensure_stays_administrable(session, project, grant)
+    details = {"principal": grantee(grant.principal_kind, user, agent), "role": grant.role.value}
     await session.delete(grant)
     await session.flush()
+    await record_event(
+        session,
+        actor,
+        AuditAction.PROJECT_GRANT_REVOKED,
+        target_kind="project_grant",
+        target_id=grant_id,
+        project_id=project.id,
+        details=details,
+    )

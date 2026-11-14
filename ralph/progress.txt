@@ -91,6 +91,10 @@
   (permissions.py) gives None (404) or a `ListAccess`; `access.require(ListAction.X)` raises the
   403 (`forbidden` or `list_ai_only`). It includes the list mode. Don't decide on
   `effective_list_role` alone. A list made in a test without a mode is human_only: no agent sees it.
+- Audit: `record_event(session, principal, AuditAction.X, target_kind=, target_id=, project_id=,
+  list_id=, details=)` (services/audit.py), called by the services after the change. All changing
+  service functions take the acting Principal (`actor` in the grant services). Tests:
+  tests/test_audit.py (`all_events`, `last_event`, `actions`); order events by id, not created_at.
 
 ## 2026-11-14 - US-001
 - Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
@@ -542,4 +546,29 @@
     should decide whether a tool for that exists at all.
   - Tests that build an agent Principal on a list created through the API without a mode must set
     the mode first: the default is human_only while the organization has no agent.
+---
+
+## 2026-11-14 22:57 - US-018
+- Audit event recording: `audit_events` table (model `AuditEvent`, enum `AuditAction`, migration
+  b82bcf0756e0), `record_event` + `changes` in services/audit.py. The project, list, item and grant
+  services record an event for every change, in the caller's transaction; all of them now take the
+  acting Principal (`create_project(session, principal, name, description)`, `update_project`,
+  `delete_project`, `update_list`, `delete_list`, `set_*_grant` / `revoke_*_grant` with `actor`).
+  Decisions (details shape, no-op = no event, cascades = one event): DECISIONS.md.
+- Files changed: src/todolist/models/{audit_event,__init__}.py, services/{audit,projects,lists,
+  items,project_grants,list_grants}.py, api/{projects,lists,project_grants,list_grants}.py,
+  migrations/versions/20261114_2253_b82bcf0756e0_add_audit_events.py, tests/test_audit.py (new),
+  DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - "A failed request records nothing" is tested two ways: failing API calls leave the event list
+    unchanged, and an event recorded inside a savepoint disappears on rollback. The test app's
+    session override does not roll back on an error (only the real `get_session` does), so a test
+    cannot observe the request-level rollback directly.
+  - `created_at` is `now()` = the transaction's start: events of one request share it. The audit
+    API (US-019) should order by `(created_at, id)`; ids are UUIDv7.
+  - `remove_member` (organization) deletes grants in bulk without events; member changes are not
+    audited in v1.
+  - The item service looks up the list's `project_id` for update / move / delete events (one small
+    query); `create_item` gets it from the `todo_list` it is given.
 ---

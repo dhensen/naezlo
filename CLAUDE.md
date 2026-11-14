@@ -177,3 +177,11 @@ uv run pytest
   `add_in_savepoint(db_session, obj, check_deferred=True)`.
 - A bulk `update(Model)` that must not bump `updated_at` sets `updated_at=Model.updated_at`, and
   uses `.execution_options(synchronize_session="fetch")` so loaded objects get the new values.
+- Audit log: model `AuditEvent` / enum `AuditAction` (`models/audit_event.py`), `record_event(session,
+  principal, action, *, target_kind, target_id, project_id, list_id, details)` and `changes(old, new)`
+  in `services/audit.py`. Every service function that changes a project, list, item or grant takes
+  the acting `Principal` and records its event itself, after the change (routes and MCP tools don't).
+  A new kind of change gets an `AuditAction` member, an event with the target's name in `details`
+  (`changes: {field: {old, new}}` for updates) and a test in `tests/test_audit.py`. No event when
+  nothing changed.
+- In tests all rows share one `created_at` (one transaction): order events by `AuditEvent.id` (UUIDv7).

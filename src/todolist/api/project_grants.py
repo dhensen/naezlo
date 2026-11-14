@@ -59,7 +59,7 @@ async def set_grant_route(
     body: GrantIn, ctx: ProjectAdminContextDep, session: SessionDep
 ) -> GrantOut:
     view = await set_project_grant(
-        session, ctx.project, body.principal_kind, body.principal_id, body.role
+        session, ctx.principal, ctx.project, body.principal_kind, body.principal_id, body.role
     )
     return _grant_out(view)
 
@@ -68,4 +68,4 @@ async def set_grant_route(
 async def revoke_grant_route(
     grant_id: uuid.UUID, ctx: ProjectAdminContextDep, session: SessionDep
 ) -> None:
-    await revoke_project_grant(session, ctx.project, grant_id)
+    await revoke_project_grant(session, ctx.principal, ctx.project, grant_id)

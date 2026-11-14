@@ -10,8 +10,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.errors import AppError
-from todolist.models import Item, ItemStatus, TodoList
+from todolist.models import AuditAction, Item, ItemStatus, TodoList
 from todolist.principals import Principal
+from todolist.services.audit import changes, record_event
 
 
 def _clean_notes(notes: str | None) -> str | None:
@@ -47,6 +48,32 @@ async def _shift_positions(
     )
 
 
+async def _record(
+    session: AsyncSession,
+    principal: Principal,
+    action: AuditAction,
+    item: Item,
+    project_id: uuid.UUID | None = None,
+    **details: object,
+) -> None:
+    """Record an event about the item. Call it before the item is deleted or expired."""
+    if project_id is None:
+        project_id = await session.scalar(
+            select(TodoList.project_id).where(TodoList.id == item.list_id)
+        )
+    await record_event(
+        session,
+        principal,
+        action,
+        target_kind="item",
+        target_id=item.id,
+        project_id=project_id,
+        list_id=item.list_id,
+        # The title makes the event readable after the item is gone.
+        details={"title": item.title, **details},
+    )
+
+
 async def list_items(session: AsyncSession, todo_list: TodoList) -> list[Item]:
     """The items of the list in their order (position, then age)."""
     items = await session.scalars(
@@ -77,6 +104,7 @@ async def create_item(
     )
     session.add(item)
     await session.flush()
+    await _record(session, principal, AuditAction.ITEM_CREATED, item, todo_list.project_id)
     return item
 
 
@@ -96,13 +124,21 @@ async def update_item(
     Going from open to done records `principal` and the time as the completion; going back to
     open clears both. Setting the status an item already has changes nothing: an item that is
     done keeps its first completion.
+
+    The audit log gets `item.updated` for a changed title or notes and `item.completed` or
+    `item.reopened` for a changed status (both when one call does both).
     """
+    old = {"title": item.title, "notes": item.notes}
+    status_action: AuditAction | None = None
     if title is not None:
         item.title = title.strip()
     if set_notes:
         item.notes = _clean_notes(notes)
     if status is not None and status is not item.status:
         item.status = status
+        status_action = (
+            AuditAction.ITEM_COMPLETED if status is ItemStatus.DONE else AuditAction.ITEM_REOPENED
+        )
         if status is ItemStatus.DONE:
             item.completed_by_kind = principal.kind
             item.completed_by_id = principal.id
@@ -115,6 +151,11 @@ async def update_item(
     await session.flush()
     # updated_at and completed_at are set by the database.
     await session.refresh(item)
+    changed = changes(old, {"title": item.title, "notes": item.notes})
+    if changed:
+        await _record(session, principal, AuditAction.ITEM_UPDATED, item, changes=changed)
+    if status_action is not None:
+        await _record(session, principal, status_action, item)
     return item
 
 
@@ -130,9 +171,8 @@ async def move_item(
     422 `invalid_before_item` when there is no such item in the item's list (it does not
     exist or it is in another list: the answer is the same, so it tells nothing about lists
     the caller cannot see). Moving an item before itself leaves it where it is.
-    `principal` is the actor, for the audit log.
+    `principal` is the actor, for the audit log; an item that stays where it is records nothing.
     """
-    del principal  # recorded once audit events exist
     await _lock_list(session, item.list_id)
     # The position as it is now that nobody else can change it.
     await session.refresh(item)
@@ -161,17 +201,24 @@ async def move_item(
     item.position = new
     await session.flush()
     await session.refresh(item)
+    await _record(
+        session,
+        principal,
+        AuditAction.ITEM_MOVED,
+        item,
+        changes={"position": {"old": old, "new": new}},
+    )
     return item
 
 
 async def delete_item(session: AsyncSession, principal: Principal, item: Item) -> None:
     """Remove the item and close the gap it leaves in the positions. `principal` is the actor,
     for the audit log."""
-    del principal  # recorded once audit events exist
     list_id = item.list_id
     await _lock_list(session, list_id)
     await session.refresh(item)
     position = item.position
+    await _record(session, principal, AuditAction.ITEM_DELETED, item)
     await session.delete(item)
     await session.flush()
     await _shift_positions(session, list_id, position + 1, None, -1)

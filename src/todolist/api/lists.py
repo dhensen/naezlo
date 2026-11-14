@@ -110,6 +110,7 @@ async def update_list_route(
 ) -> ListOut:
     todo_list = await update_list(
         session,
+        ctx.principal,
         ctx.todo_list,
         name=body.name,
         description=body.description,
@@ -121,4 +122,4 @@ async def update_list_route(
 
 @router.delete("", status_code=204)
 async def delete_list_route(ctx: ListAdminContextDep, session: SessionDep) -> None:
-    await delete_list(session, ctx.todo_list)
+    await delete_list(session, ctx.principal, ctx.todo_list)

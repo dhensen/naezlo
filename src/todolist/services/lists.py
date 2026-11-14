@@ -9,9 +9,10 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from todolist.models import Agent, ListMode, PrincipalKind, Project, TodoList
+from todolist.models import Agent, AuditAction, ListMode, PrincipalKind, Project, TodoList
 from todolist.permissions import visible_lists
 from todolist.principals import Principal
+from todolist.services.audit import changes, record_event
 
 
 def _clean_description(description: str | None) -> str | None:
@@ -66,11 +67,30 @@ async def create_list(
     )
     session.add(todo_list)
     await session.flush()
+    await record_event(
+        session,
+        principal,
+        AuditAction.LIST_CREATED,
+        target_kind="list",
+        target_id=todo_list.id,
+        project_id=project.id,
+        list_id=todo_list.id,
+        details={"name": todo_list.name, "mode": todo_list.mode.value},
+    )
     return todo_list
+
+
+def _audited_fields(todo_list: TodoList) -> dict[str, object]:
+    return {
+        "name": todo_list.name,
+        "description": todo_list.description,
+        "mode": todo_list.mode,
+    }
 
 
 async def update_list(
     session: AsyncSession,
+    principal: Principal,
     todo_list: TodoList,
     *,
     name: str | None = None,
@@ -80,6 +100,7 @@ async def update_list(
 ) -> TodoList:
     """Change the name and the mode (when given) and the description (when `set_description`;
     None clears it)."""
+    old = _audited_fields(todo_list)
     if name is not None:
         todo_list.name = name.strip()
     if set_description:
@@ -89,9 +110,34 @@ async def update_list(
     await session.flush()
     # updated_at is set by the database.
     await session.refresh(todo_list)
+    # A mode change is in here too, with the old and the new mode.
+    changed = changes(old, _audited_fields(todo_list))
+    if changed:
+        await record_event(
+            session,
+            principal,
+            AuditAction.LIST_UPDATED,
+            target_kind="list",
+            target_id=todo_list.id,
+            project_id=todo_list.project_id,
+            list_id=todo_list.id,
+            details={"name": todo_list.name, "changes": changed},
+        )
     return todo_list
 
 
-async def delete_list(session: AsyncSession, todo_list: TodoList) -> None:
+async def delete_list(session: AsyncSession, principal: Principal, todo_list: TodoList) -> None:
+    """Delete the list with its items. One event is recorded, for the list."""
+    list_id, project_id, name = todo_list.id, todo_list.project_id, todo_list.name
     await session.delete(todo_list)
     await session.flush()
+    await record_event(
+        session,
+        principal,
+        AuditAction.LIST_DELETED,
+        target_kind="list",
+        target_id=list_id,
+        project_id=project_id,
+        list_id=list_id,
+        details={"name": name},
+    )

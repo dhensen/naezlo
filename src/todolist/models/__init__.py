@@ -5,6 +5,7 @@ package to fill `Base.metadata`.
 """
 
 from todolist.models.agent import Agent
+from todolist.models.audit_event import AuditAction, AuditEvent
 from todolist.models.invitation import Invitation, InvitationRole
 from todolist.models.item import Item, ItemStatus
 from todolist.models.list_grant import ListGrant, ListRole
@@ -16,6 +17,8 @@ from todolist.models.user import User, normalize_email
 
 __all__ = [
     "Agent",
+    "AuditAction",
+    "AuditEvent",
     "Invitation",
     "InvitationRole",
     "Item",
