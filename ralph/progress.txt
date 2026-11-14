@@ -117,6 +117,12 @@
   `resolve_access_token(session, token)` → agent `Principal` or None). Tests: tests/test_oauth_token.py
   has `authorize(client)` (sign in, agent, client, approved code), `exchange(client, authorized)`
   (gives the token response with `access_token`), `refresh` and `revoke` to import.
+- MCP server (US-023): src/todolist/mcp_server/ (`create_mcp_server`, `mcp_asgi_app`, stateless
+  streamable HTTP + JSON at /mcp, bearer check by the SDK with `AgentTokenVerifier`). New tool: add
+  it in `register_tools` (mcp_server/tools.py) with `async with agent_context() as ctx`
+  (`ctx.principal`, `ctx.session`). Tests: tests/test_mcp.py has `agent_token`, `mcp_client`,
+  `mcp_http`, `running`, `whoami`, `make_list`, `grant_agent` to import. All lists of a principal:
+  `accessible_lists(principal)` (permissions.py).
 
 ## 2026-11-14 - US-001
 - Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
@@ -717,4 +723,33 @@
     /authorize or /token).
   - `invalid_client` is a 401 without a `WWW-Authenticate` header (clients send no credentials).
   - httpx `data={...}` sends a form; `content=` with a Content-Type header sends a raw body.
+---
+
+## 2026-11-14 23:35 - US-023
+- MCP server built with the SDK's `MCPServer`, served at /mcp (streamable HTTP, stateless, JSON
+  responses) by a plain route in `create_app`; the lifespan runs its session manager.
+- Bearer authentication by the SDK's resource-server middleware with `AgentTokenVerifier`
+  (calls `resolve_access_token`): 401 + `WWW-Authenticate: Bearer ... resource_metadata=".../.well-known/oauth-protected-resource/mcp"`.
+- Tool handlers get the agent `Principal` and a session through `agent_context()`; tool `whoami`
+  (agent, organization, number of accessible lists). New permission query `accessible_lists`.
+- DNS rebinding protection: /mcp only answers for the host of PUBLIC_BASE_URL (+ loopback outside production).
+- Files: src/todolist/mcp_server/{__init__,server,context,tools}.py (new), src/todolist/app.py,
+  src/todolist/db.py (`transaction`, `SessionScope`), src/todolist/permissions.py, tests/conftest.py,
+  tests/test_mcp.py (new), DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt
+- Checked by hand: uvicorn starts, `POST /mcp` without a token answers the 401 challenge, shutdown is clean.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - `Client(streamable_http_client(url, http_client=httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), ...)))`
+    is how the SDK client reaches the ASGI app. `ASGITransport` does not run the lifespan: wrap in
+    `app.router.lifespan_context(app)`, inside the test body (a fixture enters and exits in different tasks).
+  - Without a token the SDK client fails with an `ExceptionGroup` around `MCPError("Server returned an
+    error response")`; the 401 is only visible on the HTTP client (response event hook).
+  - The SDK checks `Host`: requests to /mcp from the `client` fixture (`http://test`) get 421 once
+    they carry a valid token (the 401 comes first). Use `mcp_http`.
+  - `mcp.server.auth.middleware.auth_context.get_access_token()` works inside a tool in stateless mode;
+    `mcp_server/context.py::current_principal` wraps it.
+  - A `Route(path, endpoint=<ASGI app instance>)` appended to `app.router.routes` serves all methods
+    and leaves the path as it is; it does not show up in the OpenAPI schema.
+  - pyright strict: an `@asynccontextmanager` function must be annotated `-> AsyncGenerator[T]`, and a
+    function registered by a decorator inside another function needs `# pyright: ignore[reportUnusedFunction]`.
 ---

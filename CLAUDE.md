@@ -8,7 +8,8 @@ Stack, domain model and rules: `DECISIONS.md` (it wins over personal preference)
 - `src/todolist/`: backend package (`app.py` has the `create_app()` factory, `config.py` the
   `Settings`, `db.py` the SQLAlchemy `Base`, mixins, engine and `get_session`, `models/` the ORM models,
   `services/` the domain logic, `permissions.py` the permission service, `principals.py` the `Principal` actor type, `api/` the routers under `/api`, `auth.py` the session helpers and
-  `current_user`, `google.py` the Google OpenID Connect client, `errors.py` the API errors)
+  `current_user`, `google.py` the Google OpenID Connect client, `errors.py` the API errors,
+  `mcp_server/` the MCP server at `/mcp`)
 - `migrations/`: Alembic environment and `versions/`
 - `docker-compose.yml`: PostgreSQL 18 on host port 5435 with the databases `todolist` and `todolist_test`
 - `tests/`: pytest tests
@@ -228,3 +229,21 @@ uv run pytest
 - For anything about MCP or its OAuth flow, read the installed SDK (`.venv/lib/python3.14/site-packages/mcp/`,
   version 2.x: `MCPServer`, `mcp.server.auth`, `mcp.client.auth`) and the spec revision 2026-07-28
   (`https://modelcontextprotocol.io/specification/latest/basic/authorization`) instead of memory.
+- MCP server: `src/todolist/mcp_server/` (`server.py` builds the SDK `MCPServer` per app, stateless
+  streamable HTTP with JSON responses; `context.py` the bearer check and `agent_context`; `tools.py`
+  the tools). `create_app` routes `/mcp` to it and runs its session manager in the lifespan.
+- A new MCP tool goes in `register_tools(server, agent_context)` (`mcp_server/tools.py`):
+  `@server.tool()` on an `async def` with a docstring (the description agents see) that returns a
+  pydantic model, and inside it `async with agent_context() as ctx:` for `ctx.principal` (the agent)
+  and `ctx.session` (one transaction per call, committed at the end of the block). Call the service
+  functions with `ctx.principal`; permission checks go through `permissions.py` as in the routes.
+- Code outside a route opens a session with `app.state.session_scope()` (`todolist.db.transaction`);
+  the `app` fixture replaces it with the test's `db_session`.
+- Lists across all projects of a principal's organization: `accessible_lists(principal)` in
+  `permissions.py` (`visible_lists(principal, project)` is that, narrowed to one project).
+- MCP tests (`tests/test_mcp.py`): `agent_token(client)` gives `(Authorized, token)`, and
+  `async with mcp_client(app, token) as mcp:` the SDK client on the ASGI app (`await mcp.call_tool(...)`,
+  `result.structured_content`). It runs the app lifespan (`running(app)`); enter it in the test body,
+  never in a fixture (the task group must start and stop in the same task). Raw requests:
+  `mcp_http(app, token)`, an `httpx2` client on `http://localhost:8000` (the only allowed `Host`).
+  Give the agent a list with `grant_agent(db_session, list_id, agent_id, ListRole.X)` on a `mixed` list.

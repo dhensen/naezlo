@@ -22,7 +22,7 @@ import uuid
 from dataclasses import dataclass
 from typing import cast
 
-from sqlalchemy import Select, and_, false, or_, select
+from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.errors import AppError, ForbiddenError
@@ -233,16 +233,19 @@ async def list_access(
     return ListAccess(role=role, mode=todo_list.mode, kind=principal.kind)
 
 
-def visible_lists(principal: Principal, project: Project) -> Select[TodoList]:
-    """A query for the lists of the project that the principal can see, in no order.
+def accessible_lists(principal: Principal) -> Select[TodoList]:
+    """A query for every list the principal can see, in all projects of their organization,
+    in no order.
 
-    The same rules as `list_access`, for a whole project at once: a role on the list, and for
-    an agent a list that is not human-only. It can give lists to a principal without a role
-    on the project itself (a list grant only).
+    The same rules as `list_access`, for many lists at once: a role on the list, and for an
+    agent a list that is not human-only. It can give lists to a principal without a role on
+    the list's project (a list grant only).
     """
-    in_project = select(TodoList).where(TodoList.project_id == project.id)
-    if principal.organization_id != project.organization_id:
-        return in_project.where(false())
+    in_organization = select(TodoList).where(
+        TodoList.project_id.in_(
+            select(Project.id).where(Project.organization_id == principal.organization_id)
+        )
+    )
     is_user = principal.kind is PrincipalKind.USER
     list_role = (
         select(ListGrant.role)
@@ -255,7 +258,7 @@ def visible_lists(principal: Principal, project: Project) -> Select[TodoList]:
     has_project_role = (
         select(ProjectGrant.id)
         .where(
-            ProjectGrant.project_id == project.id,
+            ProjectGrant.project_id == TodoList.project_id,
             (ProjectGrant.user_id if is_user else ProjectGrant.agent_id) == principal.id,
         )
         .exists()
@@ -265,11 +268,11 @@ def visible_lists(principal: Principal, project: Project) -> Select[TodoList]:
         and_(list_role.is_(None), has_project_role),
     )
     if not is_user:
-        return in_project.where(granted, TodoList.mode != ListMode.HUMAN_ONLY)
+        return in_organization.where(granted, TodoList.mode != ListMode.HUMAN_ONLY)
     membership_role = (
         select(Membership.role)
         .where(
-            Membership.organization_id == project.organization_id,
+            Membership.organization_id == principal.organization_id,
             Membership.user_id == principal.id,
         )
         .scalar_subquery()
@@ -277,7 +280,13 @@ def visible_lists(principal: Principal, project: Project) -> Select[TodoList]:
     manages = membership_role.in_(
         [role for role in MembershipRole if can_manage_organization(role)]
     )
-    return in_project.where(manages | and_(membership_role.is_not(None), granted))
+    return in_organization.where(manages | and_(membership_role.is_not(None), granted))
+
+
+def visible_lists(principal: Principal, project: Project) -> Select[TodoList]:
+    """`accessible_lists` narrowed to one project (nothing when the project is in another
+    organization than the principal acts in)."""
+    return accessible_lists(principal).where(TodoList.project_id == project.id)
 
 
 def visible_projects(principal: Principal) -> Select[Project]:

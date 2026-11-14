@@ -5,7 +5,8 @@ Models subclass `Base` and are imported in `todolist.models` so that Alembic see
 
 import enum
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import datetime
 from typing import Annotated
 
@@ -71,9 +72,11 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
-async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
-    """One session and one transaction per request: commit on success, roll back on error."""
-    session_factory: async_sessionmaker[AsyncSession] = request.app.state.session_factory
+@asynccontextmanager
+async def transaction(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[AsyncSession]:
+    """A session with one transaction: committed when the block ends, rolled back when it raises."""
     async with session_factory() as session:
         try:
             yield session
@@ -82,6 +85,17 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
             raise
         else:
             await session.commit()
+
+
+# Opens a session with its transaction, for code that runs outside a FastAPI route (the MCP
+# server): `async with session_scope() as session`. The app's one is `app.state.session_scope`.
+SessionScope = Callable[[], AbstractAsyncContextManager[AsyncSession]]
+
+
+async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
+    """One session and one transaction per request: commit on success, roll back on error."""
+    async with transaction(request.app.state.session_factory) as session:
+        yield session
 
 
 # Use this in route signatures: `session: SessionDep`.

@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
@@ -91,7 +92,13 @@ def app(settings: Settings, db_session: AsyncSession) -> Iterator[FastAPI]:
     async def override_get_session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
+    @asynccontextmanager
+    async def shared_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
     app.dependency_overrides[get_session] = override_get_session
+    # The MCP server opens its sessions through this; it gets the test's session too.
+    app.state.session_scope = shared_session
     yield app
     app.dependency_overrides.clear()
 
