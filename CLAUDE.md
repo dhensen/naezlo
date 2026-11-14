@@ -192,10 +192,19 @@ uv run pytest
 - Several query parameters: a pydantic model taken as `query: Annotated[MyQuery, Query()]`
   (see `AuditQuery` in `api/audit.py`).
 - OAuth server for MCP clients (hand-written, not the SDK's provider; see DECISIONS.md): models in
-  `models/oauth.py` (`OAuthClient`, `OAuthAuthorizationCode`, `OAuthAccessToken`, `OAuthRefreshToken`),
+  `models/oauth.py` (`OAuthClient`, `OAuthAuthorizationRequest`, `OAuthAuthorizationCode`, `OAuthAccessToken`,
+  `OAuthRefreshToken`),
   logic in `services/oauth.py`, routes in `api/oauth.py`. Its `root_router` holds the spec-defined
-  paths at the app root (`/.well-known/...`, `/register`, later `/authorize`, `/token`, `/revoke`) and
+  paths at the app root (`/.well-known/...`, `/register`, `/authorize`, later `/token`, `/revoke`) and
   is included in `app.py`; routes under `/api/oauth/...` go in a normal `router` in the same file.
+- Authorization flow: `GET /authorize` validates (`validate_authorization_request`), stores an
+  `OAuthAuthorizationRequest` (10 minutes, deleted when answered) and redirects to the SPA page
+  `/oauth/consent?request=<id>`, or to `/login?next=/authorize?...` without a session. The consent
+  page uses `GET /api/oauth/requests/{id}` and `POST .../approve {agent_id}` / `.../deny`, which
+  return `{redirect_url}` (`AppError`s, not `OAuthError`s). Build every authorization response with
+  `authorization_response_url(settings, redirect_uri, state, **params)`: it adds `state` and `iss`.
+- Who may authorize which agent: `can_authorize_agent` / `authorizable_agents` in `permissions.py`.
+- A route that works with and without a session takes `user: OptionalCurrentUser` (`todolist.auth`).
 - OAuth endpoints raise `todolist.errors.OAuthError(error, description, status_code=400)` (body
   `{"error", "error_description"}`), not `AppError`. They parse the body themselves so a bad request
   is an OAuth error, not FastAPI's 422.

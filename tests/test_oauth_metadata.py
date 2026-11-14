@@ -35,6 +35,7 @@ async def test_authorization_server_metadata(client: AsyncClient) -> None:
         "token_endpoint_auth_methods_supported": ["none"],
         "revocation_endpoint_auth_methods_supported": ["none"],
         "code_challenge_methods_supported": ["S256"],
+        "authorization_response_iss_parameter_supported": True,
     }
 
 

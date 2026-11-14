@@ -12,6 +12,7 @@ from todolist.models.list_grant import ListGrant, ListRole
 from todolist.models.oauth import (
     OAuthAccessToken,
     OAuthAuthorizationCode,
+    OAuthAuthorizationRequest,
     OAuthClient,
     OAuthRefreshToken,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "MembershipRole",
     "OAuthAccessToken",
     "OAuthAuthorizationCode",
+    "OAuthAuthorizationRequest",
     "OAuthClient",
     "OAuthRefreshToken",
     "Organization",

@@ -374,8 +374,8 @@
         "Typecheck passes"
       ],
       "priority": 21,
-      "passes": false,
-      "notes": "The consent page itself is built in US-037; this story delivers the backend only."
+      "passes": true,
+      "notes": "The consent page itself is built in US-037; this story delivers the backend only. Done: `state` is optional (the MCP spec makes it a SHOULD for clients) and returned unchanged when sent; every authorization response also carries `iss` (RFC 9207). An agent the user may not authorize is a 403 whether or not it exists."
     },
     {
       "id": "US-022",

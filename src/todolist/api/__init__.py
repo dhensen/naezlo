@@ -13,6 +13,7 @@ from todolist.api import (
     lists,
     me,
     members,
+    oauth,
     orgs,
     project_grants,
     projects,
@@ -36,5 +37,6 @@ api_router.include_router(items.list_router)
 api_router.include_router(items.router)
 api_router.include_router(audit.project_router)
 api_router.include_router(audit.list_router)
+api_router.include_router(oauth.router)
 
 __all__ = ["api_router"]

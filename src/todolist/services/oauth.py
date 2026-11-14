@@ -1,22 +1,37 @@
-"""The OAuth 2.1 authorization server for MCP clients: metadata and client registration.
+"""The OAuth 2.1 authorization server for MCP clients: metadata, client registration, the
+authorization request and the user's answer to it on the consent screen.
 
 The endpoints are hand-written (see DECISIONS.md); the `mcp` SDK supplies the wire models of
 the two metadata documents, so what is served here is what the SDK's client parses.
 """
 
 import hashlib
+import re
 import secrets
 import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from mcp.shared.auth import OAuthMetadata, ProtectedResourceMetadata
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.config import Settings
-from todolist.errors import OAuthError
-from todolist.models import OAuthClient
+from todolist.errors import ForbiddenError, NotFoundError, OAuthError
+from todolist.models import (
+    Agent,
+    OAuthAuthorizationCode,
+    OAuthAuthorizationRequest,
+    OAuthClient,
+    Organization,
+    User,
+)
+from todolist.permissions import authorizable_agents, can_authorize_agent
+from todolist.principals import Principal
 
 AUTHORIZATION_PATH = "/authorize"
 TOKEN_PATH = "/token"
@@ -33,6 +48,13 @@ MAX_REGISTRATION_BODY_BYTES = 16 * 1024
 MAX_REDIRECT_URIS = 10
 MAX_REDIRECT_URI_LENGTH = 2000
 MAX_CLIENT_NAME_LENGTH = 200
+
+# How long the consent screen may stay open, and how long the client has to exchange the code.
+AUTHORIZATION_REQUEST_LIFETIME = timedelta(minutes=10)
+AUTHORIZATION_CODE_LIFETIME = timedelta(minutes=10)
+MAX_STATE_LENGTH = 2000
+# RFC 7636: 43 to 128 unreserved characters (an S256 challenge is exactly 43).
+_CODE_CHALLENGE = re.compile(r"[A-Za-z0-9\-._~]{43,128}")
 _LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
@@ -65,6 +87,8 @@ def authorization_server_metadata(settings: Settings) -> OAuthMetadata:
             "token_endpoint_auth_methods_supported": [PUBLIC_CLIENT_AUTH_METHOD],
             "revocation_endpoint_auth_methods_supported": [PUBLIC_CLIENT_AUTH_METHOD],
             "code_challenge_methods_supported": ["S256"],
+            # RFC 9207: every authorization response carries `iss`.
+            "authorization_response_iss_parameter_supported": True,
         }
     )
 
@@ -198,3 +222,251 @@ def client_information(client: OAuthClient) -> dict[str, Any]:
     if client.client_name is not None:
         information["client_name"] = client.client_name
     return information
+
+
+class AuthorizationPageError(Exception):
+    """An authorization request whose client or redirect URI cannot be trusted. The browser
+    must not be sent anywhere: the person sees this message instead (RFC 6749 4.1.2.1)."""
+
+    def __init__(self, description: str) -> None:
+        super().__init__(description)
+        self.description = description
+
+
+class AuthorizationRedirectError(Exception):
+    """An invalid authorization request from a known client with a registered redirect URI:
+    the error goes back to the client through `redirect_url`."""
+
+    def __init__(self, redirect_url: str) -> None:
+        super().__init__("Invalid authorization request")
+        self.redirect_url = redirect_url
+
+
+@dataclass(frozen=True)
+class ValidatedAuthorization:
+    """The parameters of an /authorize request that passed every check."""
+
+    client: OAuthClient
+    redirect_uri: str
+    code_challenge: str
+    state: str | None
+    scope: str
+    resource: str | None
+
+
+def authorization_response_url(
+    settings: Settings, redirect_uri: str, state: str | None, **parameters: str
+) -> str:
+    """`redirect_uri` with the authorization response added to its query: `parameters` (the
+    code, or the error), the client's `state` when it sent one, and `iss` (RFC 9207)."""
+    response = dict(parameters)
+    if state is not None:
+        response["state"] = state
+    response["iss"] = settings.oauth_issuer
+    parts = urlsplit(redirect_uri)
+    query = parse_qsl(parts.query, keep_blank_values=True) + list(response.items())
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+async def validate_authorization_request(
+    session: AsyncSession, settings: Settings, parameters: Sequence[tuple[str, str]]
+) -> ValidatedAuthorization:
+    """Check the query parameters of GET /authorize (OAuth 2.1 with PKCE, RFC 8707 resource).
+
+    Raises `AuthorizationPageError` while the client and the redirect URI are not established,
+    and `AuthorizationRedirectError` for every problem after that.
+    """
+    values: dict[str, list[str]] = {}
+    for name, value in parameters:
+        values.setdefault(name, []).append(value)
+
+    def single(name: str) -> str | None:
+        """The parameter's value; None when it is absent or empty."""
+        found = values.get(name, [])
+        return found[0] if len(found) == 1 and found[0] else None
+
+    def repeated(name: str) -> bool:
+        return len(values.get(name, [])) > 1
+
+    client_id = single("client_id")
+    if client_id is None:
+        raise AuthorizationPageError("The request has no client_id, or more than one.")
+    client = await session.get(OAuthClient, client_id)
+    if client is None:
+        raise AuthorizationPageError("This application is not registered here.")
+    redirect_uri = single("redirect_uri")
+    if redirect_uri is None:
+        raise AuthorizationPageError("The request has no redirect_uri, or more than one.")
+    # Exact string comparison with what the client registered: no normalization, no prefixes.
+    if redirect_uri not in client.redirect_uris:
+        raise AuthorizationPageError(
+            "The redirect URI of the request is not one this application registered."
+        )
+
+    state = single("state")
+    state_is_usable = not repeated("state") and (state is None or len(state) <= MAX_STATE_LENGTH)
+
+    def error(code: str, description: str) -> AuthorizationRedirectError:
+        return AuthorizationRedirectError(
+            authorization_response_url(
+                settings,
+                redirect_uri,
+                state if state_is_usable else None,
+                error=code,
+                error_description=description,
+            )
+        )
+
+    if not state_is_usable:
+        raise error("invalid_request", f"state must be one value of at most {MAX_STATE_LENGTH}")
+    for name in ("response_type", "code_challenge", "code_challenge_method", "scope", "resource"):
+        if repeated(name):
+            raise error("invalid_request", f"{name} is given more than once")
+
+    response_type = single("response_type")
+    if response_type is None:
+        raise error("invalid_request", "response_type is required")
+    if response_type != "code":
+        raise error("unsupported_response_type", "response_type must be code")
+
+    code_challenge = single("code_challenge")
+    if code_challenge is None:
+        raise error("invalid_request", "code_challenge is required (PKCE)")
+    # Without a method the challenge would be `plain`, which is not accepted.
+    if single("code_challenge_method") != "S256":
+        raise error("invalid_request", "code_challenge_method must be S256")
+    if _CODE_CHALLENGE.fullmatch(code_challenge) is None:
+        raise error("invalid_request", "code_challenge is not a valid S256 challenge")
+
+    scope = single("scope")
+    if scope is not None and set(scope.split()) != {MCP_SCOPE}:
+        raise error("invalid_scope", f"scope can only be {MCP_SCOPE}")
+
+    resource = single("resource")
+    if resource is not None and resource.rstrip("/") != settings.mcp_resource_url:
+        raise error("invalid_target", f"resource must be {settings.mcp_resource_url}")
+
+    return ValidatedAuthorization(
+        client=client,
+        redirect_uri=redirect_uri,
+        code_challenge=code_challenge,
+        state=state,
+        scope=MCP_SCOPE,
+        resource=None if resource is None else settings.mcp_resource_url,
+    )
+
+
+async def create_authorization_request(
+    session: AsyncSession, validated: ValidatedAuthorization, user: User
+) -> OAuthAuthorizationRequest:
+    """Store a validated request until `user` answers it on the consent screen."""
+    now = datetime.now(UTC)
+    # Housekeeping: requests nobody answered in time.
+    await session.execute(
+        delete(OAuthAuthorizationRequest).where(OAuthAuthorizationRequest.expires_at <= now)
+    )
+    pending = OAuthAuthorizationRequest(
+        client_id=validated.client.client_id,
+        user_id=user.id,
+        redirect_uri=validated.redirect_uri,
+        code_challenge=validated.code_challenge,
+        state=validated.state,
+        scope=validated.scope,
+        resource=validated.resource,
+        expires_at=now + AUTHORIZATION_REQUEST_LIFETIME,
+    )
+    session.add(pending)
+    await session.flush()
+    return pending
+
+
+async def get_authorization_request(
+    session: AsyncSession, request_id: uuid.UUID, user: User, *, for_update: bool = False
+) -> tuple[OAuthAuthorizationRequest, OAuthClient]:
+    """The pending request `user` started, with its client; 404 when there is none (also for
+    someone else's request, an answered one and an expired one).
+
+    `for_update` locks the request, so that it can be answered only once.
+    """
+    query = (
+        select(OAuthAuthorizationRequest, OAuthClient)
+        .join(OAuthClient, OAuthClient.client_id == OAuthAuthorizationRequest.client_id)
+        .where(
+            OAuthAuthorizationRequest.id == request_id,
+            OAuthAuthorizationRequest.user_id == user.id,
+            OAuthAuthorizationRequest.expires_at > datetime.now(UTC),
+        )
+    )
+    if for_update:
+        query = query.with_for_update(of=OAuthAuthorizationRequest)
+    row = (await session.execute(query)).one_or_none()
+    if row is None:
+        raise NotFoundError("Authorization request not found")
+    return row[0], row[1]
+
+
+async def list_authorizable_agents(
+    session: AsyncSession, user: User
+) -> list[tuple[Agent, Organization]]:
+    """The agents `user` may pick on the consent screen, with their organization."""
+    rows = await session.execute(authorizable_agents(user.id))
+    return [(agent, organization) for agent, organization in rows]
+
+
+async def approve_authorization_request(
+    session: AsyncSession,
+    settings: Settings,
+    request_id: uuid.UUID,
+    user: User,
+    agent_id: uuid.UUID,
+) -> str:
+    """Let the client act as the agent: issue a single-use authorization code and return the
+    URL that brings the browser back to the client with it.
+
+    The request is used up. Raises 404 for a request that is not pending and 403 for an agent
+    the user may not authorize (one answer, whether or not that agent exists).
+    """
+    pending, _client = await get_authorization_request(session, request_id, user, for_update=True)
+    agent = await session.get(Agent, agent_id)
+    if agent is None or not await can_authorize_agent(
+        session, Principal.for_user(user, agent.organization_id), agent
+    ):
+        raise ForbiddenError("You cannot authorize an application to act as this agent")
+
+    code = new_token()
+    session.add(
+        OAuthAuthorizationCode(
+            code_hash=hash_token(code),
+            client_id=pending.client_id,
+            user_id=user.id,
+            agent_id=agent.id,
+            redirect_uri=pending.redirect_uri,
+            code_challenge=pending.code_challenge,
+            scope=pending.scope,
+            resource=pending.resource,
+            expires_at=datetime.now(UTC) + AUTHORIZATION_CODE_LIFETIME,
+        )
+    )
+    redirect_url = authorization_response_url(
+        settings, pending.redirect_uri, pending.state, code=code
+    )
+    await session.delete(pending)
+    await session.flush()
+    return redirect_url
+
+
+async def deny_authorization_request(
+    session: AsyncSession, settings: Settings, request_id: uuid.UUID, user: User
+) -> str:
+    """Refuse the client: the request is used up and the returned URL tells the client so."""
+    pending, _client = await get_authorization_request(session, request_id, user, for_update=True)
+    redirect_url = authorization_response_url(
+        settings,
+        pending.redirect_uri,
+        pending.state,
+        error="access_denied",
+        error_description="The user denied the request",
+    )
+    await session.delete(pending)
+    await session.flush()
+    return redirect_url

@@ -108,6 +108,11 @@
 - The `mcp` SDK is 2.3 (`MCPServer`, not FastMCP). Read its source in .venv and the docs at
   https://py.sdk.modelcontextprotocol.io/run/authorization/ and /run/asgi/ before using it.
 
+- OAuth for MCP: models/oauth.py, services/oauth.py, api/oauth.py (`root_router` at the app root,
+  `router` under /api/oauth). `new_token()` / `hash_token()`; errors of the spec endpoints are
+  `OAuthError`. Authorization responses: `authorization_response_url(settings, redirect_uri, state,
+  **params)` (adds `state` and `iss`). Tests: tests/test_oauth_authorize.py has `register`,
+  `authorize_params`, `start` (gives a pending request id) and `callback_params` to copy.
 ## 2026-11-14 - US-001
 - Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
   FastAPI app factory `create_app()` with `GET /healthz`, pydantic-settings `Settings`
@@ -645,4 +650,36 @@
   - `uv run alembic downgrade base` on the dev database (the enum-drop check) deletes its data.
   - Removing a member does not touch OAuth tokens that user approved; US-022/US-023 should decide
     whether a token stays valid when its approver stops being owner or admin.
+---
+## 2026-11-14 - US-021
+- OAuth authorization endpoint and consent API: `GET /authorize` (validation, error page for a bad
+  client or redirect URI, error redirect for the rest, login redirect with `next`, pending request
+  + redirect to `/oauth/consent?request=<id>`), `GET /api/oauth/requests/{id}`,
+  `POST /api/oauth/requests/{id}/approve` and `/deny`. New table `oauth_authorization_requests`
+  (migration aa786329f14d). Permission rules `can_authorize_agent` and `authorizable_agents`.
+  Authorization responses carry `iss`; the metadata advertises it. `OptionalCurrentUser` dependency.
+- Files changed: src/todolist/{auth,permissions}.py, src/todolist/models/{__init__,oauth}.py,
+  src/todolist/services/oauth.py, src/todolist/api/{__init__,oauth}.py,
+  migrations/versions/20261114_2310_aa786329f14d_add_oauth_authorization_requests.py,
+  tests/test_oauth_authorize.py, tests/test_oauth_metadata.py, DECISIONS.md, CLAUDE.md,
+  ralph/prd.json, ralph/progress.txt.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - `state` is optional here (spec: clients SHOULD send it); the SDK client always sends it and
+    rejects a response without it, and it checks `iss` against the metadata issuer as a string.
+  - US-022 (/token): look the code up by `hash_token(code)`; it has `redirect_uri`,
+    `code_challenge` (S256 only: compare with base64url(sha256(verifier)) without padding),
+    `resource` (null when /authorize got none, otherwise exactly `settings.mcp_resource_url`),
+    `scope`, `user_id`, `agent_id`, `expires_at`, `used_at`. The SDK client sends `redirect_uri`,
+    `client_id`, `code_verifier` and `resource` in the token request.
+  - US-028 (login page): `/login?next=/authorize?...` must be passed on to the sign-in
+    (`/api/auth/google/login?next=...`, or navigate to `next` after dev-login); `safe_next_path`
+    accepts it. US-037 (consent page): navigate the browser to `redirect_url` from approve/deny;
+    a 404 from the request API means expired or already answered; show `redirect_host`.
+  - A multi-entity `select(A, B)` is typed `Select[A, B]` in this SQLAlchemy version, not
+    `Select[tuple[A, B]]`.
+  - Starlette's `request.query_params.multi_items()` keeps repeated parameters; `request.url.query`
+    is the raw query string.
+  - `alembic check` fails with "Target database is not up to date" until the new migration is
+    applied to the dev database (`uv run alembic upgrade head`).
 ---

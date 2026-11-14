@@ -55,5 +55,15 @@ async def current_user(request: Request, session: SessionDep) -> User:
     return user
 
 
-# Use this in route signatures: `user: CurrentUser`.
+async def optional_current_user(request: Request, session: SessionDep) -> User | None:
+    """The session's user, or None when nobody is signed in: for routes that then send the
+    browser to the login page instead of answering 401."""
+    try:
+        return await current_user(request, session)
+    except NotAuthenticatedError:
+        return None
+
+
+# Use these in route signatures: `user: CurrentUser`, `user: OptionalCurrentUser`.
 CurrentUser = Annotated[User, Depends(current_user)]
+OptionalCurrentUser = Annotated[User | None, Depends(optional_current_user)]

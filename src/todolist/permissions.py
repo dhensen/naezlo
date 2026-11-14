@@ -10,12 +10,15 @@ Rules (DECISIONS.md, "ACL"):
 - No role means the project does not exist for that principal (the caller answers 404).
 - On a list, a list grant replaces the project role for everyone but those owners and admins:
   it can raise it, lower it, take it away (`none`) or give access without any project role.
+- A user may let an MCP client act as an agent (the OAuth consent screen) when they are owner
+  or admin of the agent's organization (`can_authorize_agent`, `authorizable_agents`).
 - The list mode comes on top of the role (`list_access`, the one check for everything that
   happens to a list or its items): a human-only list does not exist for agents, and in an
   AI-only list people read but leave the items alone; only its admins still manage the list.
 """
 
 import enum
+import uuid
 from dataclasses import dataclass
 from typing import cast
 
@@ -24,11 +27,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.errors import AppError, ForbiddenError
 from todolist.models import (
+    Agent,
     ListGrant,
     ListMode,
     ListRole,
     Membership,
     MembershipRole,
+    Organization,
     PrincipalKind,
     Project,
     ProjectGrant,
@@ -342,3 +347,39 @@ async def project_stays_administrable(
         .limit(1)
     )
     return other_admin is not None
+
+
+async def can_authorize_agent(session: AsyncSession, principal: Principal, agent: Agent) -> bool:
+    """Whether the principal may let an MCP client act as `agent` (the OAuth consent screen).
+
+    Only a user who is owner or admin of the agent's organization: a token for the agent gives
+    its holder everything the agent can do, and those are the people who manage the agent.
+    """
+    if not principal.is_user or principal.organization_id != agent.organization_id:
+        return False
+    role = await session.scalar(
+        select(Membership.role).where(
+            Membership.organization_id == agent.organization_id,
+            Membership.user_id == principal.id,
+        )
+    )
+    return role is not None and can_manage_organization(role)
+
+
+def authorizable_agents(user_id: uuid.UUID) -> Select[Agent, Organization]:
+    """A query for the agents a user may let an MCP client act as, with their organization.
+
+    The same rule as `can_authorize_agent`, across all the user's organizations (so it takes the
+    user, not a `Principal`, which acts in one). Ordered by when the user joined the
+    organization, then by the agent's age.
+    """
+    return (
+        select(Agent, Organization)
+        .join(Organization, Organization.id == Agent.organization_id)
+        .join(Membership, Membership.organization_id == Organization.id)
+        .where(
+            Membership.user_id == user_id,
+            Membership.role.in_([role for role in MembershipRole if can_manage_organization(role)]),
+        )
+        .order_by(Membership.id, Agent.id)
+    )

@@ -81,3 +81,28 @@ class OAuthAccessToken(UUIDPrimaryKeyMixin, TimestampMixin, _TokenColumns, Base)
 
 class OAuthRefreshToken(UUIDPrimaryKeyMixin, TimestampMixin, _TokenColumns, Base):
     __tablename__ = "oauth_refresh_tokens"
+
+
+class OAuthAuthorizationRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """A validated /authorize request that waits for the user's answer on the consent screen.
+
+    Short-lived and single-use: approving or denying deletes it. Its id is in the consent
+    page's URL; only the user who started it can read or answer it.
+    """
+
+    __tablename__ = "oauth_authorization_requests"
+
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("oauth_clients.client_id", ondelete="CASCADE"), index=True
+    )
+    # The signed-in user who opened /authorize.
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    redirect_uri: Mapped[str] = mapped_column(Text)
+    code_challenge: Mapped[str] = mapped_column(String(128))
+    # The client's opaque value, returned unchanged with the answer; null when it sent none.
+    state: Mapped[str | None] = mapped_column(Text)
+    scope: Mapped[str] = mapped_column(Text)
+    resource: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
