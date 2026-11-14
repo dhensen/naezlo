@@ -59,6 +59,10 @@
   `Annotated[ProjectContext, Depends(...)]`.
 - Tests: `grant_project_role(db_session, project_id, user_id, role)` (tests/helpers.py). A plain
   organization member sees no project without a grant.
+- Project grants: services/project_grants.py (`list_project_grants`, `set_project_grant` (create or
+  update, 422 `invalid_principal`), `revoke_project_grant`); API `GET|PUT /api/projects/{id}/grants`,
+  `DELETE .../grants/{grant_id}`. In tests, share a project through the API with
+  `client.put(grants_url, json={"principal_kind", "principal_id", "role"})`.
 
 ---
 
@@ -363,4 +367,28 @@
     `Select[tuple[Project]]`.
   - `ProjectContext.membership` is gone; use `ctx.role`.
   - US-013 lists: the role requirements map directly onto the three project dependencies.
+---
+
+## 2026-11-14 - US-012
+- Project grants API: `GET` / `PUT /api/projects/{project_id}/grants` and
+  `DELETE /api/projects/{project_id}/grants/{grant_id}` (project admin only), service
+  `services/project_grants.py`, rule `project_stays_administrable` in permissions.py (409
+  `last_project_admin`), 422 `invalid_principal` for a user or agent outside the organization.
+- Files changed: src/todolist/api/{__init__,project_grants}.py,
+  src/todolist/services/project_grants.py, src/todolist/permissions.py,
+  tests/test_project_grants.py, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+  No schema change, no migration.
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - The last-admin 409 cannot be reached through the API, because an organization always keeps
+    an owner. The tests reach it by setting the owner's membership role to `member` directly in
+    the database (`make_plain_member` in tests/test_project_grants.py).
+  - Agent admin grants don't count as "someone can administer the project" (DECISIONS.md).
+  - `grant_project_role` (tests/helpers.py) only inserts; a second grant for the same user fails
+    on the unique constraint. Use the PUT route to change a role in a test.
+  - `Result.tuples()` gives a deprecation warning; iterate the result rows directly.
+  - US-014 (list grants) can copy this service and router; it also needs the `none` role and
+    the `principal_kind` enum with `create_type=False` in its migration.
+  - US-018 (audit): `set_project_grant` and `revoke_project_grant` don't take the acting
+    `Principal` yet; add it there when events are recorded.
 ---

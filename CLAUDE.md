@@ -129,3 +129,8 @@ uv run pytest
   `postgresql.ENUM(..., create_type=False)` in its migration and must not drop the type on downgrade.
 - Tests give a user a project role with `grant_project_role(db_session, project_id, user_id, role)`
   (`tests/helpers.py`); an organization member without a grant sees no project.
+- Project grants: `services/project_grants.py` (`list_project_grants`, `set_project_grant`,
+  `revoke_project_grant`), routes in `api/project_grants.py`. A principal that may not get a grant
+  is a 422 raised as `AppError(422, "invalid_principal", ...)`. List grants (US-014) follow this shape.
+- Unpack multi-entity rows directly (`for grant, user, agent in await session.execute(...)`);
+  `Result.tuples()` is deprecated in this SQLAlchemy version.

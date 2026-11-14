@@ -102,3 +102,42 @@ def visible_projects(principal: Principal) -> Select[Project]:
         Project.id.in_(select(ProjectGrant.project_id).where(ProjectGrant.user_id == principal.id)),
     )
     return in_organization.where(manages | granted)
+
+
+async def project_stays_administrable(
+    session: AsyncSession, project: Project, without: ProjectGrant
+) -> bool:
+    """Whether a person can still administer the project once the grant `without` stops being
+    an admin grant (it is revoked or downgraded).
+
+    True when the organization has an owner or admin (they are admin on every project), or when
+    another member holds an admin grant. Agent grants don't count: agents get their access from
+    people, so a project that only an agent administers is out of everyone's reach.
+    """
+    manager = await session.scalar(
+        select(Membership.id)
+        .where(
+            Membership.organization_id == project.organization_id,
+            Membership.role.in_([role for role in MembershipRole if can_manage_organization(role)]),
+        )
+        .limit(1)
+    )
+    if manager is not None:
+        return True
+    other_admin = await session.scalar(
+        select(ProjectGrant.id)
+        .join(
+            Membership,
+            and_(
+                Membership.user_id == ProjectGrant.user_id,
+                Membership.organization_id == project.organization_id,
+            ),
+        )
+        .where(
+            ProjectGrant.project_id == project.id,
+            ProjectGrant.role == ProjectRole.ADMIN,
+            ProjectGrant.id != without.id,
+        )
+        .limit(1)
+    )
+    return other_admin is not None
