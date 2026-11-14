@@ -153,3 +153,11 @@ uv run pytest
 - Columns that come from an outer join are typed non-optional in a `Row`; `cast` them before an
   `is None` check or pyright (strict) reports an unnecessary comparison.
 - Tests give a user a list role with `grant_list_role(db_session, list_id, user_id, ListRole.X)`.
+- Items: model `Item` / enum `ItemStatus` (`models/item.py`), `services/items.py` (`list_items`,
+  `create_item(session, principal, todo_list, title, notes)`, `update_item(session, principal, item, ...)`,
+  `delete_item`), routes in `api/items.py` (`list_router` and `router`). Item-scoped routes
+  (`/api/items/{item_id}...`) take `ctx: ItemContextDep` (viewer) or `ItemEditorContextDep` (built
+  with `require_item_role`): 404 `Item not found`, 403 when too low; they give `ctx.item`,
+  `ctx.todo_list`, `ctx.project`, `ctx.role`, `ctx.user` and `ctx.principal`.
+- "Who did it" columns are a `<verb>_by_kind` + `<verb>_by_id` pair without a foreign key (see
+  `Item.created_by_*`), filled from a `Principal`.

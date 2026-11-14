@@ -74,6 +74,11 @@
   (not organization owners/admins). Several lists at once: `visible_lists(principal, project)`
   (permissions.py); `list_lists(session, principal, project)` uses it. Tests:
   `grant_list_role(db_session, list_id, user_id, ListRole.X)`. The list shape has `project_name`.
+- Items: models/item.py (`Item`, `ItemStatus`), services/items.py (`list_items`, `create_item`,
+  `update_item`, `delete_item`; the changing ones take a `Principal`), api/items.py. Item-scoped
+  route (`/api/items/{item_id}...`): `ctx: ItemContextDep` / `ItemEditorContextDep` (made by
+  `require_item_role`): `ctx.item`, `ctx.todo_list`, `ctx.project`, `ctx.role`, `ctx.principal`.
+  Actor columns are `<verb>_by_kind` + `<verb>_by_id` without a foreign key.
 - Member removal must delete every kind of grant in the organization (`remove_member` in
   services/organizations.py); extend it when a new grant table appears.
 
@@ -463,4 +468,27 @@
     visible list) needs its own query on top of `visible_lists`.
   - The list grants `GET` returns only list-level grants; US-035 wants inherited project access
     shown separately, which a list admin without project admin cannot read yet.
+---
+
+## 2026-11-14 22:50 - US-015
+- Item model and API: `items` table (migration 4ae9a5e8e1d8, new enum type `item_status`, reuses
+  `principal_kind`, check constraint that the completion columns match the status). Service
+  `services/items.py` takes a `Principal` for create, update and delete. Routes
+  `GET|POST /api/lists/{list_id}/items` and `GET|PATCH|DELETE /api/items/{item_id}` with the new
+  `require_item_role` dependency (role on the item's list). Done records completed_by and
+  completed_at, reopening clears them; completing a done item keeps the first completion.
+- Files changed: src/todolist/models/item.py (new), models/__init__.py, services/items.py (new),
+  api/items.py (new), api/deps.py, api/__init__.py,
+  migrations/versions/20261114_2237_4ae9a5e8e1d8_add_items.py, tests/test_items.py (new),
+  DECISIONS.md, CLAUDE.md
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - `item.completed_at = func.now()` works (and passes pyright strict); `session.refresh(item)`
+    after the flush loads the value.
+  - Deleting an item leaves a gap in the positions and `create_item` uses max + 1; US-016 must
+    close gaps on delete and may want to renumber in `delete_item` (it already takes the principal).
+  - `delete_item` takes a `Principal` it does not use yet; US-018 (audit) will.
+  - The item shape has actor kind + id, no names. The UI stories will probably want names.
+  - After deleting a list through the API, `db_session.expire_all()` before counting cascaded rows
+    is not needed for a count query, but ORM objects loaded earlier are stale.
 ---

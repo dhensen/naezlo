@@ -6,6 +6,7 @@ package to fill `Base.metadata`.
 
 from todolist.models.agent import Agent
 from todolist.models.invitation import Invitation, InvitationRole
+from todolist.models.item import Item, ItemStatus
 from todolist.models.list_grant import ListGrant, ListRole
 from todolist.models.organization import Membership, MembershipRole, Organization
 from todolist.models.project import Project
@@ -17,6 +18,8 @@ __all__ = [
     "Agent",
     "Invitation",
     "InvitationRole",
+    "Item",
+    "ItemStatus",
     "ListGrant",
     "ListMode",
     "ListRole",
