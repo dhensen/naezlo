@@ -1,4 +1,4 @@
-"""The permission service: which role a principal has on a project.
+"""The permission service: which role a principal has on a project or a list.
 
 Every permission check goes through here with a `Principal` (a user or an agent). Routes use
 the dependencies built on it (`require_project_role` in `todolist.api.deps`); MCP tools call
@@ -20,6 +20,7 @@ from todolist.models import (
     Project,
     ProjectGrant,
     ProjectRole,
+    TodoList,
 )
 from todolist.principals import Principal
 from todolist.services.organizations import can_manage_organization
@@ -72,6 +73,19 @@ async def effective_project_role(
     if can_manage_organization(membership_role):
         return ProjectRole.ADMIN
     return grant_role
+
+
+async def effective_list_role(
+    session: AsyncSession, principal: Principal, todo_list: TodoList, project: Project
+) -> ProjectRole | None:
+    """The principal's role on the list; None when the list does not exist for them.
+
+    `project` is the list's project. For now this is the role on that project; list-level
+    grants (US-014) and the list mode (US-017) come on top of it here.
+    """
+    if todo_list.project_id != project.id:
+        raise ValueError("project is not the list's project")
+    return await effective_project_role(session, principal, project)
 
 
 def visible_projects(principal: Principal) -> Select[Project]:

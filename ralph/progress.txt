@@ -63,6 +63,12 @@
   update, 422 `invalid_principal`), `revoke_project_grant`); API `GET|PUT /api/projects/{id}/grants`,
   `DELETE .../grants/{grant_id}`. In tests, share a project through the API with
   `client.put(grants_url, json={"principal_kind", "principal_id", "role"})`.
+- Lists: models/todo_list.py (`TodoList`, `ListMode`), services/lists.py (`list_lists`,
+  `create_list(session, principal, project, name, description, mode=None)`, `update_list`,
+  `delete_list`, `default_list_mode`), api/lists.py. List-scoped route (`/api/lists/{list_id}...`):
+  `ctx: ListContextDep` / `ListEditorContextDep` / `ListAdminContextDep` (todolist.api.deps, made by
+  `require_list_role`): `ctx.todo_list`, `ctx.project`, `ctx.role`, `ctx.user`, `ctx.principal`.
+  The rule is `effective_list_role(session, principal, todo_list, project)` in permissions.py.
 
 ---
 
@@ -391,4 +397,35 @@
     the `principal_kind` enum with `create_type=False` in its migration.
   - US-018 (audit): `set_project_grant` and `revoke_project_grant` don't take the acting
     `Principal` yet; add it there when events are recorded.
+---
+
+## 2026-11-14 - US-013
+- Lists with a mode: `todo_lists` table (model `TodoList`, enum `ListMode` human_only | ai_only |
+  mixed as PostgreSQL type `list_mode`, position, created_by, cascade with the project) and its
+  migration; `POST` / `GET /api/projects/{project_id}/lists` (editor / viewer), `GET` / `PATCH` /
+  `DELETE /api/lists/{list_id}` (viewer / editor / admin). Without a mode a new list is `mixed`
+  when the organization has an agent, otherwise `human_only`. New in the permission service:
+  `effective_list_role` (the project role for now); new dependencies `require_list_role` and the
+  `List*ContextDep` aliases.
+- Files changed: src/todolist/models/{__init__,todo_list}.py, src/todolist/services/lists.py,
+  src/todolist/api/{__init__,deps,lists}.py, src/todolist/permissions.py,
+  migrations/versions/20261114_2227_2f48a44bfe9a_add_todo_lists.py, tests/test_lists.py, CLAUDE.md,
+  DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+- Checked by hand on the dev database: `alembic upgrade head`, `downgrade -1`, `upgrade head`
+  again and `alembic check` (no drift).
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - US-014: change only the body of `effective_list_role` (list grant first, `none` → None,
+    owners and admins → admin) and filter `list_lists` by it; the list routes already go through
+    `require_list_role`. `list_context` answers 404 `List not found` when the role is None. The
+    index route still uses `ProjectContextDep`, which 404s for someone with only a list grant:
+    that has to change there. `test_effective_list_role_is_the_project_role` in tests/test_lists.py
+    describes the interim rule and will need updating.
+  - US-017: the mode is stored and returned but nothing enforces it yet.
+  - US-018: `create_list` takes the acting `Principal`; `update_list` and `delete_list` don't yet.
+  - List positions start at 1 and are not gap-free after a delete (no reorder story for lists);
+    items (US-016) need gap-free positions, so don't copy this blindly.
+  - A pydantic `field_validator("name", "mode")` that rejects None runs only for fields that are
+    sent, which is how PATCH tells "left out" from "null".
+  - ruff's PT018 rejects `assert a is not None and b is not None` in tests; write two asserts.
 ---

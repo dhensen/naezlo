@@ -9,12 +9,14 @@ from todolist.models.invitation import Invitation, InvitationRole
 from todolist.models.organization import Membership, MembershipRole, Organization
 from todolist.models.project import Project
 from todolist.models.project_grant import PrincipalKind, ProjectGrant, ProjectRole
+from todolist.models.todo_list import ListMode, TodoList
 from todolist.models.user import User, normalize_email
 
 __all__ = [
     "Agent",
     "Invitation",
     "InvitationRole",
+    "ListMode",
     "Membership",
     "MembershipRole",
     "Organization",
@@ -22,6 +24,7 @@ __all__ = [
     "Project",
     "ProjectGrant",
     "ProjectRole",
+    "TodoList",
     "User",
     "normalize_email",
 ]

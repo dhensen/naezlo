@@ -4,6 +4,8 @@ Org-scoped routes (`/orgs/{org_id}/...`) take `org: OrgContextDep`, or `org: Org
 when the action needs an owner or admin. Project-scoped routes (`/projects/{project_id}...`) take
 `ctx: ProjectContextDep` (viewer or higher), `ProjectEditorContextDep` or `ProjectAdminContextDep`,
 all built with `require_project_role(...)` on the permission service (`todolist.permissions`).
+List-scoped routes (`/lists/{list_id}...`) take `ctx: ListContextDep`, `ListEditorContextDep` or
+`ListAdminContextDep`, built with `require_list_role(...)`.
 """
 
 import uuid
@@ -16,8 +18,16 @@ from fastapi import Depends
 from todolist.auth import CurrentUser
 from todolist.db import SessionDep
 from todolist.errors import ForbiddenError, NotFoundError
-from todolist.models import Membership, MembershipRole, Organization, Project, ProjectRole, User
-from todolist.permissions import effective_project_role, role_at_least
+from todolist.models import (
+    Membership,
+    MembershipRole,
+    Organization,
+    Project,
+    ProjectRole,
+    TodoList,
+    User,
+)
+from todolist.permissions import effective_list_role, effective_project_role, role_at_least
 from todolist.principals import Principal
 from todolist.services.organizations import can_manage_organization, get_organization_membership
 
@@ -119,3 +129,58 @@ ProjectEditorContextDep = Annotated[
     ProjectContext, Depends(require_project_role(ProjectRole.EDITOR))
 ]
 ProjectAdminContextDep = Annotated[ProjectContext, Depends(require_project_role(ProjectRole.ADMIN))]
+
+
+@dataclass(frozen=True)
+class ListContext:
+    """The list in the path, its project and the caller's effective role on the list."""
+
+    todo_list: TodoList
+    project: Project
+    role: ProjectRole
+    user: User
+
+    @property
+    def principal(self) -> Principal:
+        """The caller as the actor for permission checks and audit events."""
+        return Principal.for_user(self.user, self.project.organization_id)
+
+
+async def list_context(list_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> ListContext:
+    """Resolve `{list_id}` for the signed-in user; 404 when they have no role on the list."""
+    todo_list = await session.get(TodoList, list_id)
+    project = None if todo_list is None else await session.get(Project, todo_list.project_id)
+    role = (
+        None
+        if todo_list is None or project is None
+        else await effective_list_role(
+            session, Principal.for_user(user, project.organization_id), todo_list, project
+        )
+    )
+    if todo_list is None or project is None or role is None:
+        # Same answer for "does not exist" and "not yours": don't reveal which ids exist.
+        raise NotFoundError("List not found")
+    return ListContext(todo_list=todo_list, project=project, role=role, user=user)
+
+
+def require_list_role(minimum: ProjectRole) -> Callable[..., Awaitable[ListContext]]:
+    """A dependency that resolves `{list_id}` and needs at least the role `minimum` on the list.
+
+    404 when the caller has no role on the list, 403 when their role is too low. Use the
+    aliases below in route signatures.
+    """
+
+    async def dependency(
+        ctx: Annotated[ListContext, Depends(list_context)],
+    ) -> ListContext:
+        if not role_at_least(ctx.role, minimum):
+            raise ForbiddenError(f"This needs the {minimum.value} role on the list")
+        return ctx
+
+    return dependency
+
+
+# Any role on the list (viewer or higher).
+ListContextDep = Annotated[ListContext, Depends(require_list_role(ProjectRole.VIEWER))]
+ListEditorContextDep = Annotated[ListContext, Depends(require_list_role(ProjectRole.EDITOR))]
+ListAdminContextDep = Annotated[ListContext, Depends(require_list_role(ProjectRole.ADMIN))]

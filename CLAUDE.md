@@ -134,3 +134,11 @@ uv run pytest
   is a 422 raised as `AppError(422, "invalid_principal", ...)`. List grants (US-014) follow this shape.
 - Unpack multi-entity rows directly (`for grant, user, agent in await session.execute(...)`);
   `Result.tuples()` is deprecated in this SQLAlchemy version.
+- Lists: model `TodoList` / enum `ListMode` (`models/todo_list.py`), `services/lists.py`
+  (`list_lists`, `create_list(session, principal, project, ...)`, `update_list`, `delete_list`,
+  `default_list_mode`), routes in `api/lists.py` (`project_router` and `router`).
+- List-scoped routes (`/api/lists/{list_id}...`) take `ctx: ListContextDep` (viewer or higher),
+  `ListEditorContextDep` or `ListAdminContextDep` (built with `require_list_role(ProjectRole.X)`):
+  404 `List not found` without a role, 403 when it is too low. They give `ctx.todo_list`,
+  `ctx.project`, `ctx.role`, `ctx.user` and `ctx.principal`. The rule behind them is
+  `effective_list_role(session, principal, todo_list, project)` in `permissions.py`.
