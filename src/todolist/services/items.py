@@ -1,12 +1,15 @@
-"""Items: list, add, change, complete and delete the items of a list.
+"""Items: list, add, change, complete, move and delete the items of a list.
 
 Shared by the HTTP API and the MCP tools. The callers check the acting principal's role on
 the list (`require_list_role` / `require_item_role`, see `todolist.permissions`).
 """
 
-from sqlalchemy import func, select
+import uuid
+
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from todolist.errors import AppError
 from todolist.models import Item, ItemStatus, TodoList
 from todolist.principals import Principal
 
@@ -16,6 +19,32 @@ def _clean_notes(notes: str | None) -> str | None:
     if notes is None:
         return None
     return notes.strip() or None
+
+
+async def _lock_list(session: AsyncSession, list_id: uuid.UUID) -> None:
+    """Make other transactions that change the positions of this list wait for this one.
+
+    Everything that picks or changes a position (create, move, delete) takes this lock first,
+    so the positions stay 1, 2, 3, ... when two of them happen at the same moment.
+    """
+    await session.execute(select(TodoList.id).where(TodoList.id == list_id).with_for_update())
+
+
+async def _shift_positions(
+    session: AsyncSession, list_id: uuid.UUID, first: int, last: int | None, by: int
+) -> None:
+    """Add `by` to the position of the list's items from position `first` up to and including
+    `last` (to the end when None). The caller holds the list lock."""
+    in_range = (Item.list_id == list_id) & (Item.position >= first)
+    if last is not None:
+        in_range &= Item.position <= last
+    await session.execute(
+        update(Item)
+        .where(in_range)
+        # Shifting an item is not a change to it: keep its updated_at.
+        .values(position=Item.position + by, updated_at=Item.updated_at)
+        .execution_options(synchronize_session="fetch")
+    )
 
 
 async def list_items(session: AsyncSession, todo_list: TodoList) -> list[Item]:
@@ -35,7 +64,7 @@ async def create_item(
 ) -> Item:
     """Add an open item at the end of the list, created by `principal`."""
     # Two items created at the same moment must not get the same position.
-    await session.execute(select(TodoList.id).where(TodoList.id == todo_list.id).with_for_update())
+    await _lock_list(session, todo_list.id)
     last = await session.scalar(select(func.max(Item.position)).where(Item.list_id == todo_list.id))
     item = Item(
         list_id=todo_list.id,
@@ -89,8 +118,60 @@ async def update_item(
     return item
 
 
-async def delete_item(session: AsyncSession, principal: Principal, item: Item) -> None:
-    """Remove the item. `principal` is the actor, for the audit log."""
+async def move_item(
+    session: AsyncSession,
+    principal: Principal,
+    item: Item,
+    before_item_id: uuid.UUID | None,
+) -> Item:
+    """Move the item to just before the item `before_item_id` of the same list, or to the end
+    of the list when None. The items in between shift one place; the positions stay 1 to n.
+
+    422 `invalid_before_item` when there is no such item in the item's list (it does not
+    exist or it is in another list: the answer is the same, so it tells nothing about lists
+    the caller cannot see). Moving an item before itself leaves it where it is.
+    `principal` is the actor, for the audit log.
+    """
     del principal  # recorded once audit events exist
+    await _lock_list(session, item.list_id)
+    # The position as it is now that nobody else can change it.
+    await session.refresh(item)
+    old = item.position
+    if before_item_id is None:
+        count = await session.scalar(
+            select(func.count()).select_from(Item).where(Item.list_id == item.list_id)
+        )
+        new = count or 1
+    elif before_item_id == item.id:
+        new = old
+    else:
+        before = await session.scalar(
+            select(Item.position).where(Item.id == before_item_id, Item.list_id == item.list_id)
+        )
+        if before is None:
+            raise AppError(422, "invalid_before_item", "before_item_id is not an item of this list")
+        # Taking the item out moves everything after it one place up.
+        new = before - 1 if before > old else before
+    if new == old:
+        return item
+    if new > old:
+        await _shift_positions(session, item.list_id, old + 1, new, -1)
+    else:
+        await _shift_positions(session, item.list_id, new, old - 1, +1)
+    item.position = new
+    await session.flush()
+    await session.refresh(item)
+    return item
+
+
+async def delete_item(session: AsyncSession, principal: Principal, item: Item) -> None:
+    """Remove the item and close the gap it leaves in the positions. `principal` is the actor,
+    for the audit log."""
+    del principal  # recorded once audit events exist
+    list_id = item.list_id
+    await _lock_list(session, list_id)
+    await session.refresh(item)
+    position = item.position
     await session.delete(item)
     await session.flush()
+    await _shift_positions(session, list_id, position + 1, None, -1)

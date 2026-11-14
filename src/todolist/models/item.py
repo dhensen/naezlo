@@ -4,7 +4,15 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from todolist.db import Base, TimestampMixin, UUIDPrimaryKeyMixin, value_enum
@@ -27,7 +35,9 @@ class Item(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             " AND completed_by_id IS NULL AND completed_at IS NULL)",
             name="completion_matches_status",
         ),
-        Index("ix_items_list_id_position", "list_id", "position"),
+        # One item per position in a list. Deferred to the end of the transaction, so a move
+        # can shift the items in between before the moved one takes its place.
+        UniqueConstraint("list_id", "position", deferrable=True, initially="DEFERRED"),
     )
 
     list_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("todo_lists.id", ondelete="CASCADE"))
@@ -36,7 +46,8 @@ class Item(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[ItemStatus] = mapped_column(
         value_enum(ItemStatus, "item_status"), default=ItemStatus.OPEN
     )
-    # Order of the items within their list, lowest first.
+    # Order of the items within their list, lowest first: 1, 2, 3, ... without gaps (the
+    # item service keeps it that way).
     position: Mapped[int] = mapped_column(Integer)
     # The actor is a user or an agent, so the id has no foreign key: it is a record of who
     # did it and stays when that user or agent is deleted.

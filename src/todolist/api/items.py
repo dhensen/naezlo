@@ -1,7 +1,7 @@
 """Items: listed and added in a list, then addressed by their own id.
 
 Access follows the caller's role on the item's list (see `todolist.permissions`): reading
-needs viewer, everything else editor.
+needs viewer, everything else (also moving) editor.
 """
 
 import uuid
@@ -19,7 +19,13 @@ from todolist.api.deps import (
 )
 from todolist.db import SessionDep
 from todolist.models import Item, ItemStatus, PrincipalKind
-from todolist.services.items import create_item, delete_item, list_items, update_item
+from todolist.services.items import (
+    create_item,
+    delete_item,
+    list_items,
+    move_item,
+    update_item,
+)
 
 list_router = APIRouter(prefix="/lists/{list_id}/items", tags=["items"])
 router = APIRouter(prefix="/items/{item_id}", tags=["items"])
@@ -48,6 +54,13 @@ class ItemPatch(BaseModel):
         if value is None:
             raise ValueError("cannot be null")
         return value
+
+
+class ItemMove(BaseModel):
+    """Where the item goes: before this item of the same list, or to the end when null. The
+    field must be sent, so an empty body does not move anything."""
+
+    before_item_id: uuid.UUID | None
 
 
 class ActorOut(BaseModel):
@@ -129,3 +142,11 @@ async def update_item_route(
 @router.delete("", status_code=204)
 async def delete_item_route(ctx: ItemEditorContextDep, session: SessionDep) -> None:
     await delete_item(session, ctx.principal, ctx.item)
+
+
+@router.post("/move")
+async def move_item_route(
+    body: ItemMove, ctx: ItemEditorContextDep, session: SessionDep
+) -> ItemOut:
+    item = await move_item(session, ctx.principal, ctx.item, body.before_item_id)
+    return _item_out(item)

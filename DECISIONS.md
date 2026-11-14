@@ -167,3 +167,13 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **Shape**: `{id, list_id, title, notes, status, position, created_by: {kind, id}, completed_by: {kind, id} | null, completed_at, created_at, updated_at}`. `PATCH` changes only the fields that are sent: `notes: null` clears them, `title: null` and `status: null` are a 422. Actor names are not in the shape yet; a story that shows them (the UI, the audit log) adds them.
 - **Position**: a new item goes after the last one of its list (highest position + 1, starting at 1; the list row is locked while it is picked). Deleting leaves a gap until US-016 makes positions gap-free.
 - **Service**: `services/items.py` (`list_items`, `create_item`, `update_item`, `delete_item`); the functions that change something take the acting `Principal`. Like the list service, they trust the caller to have checked the role. The list mode is not enforced yet (US-017).
+
+## Item reordering (2026-11-14, US-016)
+
+- **Route**: `POST /api/items/{item_id}/move {"before_item_id": <uuid> | null}` (editor on the item's list) puts the item just before that item of the same list, or at the end when null. It answers 200 with the moved item in the item shape. The field must be sent: an empty body is a 422, so it cannot move an item to the end by accident.
+- **Positions are 1 to n in every list**, without gaps or doubles. `create_item` appends at n + 1, `move_item` shifts the items between the old and the new place by one, `delete_item` shifts the items after the deleted one up. All three lock the list row first, so they cannot interleave. This replaces "deleting leaves a gap" from US-015; the migration renumbers the existing items.
+- **Unique in the database**: `uq_items_list_id_position` on `(list_id, position)`, `DEFERRABLE INITIALLY DEFERRED` (it replaces the plain index), so a move can shift rows inside the transaction and a bug that doubles a position fails at commit. Gap-freeness is kept by the service, not by a constraint.
+- **Invalid target**: a `before_item_id` that is not an item of the same list is a 422 `invalid_before_item`, whether it is in another list or does not exist (one answer, so it reveals nothing about lists the caller cannot see). An item never moves to another list.
+- **No-ops are fine**: moving an item before itself, before the item that already follows it, or to the end when it is last answers 200 and changes nothing (also not `updated_at`).
+- **`updated_at`**: a move updates it on the moved item only. The items that shift (by a move or a delete) keep theirs: their content did not change.
+- **Service**: `move_item(session, principal, item, before_item_id)` in `services/items.py`; the principal is the actor for the audit log (US-018).

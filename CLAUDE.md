@@ -161,3 +161,10 @@ uv run pytest
   `ctx.todo_list`, `ctx.project`, `ctx.role`, `ctx.user` and `ctx.principal`.
 - "Who did it" columns are a `<verb>_by_kind` + `<verb>_by_id` pair without a foreign key (see
   `Item.created_by_*`), filled from a `Principal`.
+- Item positions are 1 to n per list (unique constraint `uq_items_list_id_position`, deferred to the
+  commit). Anything that changes them takes `_lock_list` first and shifts neighbours with
+  `_shift_positions` (`services/items.py`: `create_item`, `move_item`, `delete_item`); never set
+  `Item.position` elsewhere. Tests never commit: check a deferred constraint with
+  `add_in_savepoint(db_session, obj, check_deferred=True)`.
+- A bulk `update(Model)` that must not bump `updated_at` sets `updated_at=Model.updated_at`, and
+  uses `.execution_options(synchronize_session="fetch")` so loaded objects get the new values.

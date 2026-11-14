@@ -78,6 +78,10 @@
   `update_item`, `delete_item`; the changing ones take a `Principal`), api/items.py. Item-scoped
   route (`/api/items/{item_id}...`): `ctx: ItemContextDep` / `ItemEditorContextDep` (made by
   `require_item_role`): `ctx.item`, `ctx.todo_list`, `ctx.project`, `ctx.role`, `ctx.principal`.
+- Item order: positions are 1..n per list, unique in the database (deferred constraint).
+  `move_item(session, principal, item, before_item_id)`; create, move and delete lock the list row
+  (`_lock_list`) and shift with `_shift_positions`. API `POST /api/items/{id}/move`. Tests that
+  import helpers from another test module (`from tests.test_items import ada_list, create, join`) work.
   Actor columns are `<verb>_by_kind` + `<verb>_by_id` without a foreign key.
 - Member removal must delete every kind of grant in the organization (`remove_member` in
   services/organizations.py); extend it when a new grant table appears.
@@ -491,4 +495,25 @@
   - The item shape has actor kind + id, no names. The UI stories will probably want names.
   - After deleting a list through the API, `db_session.expire_all()` before counting cascaded rows
     is not needed for a count query, but ORM objects loaded earlier are stale.
+---
+
+## 2026-11-14 23:05 - US-016
+- Item reordering: `POST /api/items/{item_id}/move {"before_item_id": uuid | null}` (editor) moves
+  the item before another item of its list or to the end; 422 `invalid_before_item` for an item of
+  another list or an unknown one. Service `move_item` takes a `Principal`. `delete_item` now closes
+  the gap. Migration 7e182c993f2e renumbers existing items and replaces the `(list_id, position)`
+  index with a deferred unique constraint. Decisions are in DECISIONS.md ("Item reordering").
+- Files changed: src/todolist/models/item.py, services/items.py, api/items.py,
+  migrations/versions/20261114_2242_7e182c993f2e_unique_item_positions.py,
+  tests/test_item_moves.py (new), tests/helpers.py, DECISIONS.md, CLAUDE.md
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - `grant_project_role` (tests/helpers.py) only inserts: calling it twice for the same user and
+    project is a unique violation. Change a role in a test through `PUT /api/projects/{id}/grants`.
+  - A deferred constraint is never checked in the tests by itself (nothing commits); run
+    `SET CONSTRAINTS ALL IMMEDIATE` (`add_in_savepoint(..., check_deferred=True)`).
+  - ruff PT012: a `pytest.raises` block takes one statement, so multi-step failures go in a helper.
+  - The bulk shift keeps `updated_at` of the shifted items (`updated_at=Item.updated_at`), and
+    `synchronize_session="fetch"` updates the positions of items already loaded in the session.
+  - `move_item` and `delete_item` take a `Principal` they don't use yet; US-018 (audit) will.
 ---

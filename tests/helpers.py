@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 from httpx import AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.models import (
@@ -71,11 +72,17 @@ async def grant_list_role(
     await session.flush()
 
 
-async def add_in_savepoint(session: AsyncSession, instance: object) -> None:
+async def add_in_savepoint(
+    session: AsyncSession, instance: object, *, check_deferred: bool = False
+) -> None:
     """Add and flush inside a savepoint, so a failure leaves the session usable.
 
     The add has to happen inside it: `begin_nested()` first flushes whatever is pending.
+    `check_deferred` also checks the constraints that normally wait for the commit (the tests
+    never commit), such as the unique item positions.
     """
     async with session.begin_nested():
         session.add(instance)
         await session.flush()
+        if check_deferred:
+            await session.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
