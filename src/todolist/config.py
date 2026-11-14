@@ -1,6 +1,7 @@
 """Application settings, read from environment variables and an optional `.env` file."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal, Self
 
 from fastapi import Depends, Request
@@ -35,6 +36,11 @@ class Settings(BaseSettings):
     # The URL people reach the app on in their browser (no path). Absolute URLs that leave the
     # app, such as the Google redirect URI, are built from it and never from the Host header.
     public_base_url: str = "http://localhost:8000"
+
+    # The built frontend (`npm --prefix frontend run build`). When it has an index.html at startup,
+    # the app serves it on every path the backend does not own; otherwise only the backend runs.
+    # Relative to the working directory.
+    frontend_dist: Path | None = Path("frontend/dist")
 
     # Google OAuth client ("Web application" type). Google login is on when both are set.
     google_client_id: str | None = None

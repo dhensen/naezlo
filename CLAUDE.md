@@ -13,6 +13,7 @@ Stack, domain model and rules: `DECISIONS.md` (it wins over personal preference)
 - `migrations/`: Alembic environment and `versions/`
 - `docker-compose.yml`: PostgreSQL 18 on host port 5435 with the databases `todolist` and `todolist_test`
 - `tests/`: pytest tests
+- `frontend/`: the React single-page app (Vite, TypeScript strict, React Router, Tailwind CSS 4, npm)
 
 ## Run
 
@@ -55,6 +56,21 @@ uv run pytest
 ```
 
 `uv run ruff format` and `uv run ruff check --fix` fix most style problems.
+
+## Frontend
+
+```sh
+npm --prefix frontend install        # once, and after package.json changes
+npm --prefix frontend run dev        # Vite on http://localhost:5173, proxies the backend paths to :8000
+npm --prefix frontend run build      # type-checks and writes frontend/dist (git-ignored)
+npm --prefix frontend run lint       # eslint
+npm --prefix frontend run typecheck  # tsc -b --noEmit
+npm --prefix frontend run test       # vitest run
+```
+
+`lint`, `typecheck` and `test` must pass before a commit, like the backend checks. With the
+dev server, set `PUBLIC_BASE_URL=http://localhost:5173` in `.env`. FastAPI serves `frontend/dist`
+itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the production setup.
 
 ## Conventions
 
@@ -274,3 +290,18 @@ uv run pytest
   as `auth` on the `mcp_http` client, with a `Browser` (the user's `client`) as its redirect and
   callback handlers. A change to the OAuth endpoints, the consent API or the /mcp challenge must
   keep it passing; extend it rather than adding a second full-flow test.
+- Frontend layout: `frontend/src/main.tsx` (the `BrowserRouter`), `App.tsx` (the `<Routes>`; tests
+  render it in a `MemoryRouter`), `pages/<Name>Page.tsx`, `config.ts` (`APP_NAME`, the only place
+  with the product name in the frontend), tests next to the code as `*.test.tsx`. Import from
+  `react-router` (v8; there is no `react-router-dom`). Tailwind 4 has no config file: it is the
+  `@tailwindcss/vite` plugin plus `@import 'tailwindcss'` in `src/index.css`.
+- Frontend tests: vitest without globals (`import { expect, test } from 'vitest'`), jsdom, Testing
+  Library with the jest-dom matchers (`src/test/setup.ts`). The vitest config is in `vite.config.ts`.
+- TypeScript stays on 6.0 until typescript-eslint supports 7 (its peer range ends below 6.1).
+- Paths the backend owns are listed twice and must stay equal: `BACKEND_PATHS` in
+  `frontend/vite.config.ts` (the dev proxy) and `BACKEND_PREFIXES` in `src/todolist/frontend.py`
+  (what the SPA fallback never answers). A new backend path outside `/api` goes in both.
+- `install_frontend(app, settings.frontend_dist)` (`src/todolist/frontend.py`) is the last route of
+  `create_app`: GET/HEAD outside the backend paths get a file of the build or `index.html`. The test
+  settings have `frontend_dist=None`; a test that wants a build overrides the `settings` fixture
+  (see `tests/test_frontend.py`).

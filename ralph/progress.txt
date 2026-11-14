@@ -7,6 +7,14 @@
 - Stack and domain rules: see DECISIONS.md.
 - A git remote named origin exists (since US-018): commit, then `git push origin main`.
 - pnpm is not installed; use npm for the frontend.
+- Frontend (frontend/, since US-027): `npm --prefix frontend install`, then `npm --prefix frontend run
+  dev | build | lint | typecheck | test`. lint, typecheck and test are quality checks. Vite 8, React 19,
+  `react-router` 8, Tailwind 4 (`@tailwindcss/vite`), vitest + Testing Library, TypeScript 6.0 (not 7:
+  typescript-eslint). Product name: `APP_NAME` in frontend/src/config.ts. Pages: src/pages/<Name>Page.tsx,
+  routes in src/App.tsx, tests `*.test.tsx` next to the code (render `<App />` in a `MemoryRouter`).
+- Backend-owned paths are listed in frontend/vite.config.ts (`BACKEND_PATHS`, dev proxy) and
+  src/todolist/frontend.py (`BACKEND_PREFIXES`, never answered by the SPA fallback); keep them equal.
+  FastAPI serves frontend/dist when it exists at startup (`FRONTEND_DIST`); tests have it off.
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -838,4 +846,42 @@
   - The SDK has no revocation call; post to `provider.context.oauth_metadata.revocation_endpoint`.
   - The audit action of a new list grant is `list_grant.set`.
   - Next is US-027 (frontend scaffold): npm, not pnpm.
+---
+
+## 2026-11-14 23:55 - US-027
+- `frontend/`: Vite 8 + React 19 + TypeScript 6.0 (strict) with npm, React Router 8, Tailwind CSS 4.
+  Scripts dev, build, lint (eslint), typecheck (`tsc -b --noEmit`), test (`vitest run`); all pass.
+  A placeholder home page (`src/pages/HomePage.tsx`) shows `APP_NAME` ("Naezlo", `src/config.ts`),
+  with one component test (`src/pages/HomePage.test.tsx`).
+- The Vite dev server proxies /api, /authorize, /token, /register, /revoke, /.well-known and /mcp
+  to http://localhost:8000.
+- Backend: setting `FRONTEND_DIST` and `src/todolist/frontend.py` (`install_frontend`): when the
+  build exists at startup, a last GET/HEAD route serves its files and falls back to index.html,
+  never for backend paths. `tests/test_frontend.py` covers the fallback, assets, cache headers,
+  path traversal, that /api/unknown stays a JSON 404 and that the API, OAuth, well-known and MCP
+  routes are not shadowed. Also checked by hand: built the frontend, started uvicorn, and /login
+  gave index.html, the hashed script was served, /api/unknown a JSON 404.
+- No browser check of the page was done (a one-heading placeholder); Playwright comes with US-029.
+- Files: frontend/ (new), src/todolist/frontend.py (new), src/todolist/app.py, src/todolist/config.py,
+  tests/test_frontend.py (new), tests/conftest.py, .env.example, CLAUDE.md, DECISIONS.md,
+  ralph/prd.json, ralph/progress.txt
+- Pushed: yes
+- **Learnings for future iterations:**
+  - `npm create vite@latest` now gives TypeScript 7 + oxlint. typescript-eslint needs TypeScript
+    below 6.1, so the project pins `typescript@~6.0` and uses eslint as the story asks.
+  - Compound shell commands with `rm` or several `npm install`s were refused by the permission
+    mode; run them as single commands (`npm --prefix frontend install ...`).
+  - `npm install` reports 7 moderate advisories in dev dependencies; not touched (`npm audit fix`
+    was not run).
+  - Vitest runs without globals: Testing Library's automatic cleanup needs the `afterEach(cleanup)`
+    in `src/test/setup.ts`.
+  - To make a route match nothing for some requests (so the normal 404 stays), subclass
+    Starlette's `Route` and return `Match.NONE` from `matches` (`_FrontendRoute`). A catch-all
+    GET route would otherwise turn a POST to an unknown path into a 405.
+  - Override the `settings` fixture in a test module (`def settings(settings, ...)`) to give
+    `app` / `client` other settings.
+  - The backend default `Settings.app_name` is still "todolist" while the README and the frontend
+    say Naezlo; a human or a later story may want to align it.
+  - Next is US-028 (API client, login page, auth guard): add TanStack Query and the generated API
+    types there.
 ---

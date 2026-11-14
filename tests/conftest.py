@@ -22,7 +22,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 def _test_settings() -> Settings:
     # _env_file=None keeps a developer's local .env out of the tests.
     # dev_login is on because tests sign in through it (tests/helpers.py); the default is off.
-    base = Settings(_env_file=None, environment="test", dev_login=True)  # pyright: ignore[reportCallIssue]
+    # frontend_dist=None: a local frontend build must not change what the backend answers.
+    base = Settings(_env_file=None, environment="test", dev_login=True, frontend_dist=None)  # pyright: ignore[reportCallIssue]
     # The app under test must never reach the development database.
     return base.model_copy(update={"database_url": base.test_database_url})
 

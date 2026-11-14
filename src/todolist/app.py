@@ -13,6 +13,7 @@ from todolist.api.oauth import root_router as oauth_root_router
 from todolist.config import Settings, get_settings
 from todolist.db import create_engine, create_session_factory, transaction
 from todolist.errors import install_error_handlers
+from todolist.frontend import install_frontend
 from todolist.google import GoogleClient
 from todolist.mcp_server import create_mcp_server, mcp_asgi_app
 from todolist.mcp_server.server import MCP_PATH
@@ -73,4 +74,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # A plain route, not a mount: the MCP app sees the path unchanged and serves exactly
     # MCP_PATH, with its own bearer authentication in front.
     app.router.routes.append(Route(MCP_PATH, endpoint=mcp_app))
+    # Last, so it only gets what no route above matched.
+    install_frontend(app, settings.frontend_dist)
     return app
