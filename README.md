@@ -1,4 +1,4 @@
-# todolist
+# TaskBridge
 
 This is a todolist app. Will be built in public.
 
@@ -16,7 +16,6 @@ This is a todolist app. Will be built in public.
 - Easy MCP setup with instructions for claude, codex
 - Auditlog per project, per list
 - User interface, Oauth login (at least Google)
-- This project needs a better name
 
 # Out of scope for v1
 
