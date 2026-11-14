@@ -95,11 +95,15 @@ async def test_create_returns_the_list(client: AsyncClient, db_session: AsyncSes
         "mode",
         "position",
         "open_item_count",
+        "role",
+        "actions",
         "created_by",
         "created_at",
         "updated_at",
     }
     assert body["open_item_count"] == 0
+    assert body["role"] == "admin"
+    assert body["actions"] == ["read", "change_items", "edit_list", "administer"]
     assert await db_session.get(TodoList, uuid.UUID(body["id"])) is not None
 
 

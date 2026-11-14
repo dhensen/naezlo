@@ -1,4 +1,5 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
+import type { QueryKey } from '@tanstack/react-query'
 
 import { ApiError } from './client'
 
@@ -31,4 +32,20 @@ export function createQueryClient(options: { retry?: boolean } = {}): QueryClien
     },
   })
   return client
+}
+
+/**
+ * Put a change that the server confirmed into a cached query.
+ *
+ * A fetch of that query that is still under way started before the change and would bring
+ * the old state back, so it is cancelled first. Without cached data there is nothing to
+ * update: the query is fetched (again) instead.
+ */
+export async function applyToCache<T>(client: QueryClient, queryKey: QueryKey, update: (data: T) => T): Promise<void> {
+  await client.cancelQueries({ queryKey, exact: true })
+  if (client.getQueryData<T>(queryKey) === undefined) {
+    await client.invalidateQueries({ queryKey, exact: true })
+  } else {
+    client.setQueryData<T>(queryKey, (data) => (data === undefined ? data : update(data)))
+  }
 }

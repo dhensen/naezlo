@@ -7,6 +7,7 @@ the lists the caller can see.
 """
 
 import uuid
+from dataclasses import replace
 from datetime import datetime
 from typing import Annotated
 
@@ -22,7 +23,10 @@ from todolist.api.deps import (
     ProjectListsContextDep,
 )
 from todolist.db import SessionDep
-from todolist.models import ListMode, Project, TodoList
+from todolist.errors import NotFoundError
+from todolist.models import ListMode, Project, ProjectRole, TodoList
+from todolist.permissions import ListAccess, ListAction, list_access, list_accesses
+from todolist.principals import Principal
 from todolist.services.items import count_items
 from todolist.services.lists import create_list, delete_list, update_list
 
@@ -68,12 +72,18 @@ class ListOut(BaseModel):
     position: int
     # Items that are not done yet.
     open_item_count: int
+    # The caller's effective role on the list, and what they may do with it (the role and
+    # the list mode together): what the UI may offer.
+    role: ProjectRole
+    actions: list[ListAction]
     created_by: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
 
-def _list_out(todo_list: TodoList, project: Project, open_item_count: int) -> ListOut:
+def _list_out(
+    todo_list: TodoList, project: Project, access: ListAccess, open_item_count: int
+) -> ListOut:
     return ListOut(
         id=todo_list.id,
         project_id=todo_list.project_id,
@@ -83,6 +93,8 @@ def _list_out(todo_list: TodoList, project: Project, open_item_count: int) -> Li
         mode=todo_list.mode,
         position=todo_list.position,
         open_item_count=open_item_count,
+        role=access.role,
+        actions=access.actions,
         created_by=todo_list.created_by,
         created_at=todo_list.created_at,
         updated_at=todo_list.updated_at,
@@ -95,9 +107,13 @@ async def _open_item_count(session: AsyncSession, todo_list: TodoList) -> int:
 
 @project_router.get("")
 async def list_lists_route(ctx: ProjectListsContextDep, session: SessionDep) -> list[ListOut]:
+    principal = Principal.for_user(ctx.user, ctx.project.organization_id)
+    accesses = await list_accesses(session, principal, ctx.project, ctx.todo_lists)
     counts = await count_items(session, [todo_list.id for todo_list in ctx.todo_lists])
     return [
-        _list_out(todo_list, ctx.project, counts[todo_list.id].open) for todo_list in ctx.todo_lists
+        _list_out(todo_list, ctx.project, accesses[todo_list.id], counts[todo_list.id].open)
+        for todo_list in ctx.todo_lists
+        if todo_list.id in accesses
     ]
 
 
@@ -108,12 +124,18 @@ async def create_list_route(
     todo_list = await create_list(
         session, ctx.principal, ctx.project, body.name, body.description, body.mode
     )
-    return _list_out(todo_list, ctx.project, 0)
+    access = await list_access(session, ctx.principal, todo_list, ctx.project)
+    if access is None:
+        # Cannot happen for a user who may create lists here; never answer without a role.
+        raise NotFoundError("List not found")
+    return _list_out(todo_list, ctx.project, access, 0)
 
 
 @router.get("")
 async def get_list_route(ctx: ListContextDep, session: SessionDep) -> ListOut:
-    return _list_out(ctx.todo_list, ctx.project, await _open_item_count(session, ctx.todo_list))
+    return _list_out(
+        ctx.todo_list, ctx.project, ctx.access, await _open_item_count(session, ctx.todo_list)
+    )
 
 
 @router.patch("")
@@ -129,7 +151,9 @@ async def update_list_route(
         set_description="description" in body.model_fields_set,
         mode=body.mode,
     )
-    return _list_out(todo_list, ctx.project, await _open_item_count(session, todo_list))
+    # A new mode changes what the caller may do from here on.
+    access = replace(ctx.access, mode=todo_list.mode)
+    return _list_out(todo_list, ctx.project, access, await _open_item_count(session, todo_list))
 
 
 @router.delete("", status_code=204)

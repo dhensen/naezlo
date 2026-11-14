@@ -834,6 +834,17 @@
         "title": "ItemStatus",
         "type": "string"
       },
+      "ListAction": {
+        "description": "What a principal wants to do with a list. `ListAccess` decides whether they may.",
+        "enum": [
+          "read",
+          "change_items",
+          "edit_list",
+          "administer"
+        ],
+        "title": "ListAction",
+        "type": "string"
+      },
       "ListGrantIn": {
         "properties": {
           "principal_id": {
@@ -962,6 +973,13 @@
       },
       "ListOut": {
         "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ListAction"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1019,6 +1037,9 @@
             "title": "Project Name",
             "type": "string"
           },
+          "role": {
+            "$ref": "#/components/schemas/ProjectRole"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -1034,6 +1055,8 @@
           "mode",
           "position",
           "open_item_count",
+          "role",
+          "actions",
           "created_by",
           "created_at",
           "updated_at"
@@ -1261,6 +1284,9 @@
             ],
             "title": "Created By"
           },
+          "default_list_mode": {
+            "$ref": "#/components/schemas/ListMode"
+          },
           "description": {
             "anyOf": [
               {
@@ -1303,7 +1329,8 @@
           "created_by",
           "created_at",
           "updated_at",
-          "role"
+          "role",
+          "default_list_mode"
         ],
         "title": "ProjectOut",
         "type": "object"

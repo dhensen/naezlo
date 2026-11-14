@@ -247,6 +247,11 @@ class ListAccess:
     def allows(self, action: ListAction) -> bool:
         return self.denial(action) is None
 
+    @property
+    def actions(self) -> list[ListAction]:
+        """Every action the principal may do, for a client that shows or hides controls."""
+        return [action for action in ListAction if self.allows(action)]
+
     def require(self, action: ListAction) -> None:
         """Raise the 403 for this action when the principal may not do it."""
         denial = self.denial(action)
@@ -270,6 +275,58 @@ async def list_access(
     if role is None:
         return None
     return ListAccess(role=role, mode=todo_list.mode, kind=principal.kind)
+
+
+async def list_accesses(
+    session: AsyncSession,
+    principal: Principal,
+    project: Project,
+    todo_lists: Collection[TodoList],
+) -> dict[uuid.UUID, ListAccess]:
+    """What the principal may do with each of these lists of `project`, by list id; a list
+    that does not exist for the principal is left out.
+
+    The same rules as `list_access`, for several lists in a fixed number of queries.
+    """
+    if any(todo_list.project_id != project.id for todo_list in todo_lists):
+        raise ValueError("project is not the project of every list")
+    if not todo_lists or principal.organization_id != project.organization_id:
+        return {}
+    # For a user this is None without a membership and admin for an owner or admin of the
+    # organization, whose role no list grant changes.
+    project_role = await effective_project_role(session, principal, project)
+    list_roles: dict[uuid.UUID, ListRole] = {}
+    if principal.kind is PrincipalKind.AGENT:
+        granted = ListGrant.agent_id == principal.id
+        grants_count = True
+    else:
+        membership_role = await session.scalar(
+            select(Membership.role).where(
+                Membership.organization_id == project.organization_id,
+                Membership.user_id == principal.id,
+            )
+        )
+        if membership_role is None:
+            return {}
+        granted = ListGrant.user_id == principal.id
+        grants_count = not can_manage_organization(membership_role)
+    if grants_count:
+        rows = await session.execute(
+            select(ListGrant.list_id, ListGrant.role).where(
+                ListGrant.list_id.in_([todo_list.id for todo_list in todo_lists]), granted
+            )
+        )
+        for list_id, list_role in rows:
+            list_roles[list_id] = list_role
+    accesses: dict[uuid.UUID, ListAccess] = {}
+    for todo_list in todo_lists:
+        if principal.kind is PrincipalKind.AGENT and todo_list.mode is ListMode.HUMAN_ONLY:
+            continue
+        list_role = list_roles.get(todo_list.id)
+        role = project_role if list_role is None else list_role.project_role
+        if role is not None:
+            accesses[todo_list.id] = ListAccess(role=role, mode=todo_list.mode, kind=principal.kind)
+    return accesses
 
 
 def accessible_lists(principal: Principal) -> Select[TodoList]:

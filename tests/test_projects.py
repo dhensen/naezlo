@@ -64,8 +64,10 @@ async def test_create_returns_the_project(client: AsyncClient, db_session: Async
         "created_at",
         "updated_at",
         "role",
+        "default_list_mode",
     }
     assert body["role"] == "admin"
+    assert body["default_list_mode"] == "human_only"
     assert await db_session.get(Project, uuid.UUID(body["id"])) is not None
 
 
@@ -341,3 +343,20 @@ async def test_every_answer_has_the_callers_role(
 
     # A project a member creates is theirs to administer.
     assert (await create(other_client, url, "Mine"))["role"] == "admin"
+
+
+async def test_default_list_mode_follows_the_agents_of_the_organization(
+    client: AsyncClient,
+) -> None:
+    org_id, url = await ada_org(client)
+    project_url = f"/api/projects/{(await create(client, url))['id']}"
+    assert (await client.get(project_url)).json()["default_list_mode"] == "human_only"
+
+    agent = await client.post(f"/api/orgs/{org_id}/agents", json={"name": "Claude"})
+    assert agent.status_code == 201, agent.text
+
+    assert (await client.get(project_url)).json()["default_list_mode"] == "mixed"
+    assert [project["default_list_mode"] for project in (await client.get(url)).json()] == ["mixed"]
+    renamed = await client.patch(project_url, json={"name": "Site"})
+    assert renamed.json()["default_list_mode"] == "mixed"
+    assert (await create(client, url, "Second"))["default_list_mode"] == "mixed"

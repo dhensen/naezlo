@@ -27,6 +27,7 @@ from todolist.permissions import (
     ListAction,
     effective_list_role,
     list_access,
+    list_accesses,
     visible_lists,
 )
 from todolist.principals import Principal
@@ -478,3 +479,115 @@ async def test_people_work_by_their_role_in_human_only_and_mixed_lists(
     ] == 1
     assert (await other_client.patch(world.list_url, json={"name": "Mine"})).status_code == 200
     assert (await other_client.delete(item_url)).status_code == 204
+
+
+# --- What the API tells the UI: the caller's role and allowed actions on each list ---
+
+READ_ONLY = ["read"]
+EDITOR_ACTIONS = ["read", "change_items", "edit_list"]
+EVERYTHING = ["read", "change_items", "edit_list", "administer"]
+
+
+@pytest.mark.parametrize(
+    ("mode", "role", "actions"),
+    [
+        (ListMode.HUMAN_ONLY, ListRole.VIEWER, READ_ONLY),
+        (ListMode.MIXED, ListRole.EDITOR, EDITOR_ACTIONS),
+        (ListMode.MIXED, ListRole.ADMIN, EVERYTHING),
+        (ListMode.AI_ONLY, ListRole.EDITOR, READ_ONLY),
+        (ListMode.AI_ONLY, ListRole.ADMIN, ["read", "edit_list", "administer"]),
+    ],
+)
+async def test_the_list_shape_has_the_callers_role_and_actions(
+    client: AsyncClient,
+    other_client: AsyncClient,
+    db_session: AsyncSession,
+    mode: ListMode,
+    role: ListRole,
+    actions: list[str],
+) -> None:
+    world = await make_world(client, db_session, mode)
+    await join(db_session, other_client, world, role)
+
+    one = (await other_client.get(world.list_url)).json()
+    index = (await other_client.get(f"/api/projects/{world.project.id}/lists")).json()
+
+    assert (one["role"], one["actions"]) == (role.value, actions)
+    assert [(row["id"], row["role"], row["actions"]) for row in index] == [
+        (one["id"], role.value, actions)
+    ]
+
+
+async def test_a_mode_change_answers_with_the_new_actions(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    world = await make_world(client, db_session, ListMode.MIXED)
+
+    response = await client.patch(world.list_url, json={"mode": "ai_only"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["actions"] == ["read", "edit_list", "administer"]
+
+
+async def test_list_accesses_agrees_with_list_access(
+    client: AsyncClient,
+    other_client: AsyncClient,
+    third_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Four lists in one project: human-only, AI-only, and two mixed ones of which one has a
+    list grant. Every kind of principal gets the same answer from both functions."""
+    world = await make_world(client, db_session, ListMode.MIXED)
+    lists_url = f"/api/projects/{world.project.id}/lists"
+    todo_lists = [world.todo_list]
+    for name, mode in [("Private", "human_only"), ("Queue", "ai_only"), ("Open", "mixed")]:
+        created = await client.post(lists_url, json={"name": name, "mode": mode})
+        assert created.status_code == 201, created.text
+        todo_list = await db_session.get(TodoList, uuid.UUID(created.json()["id"]))
+        assert todo_list is not None
+        todo_lists.append(todo_list)
+    ada = await db_session.get(User, uuid.UUID((await client.get("/api/me")).json()["user"]["id"]))
+    assert ada is not None
+    # Grace: editor on the project, but no access to the first list.
+    grace = await join(db_session, other_client, world, ListRole.NONE)
+    await grant_project_role(db_session, str(world.project.id), str(grace.id), ProjectRole.EDITOR)
+    # Linus: a member with only a viewer grant on the first list.
+    linus_me = await sign_in(third_client, "linus@example.com", "Linus")
+    await add_member(db_session, world.org_id, linus_me["user"]["id"], MembershipRole.MEMBER)
+    await grant_list_role(
+        db_session, str(world.todo_list.id), linus_me["user"]["id"], ListRole.VIEWER
+    )
+    linus = await db_session.get(User, uuid.UUID(linus_me["user"]["id"]))
+    assert linus is not None
+    # Claude: admin on the first list, viewer on the project.
+    await grant_agent(db_session, world, ListRole.ADMIN)
+    db_session.add(
+        ProjectGrant(
+            project_id=world.project.id,
+            principal_kind=PrincipalKind.AGENT,
+            agent_id=world.agent.id,
+            role=ProjectRole.VIEWER,
+        )
+    )
+    await db_session.flush()
+    organization_id = world.project.organization_id
+    principals = [
+        Principal.for_user(ada, organization_id),
+        grace,
+        Principal.for_user(linus, organization_id),
+        world.claude,
+        # Someone of another organization sees nothing.
+        Principal.for_user(ada, uuid.uuid4()),
+    ]
+
+    seen: list[int] = []
+    for principal in principals:
+        expected = {
+            todo_list.id: access
+            for todo_list in todo_lists
+            if (access := await list_access(db_session, principal, todo_list, world.project))
+        }
+        assert await list_accesses(db_session, principal, world.project, todo_lists) == expected
+        seen.append(len(expected))
+
+    assert seen == [4, 3, 1, 3, 0]

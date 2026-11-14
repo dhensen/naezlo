@@ -15,7 +15,9 @@ const queryClient = createQueryClient()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      {/* No transitions: a navigation renders together with the state change next to it
+          (sign out, leave an organization), not after it. */}
+      <BrowserRouter useTransitions={false}>
         <App />
       </BrowserRouter>
     </QueryClientProvider>

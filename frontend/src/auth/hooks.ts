@@ -41,14 +41,21 @@ export function useDevLogin() {
   })
 }
 
-/** Sign out and forget everything that was loaded for this user. */
+/**
+ * Sign out. The caller passes `onSuccess: (forget) => { navigate(...); forget() }` to
+ * `mutate`: leaving the page and forgetting the user must happen together, or the auth guard
+ * sees "signed out" first and sends the browser to /login?next=<the page that was left>.
+ */
 export function useSignOut() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => unwrap(api.POST('/api/auth/logout')),
-    onSuccess: () => {
-      queryClient.setQueryData(ME_KEY, null)
-      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== ME_KEY[0] })
+    mutationFn: async () => {
+      await unwrap(api.POST('/api/auth/logout'))
+      /** Forget the user and everything that was loaded for them. */
+      return () => {
+        queryClient.setQueryData(ME_KEY, null)
+        queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== ME_KEY[0] })
+      }
     },
   })
 }

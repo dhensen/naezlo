@@ -55,7 +55,10 @@ export function UserMenu() {
             onClick={() =>
               signOut.mutate(undefined, {
                 // Not /login?next=<here>: someone who signs out is not on their way anywhere.
-                onSuccess: () => void navigate('/login', { replace: true }),
+                onSuccess: (forget) => {
+                  void navigate('/login', { replace: true })
+                  forget()
+                },
               })
             }
           >

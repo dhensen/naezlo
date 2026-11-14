@@ -391,4 +391,18 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
   a test that renders a project page mocks `GET /api/projects/<id>` and `.../lists`.
 - A new field on an API model: add it to the exact-key assertions in the backend tests
   (`set(body) == {...}`), run `gen:api`, and add it to the fixtures in `frontend/src/test/api.ts`.
+- Lists in the UI: `frontend/src/lists/` (`modes.ts`: `MODES`, `modeInfo`; `hooks.ts`: `useCreateList`,
+  `useUpdateList`, `useDeleteList`, `listAllows(list, 'edit_list')`), `components/ModeBadge.tsx`
+  (`ModeBadge`, `ModeIcon`) and `components/ListDialogs.tsx`. `ListOut.actions` says what the caller
+  may do with a list (role and mode together, from `ListAccess.actions`); show a list control with
+  `listAllows`, never by comparing roles or modes in the frontend. `ProjectOut.default_list_mode` is
+  the mode a new list gets by default. Several lists of one project: `list_accesses` in `permissions.py`.
+- A mutation that changes cached data uses `applyToCache(queryClient, key, update)`
+  (`src/api/queryClient.ts`), not a bare `setQueryData`: it cancels a fetch that started before the
+  change. Before `invalidateQueries` after a mutation, `await queryClient.cancelQueries({ queryKey })`.
+- The router runs with `useTransitions={false}` (`main.tsx`, `src/test/render.tsx`), so `navigate(...)`
+  and a cache change in the same callback render together. `useSignOut` hands `forget` to the
+  caller's `onSuccess`, to call right after `navigate('/login')`.
+- A row button has the visible text "Edit" and `aria-label="Edit <name>"`; in Playwright the page's
+  own "Edit" button then needs `{ name: 'Edit', exact: true }`.
 

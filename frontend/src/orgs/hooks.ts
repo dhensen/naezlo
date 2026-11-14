@@ -160,10 +160,13 @@ export function useInvite(organizationId: string) {
   return useMutation({
     mutationFn: (body: Schemas['InvitationIn']) =>
       unwrap(api.POST('/api/orgs/{org_id}/invitations', { params: { path: { org_id: organizationId } }, body })),
-    onSuccess: (result) =>
-      queryClient.invalidateQueries({
-        queryKey: result.status === 'added' ? membersKey(organizationId) : invitationsKey(organizationId),
-      }),
+    onSuccess: async (result) => {
+      const queryKey = result.status === 'added' ? membersKey(organizationId) : invitationsKey(organizationId)
+      // A first fetch that is still under way started before the invitation and would be
+      // reused by the invalidation: cancel it, so the list is asked for again.
+      await queryClient.cancelQueries({ queryKey })
+      await queryClient.invalidateQueries({ queryKey })
+    },
   })
 }
 

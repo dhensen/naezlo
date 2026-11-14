@@ -41,6 +41,11 @@
   in src/orgs/paths.ts), hooks in src/projects/hooks.ts. `ProjectOut.role` is the caller's role
   (hide controls with `roleAtLeast`), `ListOut.open_item_count` the open items. Dialogs use
   `<Dialog>` (src/components/Dialog.tsx). Fixtures: `project(...)`, `todoList(...)` in src/test/api.ts.
+- Lists in the UI (since US-033): frontend/src/lists/ (modes.ts, hooks.ts), components/ModeBadge.tsx,
+  components/ListDialogs.tsx; tests in src/pages/ProjectLists.test.tsx and e2e/lists.spec.ts.
+  `ListOut.actions` (+ `role`) tells the UI what the caller may do (`listAllows`);
+  `ProjectOut.default_list_mode` is the default for a new list. Cache changes after a mutation go
+  through `applyToCache` (src/api/queryClient.ts). The router has `useTransitions={false}`.
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -1081,3 +1086,46 @@
   - Next is US-033 (lists in the UI): the list rows on the project page are plain rows; the hooks
     `useProjectLists` / `projectListsKey` are there to extend, and `ListOut` has no caller role yet.
 ---
+
+## 2026-11-15 00:45 - US-033
+- Lists in the UI: "New list" on the project page (dialog with name, description and the mode as
+  three radio buttons, preselected with the server's default for the organization), a mode badge
+  per list (label + icon per mode, tooltip on hover and keyboard focus), and per row "Edit" (rename,
+  description, mode) and "Delete" (confirmation dialog), shown according to what the API allows.
+- Backend: `ListOut.role` + `ListOut.actions` (`ListAccess.actions`; `list_accesses` in
+  permissions.py for a project's index), `ProjectOut.default_list_mode`. No schema change.
+- Labels are now "Human only / AI only / Mixed" (was "Humans only").
+- Two races found while running the e2e suite under load, both fixed (not new in this story):
+  1. a list fetch still under way when a mutation finished overwrote the fresh state (seen in the
+     invitation spec; the new list hooks had the same weakness) -> `applyToCache`, and
+     `cancelQueries` before the invalidation in `useInvite`;
+  2. after "Sign out" the browser sometimes ended on `/login?next=<page>`: React Router 8 runs
+     navigations as transitions, so the cache change rendered before the navigation ->
+     `useTransitions={false}` and `useSignOut` hands `forget` to the caller.
+  `npx playwright test --repeat-each 6` (60 runs) passes; before, 2-4 of 40 failed.
+- Files changed: src/todolist/api/lists.py, api/projects.py, permissions.py, tests/test_lists.py,
+  test_list_modes.py, test_projects.py, frontend/openapi.json + src/api/schema.d.ts (generated),
+  frontend/src/lists/{modes,hooks}.ts, components/ModeBadge.tsx, components/ListDialogs.tsx,
+  pages/ProjectPage.tsx (+ test), pages/ProjectLists.test.tsx, api/queryClient.ts, auth/hooks.ts,
+  components/UserMenu.tsx, orgs/hooks.ts, main.tsx, test/api.ts, test/render.tsx, e2e/lists.spec.ts,
+  e2e/projects.spec.ts, DECISIONS.md, CLAUDE.md
+- Checks: ruff, pyright, pytest (686), eslint, tsc, vitest (76), Playwright (10) all pass.
+- Browser check: done with the Chrome DevTools tools on the e2e backend (project page with three
+  lists and the tooltip, the "New list" dialog) at desktop width; looked right. Phone width was
+  not looked at by hand.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - `invalidateQueries` does not restart a query whose first fetch is still running (no data yet):
+    it reuses that fetch, which may predate the mutation. Cancel first (`applyToCache`).
+  - The existing project hooks (`useCreateProject`, `useUpdateProject`, `useDeleteProject`) and
+    the member hooks still use a bare `setQueryData`; move them to `applyToCache` when touched.
+  - Playwright's `getByRole('button', { name: 'Edit' })` matches "Edit Checklist" too (substring);
+    use `exact: true` when row buttons carry the same word.
+  - Stress the e2e suite with `npx playwright test --repeat-each 5` (in frontend/, after a build)
+    to find races that a single run hides.
+  - `pkill -f "todolist.e2e --port 8766"` must be its own command: in a chain it kills the shell
+    that runs it (the pattern is in that shell's command line).
+  - Next is US-034 (list view with items): the list rows are not links yet; `ListOut.actions` has
+    `change_items` for the item controls.
+---
+

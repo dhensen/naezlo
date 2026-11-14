@@ -41,7 +41,7 @@ test('create, rename and delete a project', async ({ page }) => {
   await expect(sidebar.getByRole('link', { name: 'Moon landing' })).toBeVisible()
   await expect(sidebar.getByText('No projects yet.')).toBeHidden()
 
-  // Lists (made through the API until the list pages exist) show their mode and open items.
+  // A list with items (made through the API: not this story) shows its mode and open items.
   const projectId = new URL(page.url()).pathname.split('/').pop()!
   const list = await page.request.post(`/api/projects/${projectId}/lists`, { data: { name: 'Checklist', mode: 'mixed' } })
   expect(list.status()).toBe(201)
@@ -56,7 +56,7 @@ test('create, rename and delete a project', async ({ page }) => {
   await expect(row).toContainText('2 open items')
 
   // Rename and change the description.
-  await page.getByRole('button', { name: 'Edit' }).click()
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const edit = page.getByRole('dialog', { name: 'Edit project' })
   await expect(edit.getByLabel('Name')).toHaveValue('Moon landing')
   await edit.getByLabel('Name').fill('Mars landing')
@@ -70,13 +70,13 @@ test('create, rename and delete a project', async ({ page }) => {
   await expect(sidebar.getByRole('link', { name: 'Moon landing' })).toBeHidden()
 
   // Delete: Cancel keeps it, confirming removes it and leaves the page.
-  await page.getByRole('button', { name: 'Delete' }).click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
   const remove = page.getByRole('dialog', { name: 'Delete Mars landing?' })
   await remove.getByRole('button', { name: 'Cancel' }).click()
   await expect(remove).toBeHidden()
   await expect(sidebar.getByRole('link', { name: 'Mars landing' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Delete' }).click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
   await remove.getByRole('button', { name: 'Delete project' }).click()
 
   await expect(page).toHaveURL(`/o/${organization.slug}`)
@@ -114,18 +114,18 @@ test('the controls follow the role on the project', async ({ page, browser }) =>
   const projectUrl = `/o/${organization.slug}/p/${projectId}`
   await gracePage.goto(projectUrl)
   await expect(gracePage.getByRole('heading', { level: 1, name: 'Shared plans' })).toBeVisible()
-  await expect(gracePage.getByRole('button', { name: 'Edit' })).toBeHidden()
-  await expect(gracePage.getByRole('button', { name: 'Delete' })).toBeHidden()
+  await expect(gracePage.getByRole('button', { name: 'Edit', exact: true })).toBeHidden()
+  await expect(gracePage.getByRole('button', { name: 'Delete', exact: true })).toBeHidden()
 
   // As an editor she may rename, not delete.
   expect((await grant('editor')).ok()).toBe(true)
   await gracePage.reload()
-  await expect(gracePage.getByRole('button', { name: 'Edit' })).toBeVisible()
-  await expect(gracePage.getByRole('button', { name: 'Delete' })).toBeHidden()
+  await expect(gracePage.getByRole('button', { name: 'Edit', exact: true })).toBeVisible()
+  await expect(gracePage.getByRole('button', { name: 'Delete', exact: true })).toBeHidden()
 
   // The owner has both.
   await page.goto(projectUrl)
-  await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeVisible()
   await context.close()
 })

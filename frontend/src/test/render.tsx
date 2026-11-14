@@ -18,7 +18,7 @@ export function renderApp(path = '/') {
   const queryClient = createQueryClient({ retry: false })
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[path]}>
+      <MemoryRouter initialEntries={[path]} useTransitions={false}>
         <App />
         <CurrentLocation />
       </MemoryRouter>

@@ -5,23 +5,14 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError } from '../api/client'
 import { Dialog, DIALOG_CANCEL, DIALOG_DANGER, DIALOG_INPUT, DIALOG_LABEL, DIALOG_SUBMIT } from '../components/Dialog'
 import { ErrorMessage } from '../components/ErrorMessage'
+import { DeleteListDialog, EditListDialog, NewListDialog } from '../components/ListDialogs'
+import { ModeBadge } from '../components/ModeBadge'
+import { listAllows } from '../lists/hooks'
 import { useCurrentOrganization } from '../orgs/hooks'
 import type { Organization, Project } from '../orgs/hooks'
 import { orgPath } from '../orgs/paths'
 import { roleAtLeast, useDeleteProject, useProject, useProjectLists, useUpdateProject } from '../projects/hooks'
 import type { TodoList } from '../projects/hooks'
-
-const MODE_LABELS: Record<TodoList['mode'], string> = {
-  human_only: 'Humans only',
-  ai_only: 'AI only',
-  mixed: 'Mixed',
-}
-
-const MODE_STYLES: Record<TodoList['mode'], string> = {
-  human_only: 'bg-slate-100 text-slate-700',
-  ai_only: 'bg-violet-100 text-violet-800',
-  mixed: 'bg-teal-100 text-teal-800',
-}
 
 const HEADER_BUTTON =
   'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50'
@@ -99,7 +90,7 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
           </div>
         )}
       </header>
-      <ListsSection projectId={current.id} />
+      <ListsSection project={current} />
       {dialog === 'edit' && <EditProjectDialog project={current} onClose={() => setDialog(null)} />}
       {dialog === 'delete' && (
         <DeleteProjectDialog project={current} organization={organization} onClose={() => setDialog(null)} />
@@ -115,14 +106,28 @@ function openItems(count: number): string {
   return count === 1 ? '1 open item' : `${count} open items`
 }
 
-function ListsSection({ projectId }: { projectId: string }) {
-  const lists = useProjectLists(projectId)
+const ROW_BUTTON = 'rounded-md px-2 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+const ROW_DANGER_BUTTON = 'rounded-md px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50'
+
+type ListDialog = { kind: 'new' } | { kind: 'edit' | 'delete'; list: TodoList }
+
+function ListsSection({ project }: { project: Project }) {
+  const lists = useProjectLists(project.id)
+  const [dialog, setDialog] = useState<ListDialog | null>(null)
+  const close = () => setDialog(null)
 
   return (
     <section aria-labelledby="project-lists" className="flex flex-col gap-3">
-      <h2 id="project-lists" className="text-lg font-semibold tracking-tight">
-        Lists
-      </h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="project-lists" className="text-lg font-semibold tracking-tight">
+          Lists
+        </h2>
+        {roleAtLeast(project.role, 'editor') && (
+          <button type="button" className={HEADER_BUTTON} onClick={() => setDialog({ kind: 'new' })}>
+            New list
+          </button>
+        )}
+      </div>
       {lists.isPending && (
         <p role="status" className="text-sm text-slate-500">
           Loading…
@@ -140,19 +145,52 @@ function ListsSection({ projectId }: { projectId: string }) {
           className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white"
         >
           {lists.data.map((list) => (
-            <li key={list.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-              <span className="min-w-0 flex-1 font-medium break-words text-slate-900">{list.name}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${MODE_STYLES[list.mode]}`}>
-                {MODE_LABELS[list.mode]}
-              </span>
-              <span className="w-28 text-right text-sm text-slate-600 tabular-nums">
-                {openItems(list.open_item_count)}
-              </span>
-            </li>
+            <ListRow
+              key={list.id}
+              list={list}
+              onEdit={() => setDialog({ kind: 'edit', list })}
+              onDelete={() => setDialog({ kind: 'delete', list })}
+            />
           ))}
         </ul>
       )}
+      {dialog?.kind === 'new' && <NewListDialog project={project} onClose={close} />}
+      {dialog?.kind === 'edit' && <EditListDialog list={dialog.list} onClose={close} />}
+      {dialog?.kind === 'delete' && <DeleteListDialog list={dialog.list} onClose={close} />}
     </section>
+  )
+}
+
+function ListRow({ list, onEdit, onDelete }: { list: TodoList; onEdit: () => void; onDelete: () => void }) {
+  // What the role on this list and its mode allow; the API works it out.
+  const canEdit = listAllows(list, 'edit_list')
+  const canDelete = listAllows(list, 'administer')
+
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="font-medium break-words text-slate-900">{list.name}</span>
+        {list.description !== null && (
+          <span className="text-sm break-words whitespace-pre-line text-slate-600">{list.description}</span>
+        )}
+      </div>
+      <ModeBadge mode={list.mode} />
+      <span className="w-28 text-right text-sm text-slate-600 tabular-nums">{openItems(list.open_item_count)}</span>
+      {(canEdit || canDelete) && (
+        <div className="flex shrink-0 gap-1">
+          {canEdit && (
+            <button type="button" aria-label={`Edit ${list.name}`} className={ROW_BUTTON} onClick={onEdit}>
+              Edit
+            </button>
+          )}
+          {canDelete && (
+            <button type="button" aria-label={`Delete ${list.name}`} className={ROW_DANGER_BUTTON} onClick={onDelete}>
+              Delete
+            </button>
+          )}
+        </div>
+      )}
+    </li>
   )
 }
 

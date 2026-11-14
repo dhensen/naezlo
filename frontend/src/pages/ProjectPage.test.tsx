@@ -43,10 +43,11 @@ test('shows the name, the description and the lists with mode and open items', a
   expect(await screen.findByRole('heading', { level: 1, name: 'Website' })).toBeInTheDocument()
   expect(screen.getByText('The new site.')).toBeInTheDocument()
   const rows = within(await screen.findByRole('list', { name: 'Lists' })).getAllByRole('listitem')
+  // Each row: the name, the mode badge (the tooltip's text follows the label) and the open items.
   expect(rows.map((row) => row.textContent)).toEqual([
-    'BacklogMixed3 open items',
-    'Agent queueAI only1 open item',
-    'PrivateHumans onlyNo open items',
+    expect.stringMatching(/^BacklogMixedPeople and AI agents .*3 open items/),
+    expect.stringMatching(/^Agent queueAI onlyAI agents work .*1 open item/),
+    expect.stringMatching(/^PrivateHuman onlyOnly people .*No open items/),
   ])
 })
 

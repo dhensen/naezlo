@@ -1053,6 +1053,12 @@ export interface components {
          * @enum {string}
          */
         ItemStatus: "open" | "done";
+        /**
+         * ListAction
+         * @description What a principal wants to do with a list. `ListAccess` decides whether they may.
+         * @enum {string}
+         */
+        ListAction: "read" | "change_items" | "edit_list" | "administer";
         /** ListGrantIn */
         ListGrantIn: {
             /**
@@ -1108,6 +1114,8 @@ export interface components {
         ListMode: "human_only" | "ai_only" | "mixed";
         /** ListOut */
         ListOut: {
+            /** Actions */
+            actions: components["schemas"]["ListAction"][];
             /**
              * Created At
              * Format: date-time
@@ -1136,6 +1144,7 @@ export interface components {
             project_id: string;
             /** Project Name */
             project_name: string;
+            role: components["schemas"]["ProjectRole"];
             /**
              * Updated At
              * Format: date-time
@@ -1227,6 +1236,7 @@ export interface components {
             created_at: string;
             /** Created By */
             created_by: string | null;
+            default_list_mode: components["schemas"]["ListMode"];
             /** Description */
             description: string | null;
             /**

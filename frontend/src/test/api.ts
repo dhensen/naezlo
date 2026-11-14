@@ -76,6 +76,7 @@ export function project(
     created_at: '2026-11-01T10:00:00Z',
     updated_at: '2026-11-01T10:00:00Z',
     role: 'admin',
+    default_list_mode: 'human_only',
     ...overrides,
   }
 }
@@ -96,6 +97,8 @@ export function todoList(
     mode: 'human_only',
     position: 1,
     open_item_count: 0,
+    role: 'admin',
+    actions: ['read', 'change_items', 'edit_list', 'administer'],
     created_by: ADA.user.id,
     created_at: '2026-11-01T10:00:00Z',
     updated_at: '2026-11-01T10:00:00Z',
