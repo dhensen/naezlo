@@ -260,3 +260,13 @@ uv run pytest
   `list_projects_with_lists` (`services/projects.py`, on `projects_with_accessible_lists`).
 - MCP tool tests: `call(mcp, tool, **arguments)` and `error_of(mcp, tool, **arguments)` in
   `tests/test_mcp_read_tools.py`, with `grant_agent_project`, `add_list`, `add_item`, `project_of`.
+- MCP write tools (`add_item`, `update_item`, `complete_item`, `reopen_item`, `move_item`,
+  `delete_item` in `mcp_server/tools.py`): load the item with `_accessible_item(ctx, item_id,
+  ListAction.CHANGE_ITEMS)` and call the item service. A tool whose name is also an imported service
+  function is defined as `<name>_tool` with `@server.tool(name="<name>")`. Return `_changed_item(item)`.
+- `ItemTitle` / `ItemNotes` (the accepted title and notes) live in `services/items.py`; the API
+  models and the MCP tool parameters both use them. In a tool, an optional text that can be removed
+  is removed with an empty string (a left-out argument and null look the same).
+- MCP write-tool tests: `tests/test_mcp_write_tools.py` (`shared_list(client, db_session, role, mode)`
+  gives `(authorized, token, list_id)`, `events_since`, `assert_by_agent`).
+

@@ -7,7 +7,9 @@ the list and the list mode (`list_access` in `todolist.permissions`).
 import uuid
 from collections.abc import Collection
 from dataclasses import dataclass
+from typing import Annotated
 
+from pydantic import StringConstraints
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,11 @@ from todolist.errors import AppError
 from todolist.models import AuditAction, Item, ItemStatus, TodoList
 from todolist.principals import Principal
 from todolist.services.audit import changes, record_event
+
+# What a caller (HTTP API, MCP tools) accepts as an item's title and notes. items.title holds
+# 500 characters.
+ItemTitle = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+ItemNotes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=10000)]
 
 
 def _clean_notes(notes: str | None) -> str | None:

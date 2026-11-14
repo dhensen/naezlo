@@ -126,6 +126,9 @@
 - MCP tools: `register_tools` in mcp_server/tools.py. Raise `AppError`s inside `agent_context()`
   (they become the SDK's `ToolError`); load a list with `_accessible_list(ctx, list_id, ListAction.X)`.
   Tests: `call` / `error_of` and the setup helpers in tests/test_mcp_read_tools.py.
+- MCP write tools (US-025): `_accessible_item(ctx, item_id, ListAction.X)` loads an item for a
+  tool; `_changed_item(item)` is the result shape. Tests: tests/test_mcp_write_tools.py
+  (`shared_list`, `events_since`, `assert_by_agent`).
 
 ## 2026-11-14 - US-001
 - Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
@@ -783,4 +786,26 @@
   - US-025: for the write tools use `_accessible_list(ctx, list_id, ListAction.CHANGE_ITEMS)`; an
     item tool needs the same for an item (load the item, then its list). `ForbiddenError`'s detail
     ("This needs the editor role on the list") reaches the agent as is.
+---
+
+## 2026-11-15 00:50 - US-025
+- MCP tools `add_item`, `update_item`, `complete_item`, `reopen_item`, `move_item` and `delete_item`,
+  all on the item service functions of the HTTP API, with the agent's `Principal`.
+- Permission: `list_access(...).require(ListAction.CHANGE_ITEMS)` through `_accessible_list` and the
+  new `_accessible_item`; a viewer agent reads "This needs the editor role on the list".
+- `ItemTitle` / `ItemNotes` moved to services/items.py so the API and the tools validate the same.
+- Tests: each tool, bad input, the viewer case for every tool, hidden items (404 message), the
+  audit events with actor_kind agent (in the database and through `GET /api/lists/{id}/audit`).
+- Files: src/todolist/mcp_server/tools.py, src/todolist/services/items.py, src/todolist/api/items.py,
+  tests/test_mcp_write_tools.py (new), DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt
+- Pushed: yes
+- **Learnings for future iterations:**
+  - A tool function named like an imported service function shadows it: name the function
+    `<name>_tool` and register it with `@server.tool(name="<name>")`.
+  - `Annotated[ItemTitle, Field(description=...)]` works as a tool parameter: the SDK validates the
+    constraints before the tool runs and reports pydantic's message as the tool error.
+  - An optional tool argument arrives as None both when left out and when null; `update_item`
+    removes notes with an empty string.
+  - Tool calls in a test share `db_session` with the `client`, so the HTTP API shows what a tool
+    changed right away (also inside the `mcp_client` block).
 ---

@@ -7,10 +7,9 @@ AI-only list people only read: changing anything is a 403 `list_ai_only`.
 
 import uuid
 from datetime import datetime
-from typing import Annotated
 
 from fastapi import APIRouter
-from pydantic import BaseModel, StringConstraints, field_validator
+from pydantic import BaseModel, field_validator
 
 from todolist.api.deps import (
     ItemContextDep,
@@ -21,6 +20,8 @@ from todolist.api.deps import (
 from todolist.db import SessionDep
 from todolist.models import Item, ItemStatus, PrincipalKind
 from todolist.services.items import (
+    ItemNotes,
+    ItemTitle,
     create_item,
     delete_item,
     list_items,
@@ -30,10 +31,6 @@ from todolist.services.items import (
 
 list_router = APIRouter(prefix="/lists/{list_id}/items", tags=["items"])
 router = APIRouter(prefix="/items/{item_id}", tags=["items"])
-
-# items.title holds 500 characters.
-ItemTitle = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
-ItemNotes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=10000)]
 
 
 class ItemIn(BaseModel):

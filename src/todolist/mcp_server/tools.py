@@ -9,7 +9,7 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from todolist.errors import NotFoundError
+from todolist.errors import AppError, NotFoundError
 from todolist.mcp_server.context import AgentContext, AgentContextFactory
 from todolist.models import (
     Item,
@@ -27,7 +27,17 @@ from todolist.permissions import (
     effective_project_role,
     list_access,
 )
-from todolist.services.items import ItemCounts, count_items, list_items
+from todolist.services.items import (
+    ItemCounts,
+    ItemNotes,
+    ItemTitle,
+    count_items,
+    create_item,
+    delete_item,
+    list_items,
+    move_item,
+    update_item,
+)
 from todolist.services.lists import list_accessible_lists
 from todolist.services.projects import list_projects_with_lists
 
@@ -102,6 +112,19 @@ class ListWithItems(ListInfo):
     )
 
 
+class ChangedItem(ItemInfo):
+    list_id: uuid.UUID = Field(description="The list the item is in")
+
+
+class DeletedItem(BaseModel):
+    id: uuid.UUID
+    list_id: uuid.UUID = Field(description="The list the item was in")
+    title: str = Field(description="The title of the item that no longer exists")
+
+
+ItemId = Annotated[uuid.UUID, Field(description="The id of an item from get_list or add_item")]
+
+
 def _list_info(
     todo_list: TodoList, project: Project, access: ListAccess, counts: ItemCounts
 ) -> ListInfo:
@@ -128,6 +151,10 @@ def _item_info(item: Item) -> ItemInfo:
         updated_at=item.updated_at,
         completed_at=item.completed_at,
     )
+
+
+def _changed_item(item: Item) -> ChangedItem:
+    return ChangedItem(**_item_info(item).model_dump(), list_id=item.list_id)
 
 
 async def _project_with_lists(ctx: AgentContext, project_id: uuid.UUID) -> Project:
@@ -160,6 +187,23 @@ async def _accessible_list(
     raise NotFoundError(
         f"List {list_id} not found: it does not exist or you have no access to it. "
         "Call list_lists for the lists you can use."
+    )
+
+
+async def _accessible_item(ctx: AgentContext, item_id: uuid.UUID, action: ListAction) -> Item:
+    """The item, when the agent may do `action` on its list. An unknown item and one in a
+    list the agent cannot see give the same error."""
+    item = await ctx.session.get(Item, item_id)
+    todo_list = None if item is None else await ctx.session.get(TodoList, item.list_id)
+    if item is not None and todo_list is not None:
+        project = await ctx.session.get_one(Project, todo_list.project_id)
+        access = await list_access(ctx.session, ctx.principal, todo_list, project)
+        if access is not None:
+            access.require(action)
+            return item
+    raise NotFoundError(
+        f"Item {item_id} not found: it does not exist or you have no access to its list. "
+        "Call get_list for the items of a list."
     )
 
 
@@ -238,3 +282,97 @@ def register_tools(server: MCPServer, agent_context: AgentContextFactory) -> Non
             items = await list_items(ctx.session, todo_list, include_done=include_done)
             info = _list_info(todo_list, project, access, counts[todo_list.id])
             return ListWithItems(**info.model_dump(), items=[_item_info(item) for item in items])
+
+    @server.tool()
+    async def add_item(  # pyright: ignore[reportUnusedFunction]
+        list_id: Annotated[uuid.UUID, Field(description="The id of a list from list_lists")],
+        title: Annotated[ItemTitle, Field(description="What has to be done, 1 to 500 characters")],
+        notes: Annotated[
+            ItemNotes | None, Field(description="Optional details, up to 10000 characters")
+        ] = None,
+    ) -> ChangedItem:
+        """Add an open item at the end of a list. Needs the editor role on the list (see
+        role in list_lists). Use move_item to put it somewhere else in the list."""
+        async with agent_context() as ctx:
+            todo_list, _, _ = await _accessible_list(ctx, list_id, ListAction.CHANGE_ITEMS)
+            item = await create_item(ctx.session, ctx.principal, todo_list, title, notes)
+            return _changed_item(item)
+
+    @server.tool(name="update_item")
+    async def update_item_tool(  # pyright: ignore[reportUnusedFunction]
+        item_id: ItemId,
+        title: Annotated[
+            ItemTitle | None, Field(description="The new title; leave out to keep the title")
+        ] = None,
+        notes: Annotated[
+            ItemNotes | None,
+            Field(
+                description="The new notes; leave out to keep the notes, "
+                "pass an empty string to remove them"
+            ),
+        ] = None,
+    ) -> ChangedItem:
+        """Change the title or the notes of an item (or both). Needs the editor role on the
+        item's list. Use complete_item and reopen_item for the status, move_item for the place."""
+        async with agent_context() as ctx:
+            item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
+            if title is None and notes is None:
+                raise AppError(
+                    422, "nothing_to_update", "Nothing to change: pass title, notes or both."
+                )
+            item = await update_item(
+                ctx.session,
+                ctx.principal,
+                item,
+                title=title,
+                notes=notes,
+                set_notes=notes is not None,
+            )
+            return _changed_item(item)
+
+    @server.tool()
+    async def complete_item(item_id: ItemId) -> ChangedItem:  # pyright: ignore[reportUnusedFunction]
+        """Mark an item as done. Needs the editor role on the item's list. An item that is
+        already done stays as it is."""
+        async with agent_context() as ctx:
+            item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
+            item = await update_item(ctx.session, ctx.principal, item, status=ItemStatus.DONE)
+            return _changed_item(item)
+
+    @server.tool()
+    async def reopen_item(item_id: ItemId) -> ChangedItem:  # pyright: ignore[reportUnusedFunction]
+        """Make a done item open again. Needs the editor role on the item's list. An item
+        that is already open stays as it is."""
+        async with agent_context() as ctx:
+            item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
+            item = await update_item(ctx.session, ctx.principal, item, status=ItemStatus.OPEN)
+            return _changed_item(item)
+
+    @server.tool(name="move_item")
+    async def move_item_tool(  # pyright: ignore[reportUnusedFunction]
+        item_id: ItemId,
+        before_item_id: Annotated[
+            uuid.UUID | None,
+            Field(
+                description="Put the item just before this item of the same list; "
+                "leave out to move it to the end of the list"
+            ),
+        ] = None,
+    ) -> ChangedItem:
+        """Move an item to another place in its list: before another item, or to the end.
+        Needs the editor role on the list. The result has the item's new position; the items
+        in between shift one place."""
+        async with agent_context() as ctx:
+            item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
+            item = await move_item(ctx.session, ctx.principal, item, before_item_id)
+            return _changed_item(item)
+
+    @server.tool(name="delete_item")
+    async def delete_item_tool(item_id: ItemId) -> DeletedItem:  # pyright: ignore[reportUnusedFunction]
+        """Remove an item from its list for good; this cannot be undone. Needs the editor
+        role on the item's list. Use complete_item for work that is finished."""
+        async with agent_context() as ctx:
+            item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
+            deleted = DeletedItem(id=item.id, list_id=item.list_id, title=item.title)
+            await delete_item(ctx.session, ctx.principal, item)
+            return deleted
