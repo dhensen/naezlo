@@ -8,6 +8,14 @@
 - There is no git remote named origin: commit, don't push.
 - pnpm is not installed; use npm for the frontend.
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
+- Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
+  Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
+- DB in routes: `session: SessionDep` (todolist.db); commit/rollback is done by the dependency,
+  services only `flush()`. DB in tests: `db_session` fixture (same session the `client` app uses,
+  rolled back after each test; `commit()` inside it is only a savepoint release).
+- New model: subclass `Base` + `UUIDPrimaryKeyMixin` + `TimestampMixin`, import the module in
+  src/todolist/models/__init__.py, then `uv run alembic revision --autogenerate -m "..."` and
+  `uv run alembic upgrade head` (dev DB). Tests re-migrate todolist_test themselves.
 
 ---
 
@@ -30,4 +38,33 @@
   - `Settings(_env_file=None)` needs `# pyright: ignore[reportCallIssue]`; pyright doesn't
     know that pydantic-settings init argument.
   - `create_app(settings)` stores the settings on `app.state.settings`.
+---
+
+## 2026-11-14 - US-002
+- PostgreSQL 18 via docker compose (named volume, healthcheck, init script that creates
+  todolist_test), `DATABASE_URL` / `TEST_DATABASE_URL` settings, `src/todolist/db.py` (Base with
+  naming convention, UUID and timestamp mixins, engine, session factory, `get_session`,
+  `SessionDep`), Alembic with an async env.py, test fixtures (schema reset + migrate once per
+  session, per-test rolled-back transaction, `get_session` override) and tests for isolation,
+  commit/rollback of the real dependency, the mixins and constraint names.
+- There is no migration file yet (no models); US-003 generates the first one.
+- Files changed: docker-compose.yml, docker/postgres/init.sql, alembic.ini, migrations/{env.py,
+  script.py.mako,versions/.gitkeep}, src/todolist/{app,config,db}.py, src/todolist/models/__init__.py,
+  tests/{conftest,test_db}.py, pyproject.toml, uv.lock, .env.example, CLAUDE.md, DECISIONS.md,
+  ralph/prd.json, ralph/progress.txt.
+- Checked by hand: `uv run alembic upgrade head`, `alembic check` and an autogenerate run on the
+  dev database (the generated smoke-test revision was deleted again).
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - The migration fixture in conftest is sync on purpose: env.py uses `asyncio.run()`, which
+    fails inside the session event loop of async fixtures.
+  - postgres:18 wants the volume at /var/lib/postgresql (not .../data).
+  - docker-entrypoint init scripts only run on an empty volume; to re-run them use
+    `docker compose down -v` (destroys local dev data).
+  - pyright strict flags `@asynccontextmanager` functions annotated `-> AsyncIterator[...]`;
+    use `AsyncGenerator[...]`.
+  - Tests needing a table that isn't a real model can use a separate DeclarativeBase/MetaData
+    and create/drop it in a module fixture (see tests/test_db.py), so autogenerate ignores it.
+  - Alembic's ruff post-write hook strips unused `sa` / `op` imports from an empty revision;
+    that is fine for real revisions.
 ---

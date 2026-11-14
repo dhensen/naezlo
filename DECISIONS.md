@@ -33,3 +33,12 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **Audit log**: one `audit_events` table with organization, project, list (nullable), actor kind, actor id, actor name snapshot, action, target and JSON details. Events are written in the same transaction as the change and survive deletion of their target.
 - **MCP**: streamable HTTP at `/mcp`. The app is its own OAuth 2.1 authorization server (metadata discovery, dynamic client registration, PKCE with S256, refresh token rotation, revocation). On the consent screen the signed-in user picks which agent the client acts as; that requires being owner or admin of the agent's organization. Tokens are stored hashed and resolve to that agent. MCP tools and the HTTP API share the same service functions.
 - **Not in v1**: billing, sending email, password login. The product name ("needs a better name" in the README) is a human decision; keep `todolist` as the working name and keep it in one place per layer (a setting in the backend, a constant in the frontend).
+
+## Database plumbing (2026-11-14, US-002)
+
+- **Host port 5435** for the compose Postgres (override with `POSTGRES_PORT`; then also set `DATABASE_URL` and `TEST_DATABASE_URL`). Ports 5432 to 5434 are used by other projects on the development machine. The compose credentials (`todolist` / `todolist`) are local-only defaults, not secrets.
+- **Primary keys** are UUIDv7 generated in Python (`uuid.uuid7`), so ids are known before the flush and sort by creation time.
+- **Timestamps** are `timestamptz`, set by the database (`now()`).
+- **One transaction per request**: `get_session` commits when the handler returns and rolls back when it raises. Routes use `SessionDep`, which has `scope="function"` so the commit happens before the response is sent. Services flush; they don't commit.
+- **Alembic** lives in `migrations/` with an async `env.py`. The URL comes from `Settings.database_url`; nothing is stored in `alembic.ini`. New revision files are formatted and lint-fixed by ruff through post-write hooks.
+- **Test database**: the test session drops and recreates the `public` schema of `todolist_test` and migrates it to head, so every run also proves that migrations work on an empty database. The app under test gets `database_url = test_database_url`.

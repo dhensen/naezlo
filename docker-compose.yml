@@ -1,0 +1,26 @@
+# Local development and test database. Start with `docker compose up -d`.
+# The credentials below are local-only defaults, not secrets.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: todolist
+      POSTGRES_PASSWORD: todolist
+      POSTGRES_DB: todolist
+    ports:
+      # Host port 5435: 5432-5434 are commonly taken by other local projects.
+      - "127.0.0.1:${POSTGRES_PORT:-5435}:5432"
+    volumes:
+      # postgres:18 keeps its data in /var/lib/postgresql/<major>/docker.
+      - postgres-data:/var/lib/postgresql
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      # Over TCP on purpose: during first-run initialisation the server only listens on
+      # the unix socket, so this turns healthy after both databases exist.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U todolist -d todolist_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres-data:

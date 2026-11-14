@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     app_name: str = "todolist"
     environment: Literal["development", "test", "production"] = "development"
 
+    # The defaults match docker-compose.yml.
+    database_url: str = "postgresql+asyncpg://todolist:todolist@localhost:5435/todolist"
+    # Only the test suite uses this one; it wipes and re-migrates that database.
+    test_database_url: str = "postgresql+asyncpg://todolist:todolist@localhost:5435/todolist_test"
+
 
 @lru_cache
 def get_settings() -> Settings:
