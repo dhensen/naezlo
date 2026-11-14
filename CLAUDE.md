@@ -69,3 +69,8 @@ uv run pytest
   Service code calls `session.flush()`, not `session.commit()`.
 - Tests that touch the database use the `db_session` fixture. It is the same session the app
   gets through `client`, and everything is rolled back after each test.
+- Enum columns use `value_enum(MyStrEnum, "type_name")` from `todolist.db`. Autogenerate does not
+  drop the PostgreSQL enum type on downgrade: add `sa.Enum(name="type_name").drop(op.get_bind())`
+  to `downgrade()` by hand, and check with `alembic upgrade head && alembic downgrade base`.
+- Relationships are `lazy="raise"`; load them with `selectinload(...)` or query explicitly.
+- Emails are stored lowercased; look users up with `todolist.models.normalize_email(email)`.

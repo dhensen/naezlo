@@ -3,13 +3,14 @@
 Models subclass `Base` and are imported in `todolist.models` so that Alembic sees them.
 """
 
+import enum
 import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Annotated
 
 from fastapi import Depends, Request
-from sqlalchemy import DateTime, MetaData, Uuid, func
+from sqlalchemy import DateTime, Enum, MetaData, Uuid, func
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -45,6 +46,19 @@ class TimestampMixin:
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+def _enum_values(enum_class: type[enum.Enum]) -> list[str]:
+    return [str(member.value) for member in enum_class]
+
+
+def value_enum(enum_class: type[enum.Enum], name: str) -> Enum:
+    """A PostgreSQL enum column type that stores the members' values ("owner"), not their names.
+
+    `name` is the name of the database type. Autogenerate does not drop it in `downgrade()`;
+    add `sa.Enum(name=...).drop(op.get_bind())` to the migration by hand.
+    """
+    return Enum(enum_class, name=name, values_callable=_enum_values)
 
 
 def create_engine(database_url: str) -> AsyncEngine:

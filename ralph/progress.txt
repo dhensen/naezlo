@@ -16,6 +16,11 @@
 - New model: subclass `Base` + `UUIDPrimaryKeyMixin` + `TimestampMixin`, import the module in
   src/todolist/models/__init__.py, then `uv run alembic revision --autogenerate -m "..."` and
   `uv run alembic upgrade head` (dev DB). Tests re-migrate todolist_test themselves.
+- Enum column: `value_enum(MyStrEnum, "pg_type_name")` (todolist.db). Add
+  `sa.Enum(name="pg_type_name").drop(op.get_bind())` to the migration's downgrade by hand.
+- Relationships are `lazy="raise"`: use `selectinload` or a join. Emails: `normalize_email()`.
+- Testing a constraint: add the bad row, then flush inside `async with session.begin_nested()`
+  under `pytest.raises(IntegrityError)` (see tests/test_models_tenancy.py); the session stays usable.
 
 ---
 
@@ -67,4 +72,24 @@
     and create/drop it in a module fixture (see tests/test_db.py), so autogenerate ignores it.
   - Alembic's ruff post-write hook strips unused `sa` / `op` imports from an empty revision;
     that is fine for real revisions.
+---
+
+## 2026-11-14 - US-003
+- Models `User` (email lowercased by a validator and guarded by a check constraint, google_sub
+  nullable unique), `Organization` (unique slug) and `Membership` (role enum owner | admin |
+  member, unique (organization_id, user_id), ON DELETE CASCADE to both organization and user),
+  the first Alembic migration, and a `value_enum` helper in db.py.
+- Files changed: src/todolist/db.py, src/todolist/models/{__init__,user,organization}.py,
+  migrations/versions/20261114_2154_3f46e4359648_add_users_organizations_and_memberships.py,
+  tests/test_models_tenancy.py, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+- Checked by hand on the dev database: `alembic upgrade head`, `alembic downgrade base`,
+  `alembic upgrade head` again, and `alembic check` (no drift).
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - Autogenerate's downgrade leaves the PostgreSQL enum type behind, so a second upgrade fails
+    with "type already exists". Drop it by hand in downgrade (see the US-003 migration).
+  - pyright strict rejects an inline lambda as `values_callable`; that is why `value_enum` exists.
+  - Models can use forward references without quotes (`Mapped[list[Membership]]`): Python 3.14
+    evaluates annotations lazily.
+  - Slug generation and the default organization are not here; they belong to US-004.
 ---

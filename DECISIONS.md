@@ -42,3 +42,10 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **One transaction per request**: `get_session` commits when the handler returns and rolls back when it raises. Routes use `SessionDep`, which has `scope="function"` so the commit happens before the response is sent. Services flush; they don't commit.
 - **Alembic** lives in `migrations/` with an async `env.py`. The URL comes from `Settings.database_url`; nothing is stored in `alembic.ini`. New revision files are formatted and lint-fixed by ruff through post-write hooks.
 - **Test database**: the test session drops and recreates the `public` schema of `todolist_test` and migrates it to head, so every run also proves that migrations work on an empty database. The app under test gets `database_url = test_database_url`.
+
+## Tenancy models (2026-11-14, US-003)
+
+- **Emails** are stored trimmed and lowercased. The `User` model normalizes on assignment and a check constraint (`email = lower(email)`) guards the column, so the plain unique constraint is case-insensitive in effect. Look users up with `normalize_email(...)`.
+- **Enums** are native PostgreSQL enum types that store the lowercase values (`owner`, not `OWNER`), built with `todolist.db.value_enum`. Python side: `enum.StrEnum`.
+- **Deleting a user** deletes their memberships (`ON DELETE CASCADE`), like deleting an organization does. v1 has no user deletion feature; this only keeps the schema consistent.
+- **Relationships** are declared with `lazy="raise"`: async code cannot lazy-load, so a forgotten `selectinload` fails loudly instead of with `MissingGreenlet`.
