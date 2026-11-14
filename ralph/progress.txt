@@ -18,6 +18,12 @@
   hooks; errors are `ApiError`, shown with `<ErrorMessage error={...} />`. Auth: src/auth/ (`useMe`,
   `RequireAuth`, `safeNextPath`); new pages go inside the guard + `AppLayout` in App.tsx. Tests:
   `mockApi({...})` (src/test/api.ts) then `renderApp('/path')` (src/test/render.tsx).
+- E2E (since US-029): `npm --prefix frontend run e2e` is a quality check (needs `docker compose up -d`
+  and once `npx --prefix frontend playwright install chromium`). It builds the frontend; Playwright
+  starts `uv run python -m todolist.e2e --port 8765` (database todolist_e2e, emptied + migrated at
+  every start, dev-login on). Specs: frontend/e2e/*.spec.ts; sign in with `const user = await
+  signIn(page)` from `./helpers.ts` (unique email per call, `user.organizationName`, also
+  `signOut(page, user)`, `uniqueUser()`). Tests share the database: assert only on your own data.
 - Backend-owned paths are listed in frontend/src/backendPaths.ts (`BACKEND_PATHS`, dev proxy) and
   src/todolist/frontend.py (`BACKEND_PREFIXES`, never answered by the SPA fallback); keep them equal.
   FastAPI serves frontend/dist when it exists at startup (`FRONTEND_DIST`); tests have it off.
@@ -930,4 +936,37 @@
     another port with `PUBLIC_BASE_URL` set to it and the built frontend (`npm run build`).
     Don't `pkill -f` with a pattern that also matches the shell's own command line.
   - Next is US-029 (Playwright e2e harness).
+---
+
+## 2026-11-15 00:15 - US-029
+- Playwright harness: `@playwright/test` 1.65 in frontend/ (Chromium only, headless),
+  `npm --prefix frontend run e2e` = `npm run build && playwright test`. Playwright's `webServer`
+  starts `uv run python -m todolist.e2e --port 8765` from the repo root (never reuses a server).
+- `src/todolist/e2e.py`: creates the database todolist_e2e when missing, empties and migrates it,
+  serves the app with dev-login and the built frontend. New setting `e2e_database_url`
+  (`E2E_DATABASE_URL`, in .env.example); only a database named `*_e2e` is ever emptied.
+  docker/postgres/init.sql also creates it on a fresh volume.
+- Helper frontend/e2e/helpers.ts (`signIn`, `signOut`, `uniqueUser`); first spec
+  frontend/e2e/auth.spec.ts (guard → /login, dev-login, default organization name, reload, sign
+  out, guard again).
+- The placeholder HomePage shows the first organization's name (needed by the spec; no other UI).
+- Playwright output (frontend/test-results, playwright-report, blob-report) is git-ignored.
+- Checks: 675 pytest, 29 vitest, 1 e2e, lint/typecheck/ruff/pyright clean.
+- No separate visual check with browser tools this time; the spec covers the flow in Chromium.
+- Files: src/todolist/e2e.py, src/todolist/config.py, tests/test_e2e.py, .env.example, .gitignore,
+  docker/postgres/init.sql, frontend/{package.json,package-lock.json,playwright.config.ts,
+  tsconfig.node.json,vite.config.ts,eslint.config.js}, frontend/e2e/*, frontend/src/pages/HomePage*,
+  CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt
+- Pushed: yes
+- **Learnings for future iterations:**
+  - Chromium for Playwright lives in ~/.cache/ms-playwright; after a Playwright upgrade run
+    `npx --prefix frontend playwright install chromium` again. No system packages were needed here.
+  - The guard sends a visitor of `/` to plain `/login` (no `?next=`); deeper paths get `?next=`.
+  - e2e specs are type-checked by tsconfig.node.json (nodenext): import helpers as `./helpers.ts`.
+  - Vitest's default include would pick up e2e/*.spec.ts; vite.config.ts limits it to src/.
+  - `# pyright: ignore[reportCallIssue]` for `Settings(_env_file=None, ...)` must sit on the
+    `_env_file` line when the call spans several lines.
+  - Port 8000 is used by another process on this machine; e2e uses 8765 (`E2E_PORT` to change).
+  - Next is US-030 (app shell with organization switcher): it needs a Playwright spec, and it
+    replaces the organization line on HomePage (update e2e/auth.spec.ts if the text moves).
 ---

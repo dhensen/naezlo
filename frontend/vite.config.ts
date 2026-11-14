@@ -16,6 +16,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Not e2e/*.spec.ts: those are Playwright's (npm run e2e).
+    include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
     unstubGlobals: true,

@@ -11,9 +11,11 @@ Stack, domain model and rules: `DECISIONS.md` (it wins over personal preference)
   `current_user`, `google.py` the Google OpenID Connect client, `errors.py` the API errors,
   `mcp_server/` the MCP server at `/mcp`)
 - `migrations/`: Alembic environment and `versions/`
-- `docker-compose.yml`: PostgreSQL 18 on host port 5435 with the databases `todolist` and `todolist_test`
+- `docker-compose.yml`: PostgreSQL 18 on host port 5435 with the databases `todolist`, `todolist_test`
+  and `todolist_e2e`
 - `tests/`: pytest tests
-- `frontend/`: the React single-page app (Vite, TypeScript strict, React Router, Tailwind CSS 4, npm)
+- `frontend/`: the React single-page app (Vite, TypeScript strict, React Router, Tailwind CSS 4, npm);
+  `frontend/e2e/` holds the Playwright specs
 
 ## Run
 
@@ -67,9 +69,11 @@ npm --prefix frontend run lint       # eslint
 npm --prefix frontend run typecheck  # tsc -b --noEmit
 npm --prefix frontend run test       # vitest run
 npm --prefix frontend run gen:api    # after an API change: frontend/openapi.json + src/api/schema.d.ts
+npm --prefix frontend run e2e        # Playwright (Chromium, headless) against the real backend
+npx --prefix frontend playwright install chromium   # once per machine, and after a Playwright upgrade
 ```
 
-`lint`, `typecheck` and `test` must pass before a commit, like the backend checks. With the
+`lint`, `typecheck`, `test` and `e2e` must pass before a commit, like the backend checks. With the
 dev server, set `PUBLIC_BASE_URL=http://localhost:5173` in `.env`. FastAPI serves `frontend/dist`
 itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the production setup.
 
@@ -326,3 +330,18 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
   `apiError`, `NOT_SIGNED_IN`, `config`) and then `renderApp('/path')` (`src/test/render.tsx`: the
   whole app, fresh query client, current location in `screen.getByTestId('location')`). The routes
   object may be changed during the test (after a sign-in, `routes['GET /api/me'] = json(ADA)`).
+- End-to-end tests: `npm --prefix frontend run e2e` builds the frontend and runs the Playwright
+  specs in `frontend/e2e/*.spec.ts` (config: `frontend/playwright.config.ts`, Chromium only). Playwright
+  starts the backend itself with `uv run python -m todolist.e2e --port 8765` (`src/todolist/e2e.py`):
+  the database `todolist_e2e` (`E2E_DATABASE_URL`; created when missing, emptied and migrated at
+  every start), dev-login on, the built frontend served by FastAPI. It needs `docker compose up -d`.
+  Another port: `E2E_PORT=8766 npm --prefix frontend run e2e`. A failure leaves a trace and a
+  screenshot in `frontend/test-results/` (git-ignored, like `frontend/playwright-report/`).
+- A spec signs in with `const user = await signIn(page)` from `frontend/e2e/helpers.ts` (import it
+  as `./helpers.ts`): the dev-login form with a new unique email (`uniqueUser()`), so every test has
+  its own user and default organization (`user.organizationName`). `signIn(page, { user, path })`
+  signs an existing user in again or starts on another page; `signOut(page, user)` uses the menu.
+  Tests run in parallel on one database that is only emptied before the run: never assert on
+  global state (counts over all rows), only on what the test's own user made.
+- Vitest only picks up `src/**/*.test.{ts,tsx}`; Playwright only `e2e/*.spec.ts`. Every UI story
+  gets a spec; find elements by role and label (`getByRole`, `getByLabel`), not by CSS class.

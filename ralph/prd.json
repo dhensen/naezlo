@@ -513,8 +513,8 @@
         "Typecheck passes"
       ],
       "priority": 29,
-      "passes": false,
-      "notes": "If the Chromium download or its system dependencies cannot be installed, record what is needed in ralph/progress.txt and reply BLOCKED."
+      "passes": true,
+      "notes": "Chromium (headless shell) downloaded and runs on this machine without extra system packages. The placeholder home page now shows the first organization's name so the spec can see it; US-030 replaces it with the switcher."
     },
     {
       "id": "US-030",

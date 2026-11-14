@@ -317,3 +317,11 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **Errors** are shown by one component, `ErrorMessage` (inline, `role="alert"`), not a toast.
 - **User menu and layout**: `AppLayout` (a header with the product name and the user menu) wraps the guarded pages. It is minimal; the app shell story (US-030) builds on it.
 
+## End-to-end tests (2026-11-15, US-029)
+
+- Playwright (`@playwright/test`, Chromium only, headless) lives in `frontend/`; specs in `frontend/e2e/`. `npm --prefix frontend run e2e` builds the frontend and Playwright starts the backend with `python -m todolist.e2e`, which serves the build itself (the production setup, no Vite dev server).
+- The browser tests have their own database, `todolist_e2e` (`E2E_DATABASE_URL`). The launcher creates it when the Postgres volume predates it, empties it and migrates it to head at every start, and refuses a database whose name does not end with `_e2e`. Playwright never reuses a running server, so a run always starts empty.
+- The backend for the browser tests listens on port 8765 (`E2E_PORT` changes it), not 8000, so a running development server is left alone.
+- Tests are isolated by data, not by transaction: each one signs in through the dev-login form as a new user with a unique email and so gets its own default organization.
+- Until the app shell (US-030) exists, the placeholder home page shows the name of the user's first organization; the first spec checks it.
+

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://todolist:todolist@localhost:5435/todolist"
     # Only the test suite uses this one; it wipes and re-migrates that database.
     test_database_url: str = "postgresql+asyncpg://todolist:todolist@localhost:5435/todolist_test"
+    # Only the browser tests use this one (`python -m todolist.e2e` wipes and re-migrates it).
+    e2e_database_url: str = "postgresql+asyncpg://todolist:todolist@localhost:5435/todolist_e2e"
 
     # Signs the session cookie. Generate one with: openssl rand -hex 32
     session_secret: str = DEV_SESSION_SECRET
