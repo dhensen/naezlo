@@ -18,7 +18,8 @@ from pydantic import BaseModel
 from todolist.auth import CurrentUser, OptionalCurrentUser
 from todolist.config import SettingsDep
 from todolist.db import SessionDep
-from todolist.services import oauth
+from todolist.errors import oauth_error_response
+from todolist.services import oauth, oauth_tokens
 
 root_router = APIRouter(tags=["oauth"])
 router = APIRouter(prefix="/oauth", tags=["oauth"])
@@ -106,6 +107,29 @@ async def authorize(
 
     pending = await oauth.create_authorization_request(session, validated, user)
     return _redirect(f"{CONSENT_PAGE_PATH}?{urlencode({'request': str(pending.id)})}")
+
+
+@root_router.post(oauth.TOKEN_PATH)
+async def token(request: Request, session: SessionDep, settings: SettingsDep) -> JSONResponse:
+    """The OAuth token endpoint: exchanges an authorization code (with its PKCE verifier) for
+    tokens, and rotates a refresh token. The body is form-encoded."""
+    try:
+        issued = await oauth_tokens.token_request(
+            session, settings, request.headers.get("content-type"), await request.body()
+        )
+    except oauth_tokens.ReplayedGrantError as error:
+        # Returned, not raised: the revocation that came with it must be committed.
+        return oauth_error_response(error)
+    return JSONResponse(issued.response_body(), headers={**_NO_STORE, "Pragma": "no-cache"})
+
+
+@root_router.post(oauth.REVOCATION_PATH)
+async def revoke(request: Request, session: SessionDep) -> Response:
+    """RFC 7009 token revocation. Answers 200 also when the token was not valid."""
+    await oauth_tokens.revoke_token(
+        session, request.headers.get("content-type"), await request.body()
+    )
+    return Response(status_code=200, headers=_NO_STORE)
 
 
 class ConsentOrganizationOut(BaseModel):

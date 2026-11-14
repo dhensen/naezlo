@@ -60,13 +60,19 @@ async def _handle_app_error(_request: Request, exc: Exception) -> JSONResponse:
     )
 
 
-async def _handle_oauth_error(_request: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, OAuthError)
+def oauth_error_response(error: OAuthError) -> JSONResponse:
+    """The response for an `OAuthError`. Raising the error gives the same; a route returns
+    this instead when the changes of the request must be kept (raising rolls them back)."""
     return JSONResponse(
-        status_code=exc.status_code,
-        content={"error": exc.error, "error_description": exc.description},
+        status_code=error.status_code,
+        content={"error": error.error, "error_description": error.description},
         headers={"Cache-Control": "no-store"},
     )
+
+
+async def _handle_oauth_error(_request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, OAuthError)
+    return oauth_error_response(exc)
 
 
 def install_error_handlers(app: FastAPI) -> None:

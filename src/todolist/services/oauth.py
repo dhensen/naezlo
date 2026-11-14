@@ -68,6 +68,14 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+async def find_client(session: AsyncSession, client_id: str) -> OAuthClient | None:
+    """The registered client with this id. The id comes straight from a request."""
+    # PostgreSQL refuses a NUL byte in a text parameter; no client id has one.
+    if "\x00" in client_id:
+        return None
+    return await session.get(OAuthClient, client_id)
+
+
 def authorization_server_metadata(settings: Settings) -> OAuthMetadata:
     """RFC 8414 metadata, served at /.well-known/oauth-authorization-server."""
     issuer = settings.oauth_issuer
@@ -291,7 +299,7 @@ async def validate_authorization_request(
     client_id = single("client_id")
     if client_id is None:
         raise AuthorizationPageError("The request has no client_id, or more than one.")
-    client = await session.get(OAuthClient, client_id)
+    client = await find_client(session, client_id)
     if client is None:
         raise AuthorizationPageError("This application is not registered here.")
     redirect_uri = single("redirect_uri")

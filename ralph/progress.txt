@@ -113,6 +113,11 @@
   `OAuthError`. Authorization responses: `authorization_response_url(settings, redirect_uri, state,
   **params)` (adds `state` and `iss`). Tests: tests/test_oauth_authorize.py has `register`,
   `authorize_params`, `start` (gives a pending request id) and `callback_params` to copy.
+- OAuth tokens: services/oauth_tokens.py (`token_request`, `revoke_token`,
+  `resolve_access_token(session, token)` → agent `Principal` or None). Tests: tests/test_oauth_token.py
+  has `authorize(client)` (sign in, agent, client, approved code), `exchange(client, authorized)`
+  (gives the token response with `access_token`), `refresh` and `revoke` to import.
+
 ## 2026-11-14 - US-001
 - Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
   FastAPI app factory `create_app()` with `GET /healthz`, pydantic-settings `Settings`
@@ -682,4 +687,34 @@
     is the raw query string.
   - `alembic check` fails with "Target database is not up to date" until the new migration is
     applied to the dev database (`uv run alembic upgrade head`).
+---
+## 2026-11-14 - US-022
+- OAuth token endpoint: `POST /token` (authorization_code with PKCE S256, redirect URI, client and
+  expiry checks; refresh_token with rotation), `POST /revoke` (RFC 7009) and
+  `resolve_access_token(session, token)`. Access tokens last 1 hour, refresh tokens 30 days.
+  Reusing a code or a rotated refresh token is `invalid_grant` and revokes the token family.
+  Tokens, refresh and code exchange stop working when the approving user may no longer authorize
+  the agent (decision recorded in DECISIONS.md). No migration was needed.
+- Files changed: src/todolist/services/oauth_tokens.py (new), src/todolist/services/oauth.py
+  (`find_client`), src/todolist/api/oauth.py, src/todolist/errors.py (`oauth_error_response`),
+  tests/test_oauth_token.py (new), DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - Raising in a handler rolls back everything the request did. The reuse case revokes tokens and
+    then answers with an error, so the route catches `ReplayedGrantError` and returns
+    `oauth_error_response(error)`. The normal test session never rolls back, so this is only
+    caught by a test that overrides `get_session` with a rollback-on-raise wrapper around
+    `db_session` (after `await db_session.commit()`, which keeps the setup); see
+    `test_revocation_after_reuse_survives_the_rollback_of_a_failed_request`.
+  - The verifier `a-code-verifier` behind `CHALLENGE` in tests/test_oauth_authorize.py is too short
+    for /token (43 to 128 characters); tests/test_oauth_token.py has its own `VERIFIER` / `CHALLENGE`
+    and passes `code_challenge=` to `start`.
+  - US-023: `resolve_access_token` gives only the `Principal`. The SDK's `TokenVerifier` wants an
+    `AccessToken` (client id, scopes, expiry, resource): read what it needs in the SDK first, and
+    add a function next to `resolve_access_token` that returns the row too, built on
+    `_authorized_agent`, if the Principal is not enough. A token's `resource` is
+    `settings.mcp_resource_url` or null (null only when the client sent no `resource` to either
+    /authorize or /token).
+  - `invalid_client` is a 401 without a `WWW-Authenticate` header (clients send no credentials).
+  - httpx `data={...}` sends a form; `content=` with a Content-Type header sends a raw body.
 ---

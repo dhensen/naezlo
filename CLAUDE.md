@@ -213,6 +213,18 @@ uv run pytest
   adds a trailing slash, and clients compare the issuer as a string.
 - Codes and tokens: `new_token()` gives the plain value, `hash_token()` what is stored and looked up
   (`services/oauth.py`). Never store or log the plain value. The only scope is `MCP_SCOPE` (`mcp`).
+- Tokens: `services/oauth_tokens.py` (`token_request`, `revoke_token`, `resolve_access_token(session, token)`,
+  which gives the agent `Principal` or None), routes `POST /token` and `POST /revoke`. They take a
+  form body (`parse_form`); clients are public and identified by the `client_id` field. Every token
+  check goes through `_authorized_agent`: a token is dead when the approving user may no longer
+  authorize the agent.
+- A request's transaction is rolled back when the handler raises. An error that must keep its
+  changes (revoking tokens after a replayed code: `ReplayedGrantError`) is caught in the route and
+  returned with `oauth_error_response(error)` from `todolist.errors`.
+- Look a client up with `find_client(session, client_id)` (`services/oauth.py`), not `session.get`:
+  the id comes from the request and PostgreSQL rejects a NUL byte in a text parameter.
+- In a test, change a loaded row by setting the attribute and flushing (`row.expires_at = ...`);
+  a bulk `update()` leaves the objects already in the shared session stale.
 - For anything about MCP or its OAuth flow, read the installed SDK (`.venv/lib/python3.14/site-packages/mcp/`,
   version 2.x: `MCPServer`, `mcp.server.auth`, `mcp.client.auth`) and the spec revision 2026-07-28
   (`https://modelcontextprotocol.io/specification/latest/basic/authorization`) instead of memory.
