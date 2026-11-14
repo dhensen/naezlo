@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/AppLayout'
 import { HomePage } from './pages/HomePage'
+import { ListPage } from './pages/ListPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OrganizationPage } from './pages/OrganizationPage'
@@ -22,6 +23,7 @@ export function App() {
           <Route index element={<OrganizationPage />} />
           <Route path="settings" element={<OrganizationSettingsPage />} />
           <Route path="p/:projectId" element={<ProjectPage />} />
+          <Route path="l/:listId" element={<ListPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route element={<AppLayout />}>

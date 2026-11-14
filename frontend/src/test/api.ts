@@ -92,6 +92,7 @@ export function todoList(
     id,
     project_id: of.id,
     project_name: of.name,
+    organization_id: of.organization_id,
     name,
     description: null,
     mode: 'human_only',
@@ -100,6 +101,29 @@ export function todoList(
     role: 'admin',
     actions: ['read', 'change_items', 'edit_list', 'administer'],
     created_by: ADA.user.id,
+    created_at: '2026-11-01T10:00:00Z',
+    updated_at: '2026-11-01T10:00:00Z',
+    ...overrides,
+  }
+}
+
+/** An item as the API returns it: open, without notes, added by Ada. */
+export function item(
+  of: Schemas['ListOut'],
+  id: string,
+  title: string,
+  overrides: Partial<Schemas['ItemOut']> = {},
+): Schemas['ItemOut'] {
+  return {
+    id,
+    list_id: of.id,
+    title,
+    notes: null,
+    status: 'open',
+    position: 1,
+    created_by: { kind: 'user', id: ADA.user.id },
+    completed_by: null,
+    completed_at: null,
     created_at: '2026-11-01T10:00:00Z',
     updated_at: '2026-11-01T10:00:00Z',
     ...overrides,

@@ -71,7 +71,7 @@ async def list_count(session: AsyncSession) -> int:
 
 
 async def test_create_returns_the_list(client: AsyncClient, db_session: AsyncSession) -> None:
-    _, project_id, url = await ada_project(client)
+    org_id, project_id, url = await ada_project(client)
     ada_id = (await client.get("/api/me")).json()["user"]["id"]
 
     response = await client.post(url, json={"name": "  Launch ", "description": " Go live. "})
@@ -82,6 +82,7 @@ async def test_create_returns_the_list(client: AsyncClient, db_session: AsyncSes
     assert body["description"] == "Go live."
     assert body["project_id"] == project_id
     assert body["project_name"] == "Website"
+    assert body["organization_id"] == org_id
     assert body["created_by"] == ada_id
     assert body["position"] == 1
     assert body["created_at"] is not None
@@ -90,6 +91,7 @@ async def test_create_returns_the_list(client: AsyncClient, db_session: AsyncSes
         "id",
         "project_id",
         "project_name",
+        "organization_id",
         "name",
         "description",
         "mode",

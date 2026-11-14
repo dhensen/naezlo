@@ -10,6 +10,11 @@ export function projectPath(slug: string, projectId: string): string {
   return orgPath(slug, `/p/${encodeURIComponent(projectId)}`)
 }
 
+/** The page of a list with its items: `/o/<slug>/l/<list id>`. */
+export function listPath(slug: string, listId: string): string {
+  return orgPath(slug, `/l/${encodeURIComponent(listId)}`)
+}
+
 const LAST_ORGANIZATION_KEY = 'lastOrganization'
 
 /** The slug of the organization this browser showed last, or null. */

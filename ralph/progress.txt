@@ -46,6 +46,10 @@
   `ListOut.actions` (+ `role`) tells the UI what the caller may do (`listAllows`);
   `ProjectOut.default_list_mode` is the default for a new list. Cache changes after a mutation go
   through `applyToCache` (src/api/queryClient.ts). The router has `useTransitions={false}`.
+- Items in the UI (since US-034): `/o/:orgSlug/l/:listId` (src/pages/ListPage.tsx, `listPath`), hooks
+  in src/items/hooks.ts. All item changes go through `useChangeItems` as an `ItemChange` (optimistic
+  via `applyItemChange`, rollback + message on error, serial per list). `ListOut.organization_id`
+  exists. Tests: src/pages/ListPage.test.tsx, e2e/items.spec.ts (`saved(page, method, action)`).
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -1129,3 +1133,39 @@
     `change_items` for the item controls.
 ---
 
+
+## 2026-11-15 01:00 - US-034
+- The list page `/o/:orgSlug/l/:listId`: list name, mode badge, description, link to the parent
+  project, an "Add an item" field (Enter, keeps the focus), open items with a checkbox, a title
+  that is edited in place, a "Notes" area, move up / move down buttons and "Delete" (asks in the
+  row), and a folded "Done (n)" section with the done items struck through. Changes show at once
+  and are undone with a message when the API rejects them. Without `change_items` the page is
+  read-only with a notice (a special one for AI-only lists). Items added or completed by an agent
+  carry a marker. The list names on the project page are links now.
+- Backend: `ListOut.organization_id` (no schema change); nothing else was needed, the item API of
+  US-015/016 was enough.
+- Files changed: src/todolist/api/lists.py, tests/test_lists.py, frontend/openapi.json +
+  src/api/schema.d.ts (generated), frontend/src/items/hooks.ts (new), pages/ListPage.tsx (new) +
+  ListPage.test.tsx (new), pages/ProjectPage.tsx, lists/hooks.ts, orgs/paths.ts, App.tsx,
+  test/api.ts, e2e/items.spec.ts (new), DECISIONS.md, CLAUDE.md
+- Checks: ruff, pyright, pytest (686), eslint, tsc, vitest (91), Playwright (12) all pass;
+  `npx playwright test e2e/items.spec.ts --repeat-each 8` (16 runs) passes.
+- Browser check: done with the Chrome DevTools tools on the e2e backend, at desktop and at phone
+  width (open notes, the delete question, a long title, the Done section); looked right. The agent
+  marker was not looked at in a browser (no agent-made item there); vitest covers it.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - TanStack Query `scope: { id }` on a mutation runs the requests serially while `onMutate` still
+    runs at once: optimistic UI without out-of-order writes.
+  - `mutate(vars, { onError })` callbacks only fire for the last of several running calls.
+  - userEvent (and only it, not a browser) "clicks" the button that got the focus during an Enter
+    keydown unless the handler calls `preventDefault()`.
+  - React moves the DOM node of a row that goes down in a keyed list, which drops the keyboard
+    focus; the page gives it back in a layout effect keyed on the items (`moved` ref in ItemsSection).
+  - Playwright `.check()` fails on an optimistic checkbox whose row leaves the list; use `.click()`.
+  - The list page has no "Edit list" / "Delete list" / grants controls (no story asked for them
+    there; they are on the project page). `ItemOut` has no actor names, so the marker says
+    "an agent"; a later story that wants names needs them in the API.
+  - Stop a background `todolist.e2e --port 8766` with its own `pkill -f` command (exit code 144
+    of that command is expected).
+---

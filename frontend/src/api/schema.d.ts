@@ -1135,6 +1135,11 @@ export interface components {
             name: string;
             /** Open Item Count */
             open_item_count: number;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
             /** Position */
             position: number;
             /**

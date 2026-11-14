@@ -66,6 +66,8 @@ class ListOut(BaseModel):
     project_id: uuid.UUID
     # For a caller who can open the list but not its project.
     project_name: str
+    # The list's page lives under its organization's address.
+    organization_id: uuid.UUID
     name: str
     description: str | None
     mode: ListMode
@@ -88,6 +90,7 @@ def _list_out(
         id=todo_list.id,
         project_id=todo_list.project_id,
         project_name=project.name,
+        organization_id=project.organization_id,
         name=todo_list.name,
         description=todo_list.description,
         mode=todo_list.mode,

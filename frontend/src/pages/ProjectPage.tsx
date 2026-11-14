@@ -10,7 +10,7 @@ import { ModeBadge } from '../components/ModeBadge'
 import { listAllows } from '../lists/hooks'
 import { useCurrentOrganization } from '../orgs/hooks'
 import type { Organization, Project } from '../orgs/hooks'
-import { orgPath } from '../orgs/paths'
+import { listPath, orgPath } from '../orgs/paths'
 import { roleAtLeast, useDeleteProject, useProject, useProjectLists, useUpdateProject } from '../projects/hooks'
 import type { TodoList } from '../projects/hooks'
 
@@ -90,7 +90,7 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
           </div>
         )}
       </header>
-      <ListsSection project={current} />
+      <ListsSection project={current} organization={organization} />
       {dialog === 'edit' && <EditProjectDialog project={current} onClose={() => setDialog(null)} />}
       {dialog === 'delete' && (
         <DeleteProjectDialog project={current} organization={organization} onClose={() => setDialog(null)} />
@@ -111,7 +111,7 @@ const ROW_DANGER_BUTTON = 'rounded-md px-2 py-1 text-sm font-medium text-red-700
 
 type ListDialog = { kind: 'new' } | { kind: 'edit' | 'delete'; list: TodoList }
 
-function ListsSection({ project }: { project: Project }) {
+function ListsSection({ project, organization }: { project: Project; organization: Organization }) {
   const lists = useProjectLists(project.id)
   const [dialog, setDialog] = useState<ListDialog | null>(null)
   const close = () => setDialog(null)
@@ -148,6 +148,7 @@ function ListsSection({ project }: { project: Project }) {
             <ListRow
               key={list.id}
               list={list}
+              to={listPath(organization.slug, list.id)}
               onEdit={() => setDialog({ kind: 'edit', list })}
               onDelete={() => setDialog({ kind: 'delete', list })}
             />
@@ -161,7 +162,15 @@ function ListsSection({ project }: { project: Project }) {
   )
 }
 
-function ListRow({ list, onEdit, onDelete }: { list: TodoList; onEdit: () => void; onDelete: () => void }) {
+interface ListRowProps {
+  list: TodoList
+  /** The list's own page, with its items. */
+  to: string
+  onEdit: () => void
+  onDelete: () => void
+}
+
+function ListRow({ list, to, onEdit, onDelete }: ListRowProps) {
   // What the role on this list and its mode allow; the API works it out.
   const canEdit = listAllows(list, 'edit_list')
   const canDelete = listAllows(list, 'administer')
@@ -169,7 +178,9 @@ function ListRow({ list, onEdit, onDelete }: { list: TodoList; onEdit: () => voi
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="font-medium break-words text-slate-900">{list.name}</span>
+        <Link to={to} className="font-medium break-words text-slate-900 hover:underline">
+          {list.name}
+        </Link>
         {list.description !== null && (
           <span className="text-sm break-words whitespace-pre-line text-slate-600">{list.description}</span>
         )}

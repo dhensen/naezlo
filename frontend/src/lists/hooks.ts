@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api, unwrap } from '../api/client'
 import type { Schemas } from '../api/client'
@@ -14,6 +14,18 @@ export type ListAction = Schemas['ListAction']
  */
 export function listAllows(list: TodoList, action: ListAction): boolean {
   return list.actions.includes(action)
+}
+
+export function listKey(listId: string) {
+  return ['lists', listId] as const
+}
+
+/** One list, with what the user may do with it. A 404 means it does not exist for the user. */
+export function useList(listId: string) {
+  return useQuery({
+    queryKey: listKey(listId),
+    queryFn: () => unwrap(api.GET('/api/lists/{list_id}', { params: { path: { list_id: listId } } })),
+  })
 }
 
 /** Create a list at the end of a project; the project page gets it at once. */
@@ -33,10 +45,12 @@ export function useUpdateList(list: TodoList) {
   return useMutation({
     mutationFn: (body: Schemas['ListPatch']) =>
       unwrap(api.PATCH('/api/lists/{list_id}', { params: { path: { list_id: list.id } }, body })),
-    onSuccess: (updated) =>
-      applyToCache<TodoList[]>(queryClient, projectListsKey(updated.project_id), (lists) =>
+    onSuccess: (updated) => {
+      queryClient.setQueryData(listKey(updated.id), updated)
+      return applyToCache<TodoList[]>(queryClient, projectListsKey(updated.project_id), (lists) =>
         lists.map((candidate) => (candidate.id === updated.id ? updated : candidate)),
-      ),
+      )
+    },
   })
 }
 
@@ -45,9 +59,11 @@ export function useDeleteList(list: TodoList) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => unwrap(api.DELETE('/api/lists/{list_id}', { params: { path: { list_id: list.id } } })),
-    onSuccess: () =>
-      applyToCache<TodoList[]>(queryClient, projectListsKey(list.project_id), (lists) =>
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: listKey(list.id) })
+      return applyToCache<TodoList[]>(queryClient, projectListsKey(list.project_id), (lists) =>
         lists.filter((candidate) => candidate.id !== list.id),
-      ),
+      )
+    },
   })
 }

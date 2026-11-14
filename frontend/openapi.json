@@ -1024,6 +1024,11 @@
             "title": "Open Item Count",
             "type": "integer"
           },
+          "organization_id": {
+            "format": "uuid",
+            "title": "Organization Id",
+            "type": "string"
+          },
           "position": {
             "title": "Position",
             "type": "integer"
@@ -1050,6 +1055,7 @@
           "id",
           "project_id",
           "project_name",
+          "organization_id",
           "name",
           "description",
           "mode",

@@ -602,8 +602,8 @@
         "Verify in a browser if browser tools are available"
       ],
       "priority": 34,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "ListOut got organization_id (the page checks the list belongs under /o/<slug>). The agent marker is covered by vitest; the Playwright spec has no agent-made item."
     },
     {
       "id": "US-035",

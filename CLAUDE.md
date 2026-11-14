@@ -405,4 +405,19 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
   caller's `onSuccess`, to call right after `navigate('/login')`.
 - A row button has the visible text "Edit" and `aria-label="Edit <name>"`; in Playwright the page's
   own "Edit" button then needs `{ name: 'Edit', exact: true }`.
-
+- Items in the UI: the list page is `/o/:orgSlug/l/:listId` (`listPath(slug, id)`, `src/pages/ListPage.tsx`),
+  hooks in `src/items/hooks.ts` (`useItems`, `itemsKey`, `useChangeItems(list, userId, onError)`) and
+  `useList` / `listKey` in `src/lists/hooks.ts`. Every item change is an `ItemChange` (`add | update |
+  move | delete`, `addItem(listId, title)`) and goes through `useChangeItems`: optimistic with
+  `applyItemChange` (pure and idempotent; extend it for a new kind of change), rolled back on an
+  error, one request at a time per list (`scope`). Don't write a second mutation for items.
+- Callbacks passed to `mutate(...)` only run for the last call when several are under way: an
+  error handler for a mutation that is fired repeatedly goes in the hook (`onError` of `useChangeItems`).
+- A key handler that moves the focus to a button (Enter in the inline title field) calls
+  `event.preventDefault()`, or the same key press also activates that button in the tests.
+- Optimistic changes show a tick later (`onMutate` is async): in Playwright use `.click()` on such a
+  checkbox, not `.check()` / `.uncheck()` (they fail when the box leaves the list), and wrap an action in
+  `saved(page, method, action)` (`frontend/e2e/items.spec.ts`) before a reload, so the request is done.
+- Vitest fixture `item(list, id, title, overrides)` (`src/test/api.ts`); a test that renders a list
+  page mocks `GET /api/lists/<id>` and `GET /api/lists/<id>/items`. `recorded(answer)` in
+  `src/pages/ListPage.test.tsx` gives a route that keeps the request bodies.
