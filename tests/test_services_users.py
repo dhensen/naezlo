@@ -1,11 +1,12 @@
 """get_or_create_user, the default organization and slugs."""
 
 import pytest
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from todolist.models import Membership, MembershipRole, Organization, User
 from todolist.services.organizations import (
+    SLUG_LOCK_KEY,
     create_organization,
     list_user_organizations,
     slugify,
@@ -95,6 +96,21 @@ async def test_a_very_long_name_still_fits(db_session: AsyncSession) -> None:
 )
 def test_slugify(text: str, expected: str) -> None:
     assert slugify(text) == expected
+
+
+async def test_picking_a_slug_locks_out_other_transactions(
+    db_session: AsyncSession, engine: AsyncEngine
+) -> None:
+    # Two people with the same name signing up at once: the second waits for the first to
+    # commit instead of picking the same slug.
+    try_lock = select(func.pg_try_advisory_xact_lock(SLUG_LOCK_KEY))
+    async with engine.connect() as other:
+        assert await other.scalar(try_lock) is True
+        await other.rollback()
+
+        await unique_slug(db_session, "Ada")
+
+        assert await other.scalar(try_lock) is False
 
 
 async def test_unique_slug_skips_taken_slugs(db_session: AsyncSession) -> None:

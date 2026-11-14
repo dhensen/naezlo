@@ -27,6 +27,12 @@
 - Backend-owned paths are listed in frontend/src/backendPaths.ts (`BACKEND_PATHS`, dev proxy) and
   src/todolist/frontend.py (`BACKEND_PREFIXES`, never answered by the SPA fallback); keep them equal.
   FastAPI serves frontend/dist when it exists at startup (`FRONTEND_DIST`); tests have it off.
+- App shell (since US-030): organization pages are routes under `/o/:orgSlug` inside `AppLayout`
+  (top bar with switcher + user menu, sidebar with projects, drawer below `md`). In a page use
+  `useCurrentOrganization()` (src/orgs/hooks.ts) and `orgPath(slug, '/rest')` (src/orgs/paths.ts).
+  Vitest fixtures: `ADA_IN_ORGS`, `ACME`, `BETA`, `project(...)` in src/test/api.ts; mock
+  `GET /api/orgs/${ACME.id}/projects` when rendering `/o/acme`. E2E: the user's slug comes from
+  `GET /api/me` via `page.request` (see frontend/e2e/shell.spec.ts).
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -969,4 +975,38 @@
   - Port 8000 is used by another process on this machine; e2e uses 8765 (`E2E_PORT` to change).
   - Next is US-030 (app shell with organization switcher): it needs a Playwright spec, and it
     replaces the organization line on HomePage (update e2e/auth.spec.ts if the text moves).
+---
+
+## 2026-11-15 01:00 - US-030
+- App shell: `AppLayout` now has a top bar (menu button at phone width, product name, organization
+  switcher, user menu) and a sidebar with the projects of the current organization (loading, error
+  and "No projects yet." states); below `md` the sidebar is a drawer. Routes are `/o/:orgSlug/...`;
+  `/` redirects to the last used organization (localStorage) or the first; an unknown slug shows
+  "Organization not found"; a user without organizations gets a start page with "New organization".
+  The switcher lists the organizations and has "New organization" (dialog → POST /api/orgs → cache
+  update → switch).
+- Backend fix found by the new spec: two same-named users signing up at once got the same slug and
+  one a 500. `unique_slug` now takes an advisory lock (test in tests/test_services_users.py).
+- User menu and switcher close through the new `useDismiss` hook (the blur handler broke clicks
+  in Safari).
+- Checks: ruff, pyright, 676 pytest, eslint, tsc, 42 vitest, 3 Playwright tests (run 5 times).
+- Browser check done with Chrome DevTools against `python -m todolist.e2e --port 8766`: sign-in →
+  /o/grace-hopper, switcher menu, dialog and creation at phone width, drawer open. Looked right.
+- Files: frontend/src/{App.tsx, components/{AppLayout,OrganizationSwitcher,NewOrganizationDialog,
+  Sidebar,UserMenu}.tsx, components/useDismiss.ts, components/AppLayout.test.tsx, orgs/{hooks,paths}.ts,
+  pages/{HomePage,OrganizationPage}.tsx, pages/HomePage.test.tsx, test/{api.ts,setup.ts}},
+  frontend/e2e/{shell,auth}.spec.ts, src/todolist/services/organizations.py,
+  tests/test_services_users.py, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt
+- Pushed: yes
+- **Learnings for future iterations:**
+  - Playwright runs the specs in parallel and all users are "Ada Lovelace": anything in the backend
+    that picks "the next free value" gets real concurrency there. A 500 on the dev-login form in a
+    spec is a backend race, not a flaky test.
+  - The e2e specs are compiled without the DOM lib: `page.evaluate(() => document...)` fails the
+    typecheck; pass the expression as a string.
+  - A file may export components only (react-refresh rule), so hooks and helpers go in `.ts` files.
+  - Sidebar project links point to `/o/<slug>/projects/<id>`, which is "Page not found" until
+    US-032 adds the page; `OrganizationPage` is a placeholder start page that US-032 can replace.
+  - US-031 (organization settings) needs a link somewhere in the shell (switcher menu or sidebar).
+  - Stop a background server by the pid from `ss -ltnp | grep :PORT`, not with pkill -f.
 ---

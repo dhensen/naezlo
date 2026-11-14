@@ -345,3 +345,22 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
   global state (counts over all rows), only on what the test's own user made.
 - Vitest only picks up `src/**/*.test.{ts,tsx}`; Playwright only `e2e/*.spec.ts`. Every UI story
   gets a spec; find elements by role and label (`getByRole`, `getByLabel`), not by CSS class.
+- Organization pages are routes under `/o/:orgSlug` in `App.tsx` (inside `AppLayout`, which adds
+  the sidebar there). In a page, `useCurrentOrganization()` (`src/orgs/hooks.ts`) gives
+  `{ slug, organization }` from the route and `/api/me`; build links with `orgPath(slug, '/rest')`
+  (`src/orgs/paths.ts`). `/` redirects to the last used organization (`localStorage`).
+- Frontend data hooks per area live in `src/<area>/hooks.ts` (`src/orgs/hooks.ts`: `useProjects`,
+  `projectsKey(orgId)`, `useCreateOrganization`). A mutation that changes a list updates or
+  invalidates that list's query key, so the sidebar follows.
+- A dropdown menu closes through `useDismiss(ref, open, onDismiss)` (`src/components/useDismiss.ts`;
+  pass a stable `onDismiss`), not an `onBlur` handler. A dialog follows `NewOrganizationDialog`
+  (`role="dialog"`, `aria-modal`, labelled by its heading, Escape and Cancel close it).
+- Frontend test fixtures: `ADA` has no organization (`/` shows the empty start); `ADA_IN_ORGS` is in
+  `ACME` and `BETA`, and a test that renders `/o/acme` must mock `GET /api/orgs/${ACME.id}/projects`
+  (`json([])` or `project(ACME, id, name)` rows). `localStorage` is cleared after every test.
+- E2E: after `signIn(page)` the URL is `/o/<slug>`; the slug of a test user is not predictable
+  (`ada-lovelace-7`), so read it from `GET /api/me` with `page.request` (see `organizations(page)` in
+  `frontend/e2e/shell.spec.ts`). `page.request.post(...)` is fine to set data up that the story under
+  test does not create itself. The specs are type-checked without the DOM library.
+- `unique_slug` (`services/organizations.py`) holds an advisory lock until the transaction ends;
+  anything else that must pick a free value and insert it under concurrency does the same.

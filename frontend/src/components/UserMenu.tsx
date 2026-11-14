@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { useMe, useSignOut } from '../auth/hooks'
 import { ErrorMessage } from './ErrorMessage'
+import { useDismiss } from './useDismiss'
 
 /** The signed-in user's name in the header; opens to their email and "Sign out". */
 export function UserMenu() {
@@ -10,6 +11,12 @@ export function UserMenu() {
   const signOut = useSignOut()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const menu = useRef<HTMLDivElement>(null)
+  useDismiss(
+    menu,
+    open,
+    useCallback(() => setOpen(false), []),
+  )
 
   const user = me.data?.user
   if (!user) {
@@ -17,20 +24,7 @@ export function UserMenu() {
   }
 
   return (
-    <div
-      className="relative"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          setOpen(false)
-        }
-      }}
-      onBlur={(event) => {
-        // Focus left the menu (not: moved between its own controls).
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setOpen(false)
-        }
-      }}
-    >
+    <div ref={menu} className="relative">
       <button
         type="button"
         aria-haspopup="true"
@@ -45,7 +39,7 @@ export function UserMenu() {
         >
           {user.name.charAt(0).toUpperCase()}
         </span>
-        <span className="max-w-40 truncate">{user.name}</span>
+        <span className="hidden max-w-40 truncate sm:inline">{user.name}</span>
       </button>
       {open && (
         <div className="absolute right-0 z-10 mt-1 flex w-64 flex-col gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-lg">

@@ -531,7 +531,7 @@
         "Verify in a browser if browser tools are available"
       ],
       "priority": 30,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

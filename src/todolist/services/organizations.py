@@ -4,7 +4,7 @@ import re
 import unicodedata
 import uuid
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.errors import ConflictError, ForbiddenError, NotFoundError
@@ -22,6 +22,8 @@ from todolist.models import (
 # The column holds 100 characters; this leaves room for a "-<n>" suffix.
 _SLUG_BASE_MAX_LENGTH = 80
 _FALLBACK_SLUG = "org"
+# Key of the PostgreSQL advisory lock that makes picking a slug and inserting it one step.
+SLUG_LOCK_KEY = 7_105_001
 
 
 def slugify(text: str) -> str:
@@ -32,8 +34,13 @@ def slugify(text: str) -> str:
 
 
 async def unique_slug(session: AsyncSession, text: str) -> str:
-    """A slug for `text` that no organization uses yet: "ada", then "ada-2", "ada-3", ..."""
+    """A slug for `text` that no organization uses yet: "ada", then "ada-2", "ada-3", ...
+
+    Holds a lock until the transaction ends, so two people with the same name who sign up at
+    the same moment get different slugs instead of a unique violation for one of them.
+    """
     base = slugify(text)
+    await session.execute(select(func.pg_advisory_xact_lock(SLUG_LOCK_KEY)))
     # `base` only contains [a-z0-9-], so it needs no LIKE escaping.
     taken = set(
         await session.scalars(
