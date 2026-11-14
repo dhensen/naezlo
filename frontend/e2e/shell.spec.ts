@@ -90,7 +90,7 @@ test('at phone width the sidebar is a drawer behind the menu button', async ({ p
   // Choosing a project closes the drawer.
   await sidebar.getByRole('link', { name: 'Pocket project' }).click()
   await expect(sidebar).toBeHidden()
-  await expect(page).toHaveURL(new RegExp(`/o/${organization.slug}/projects/[0-9a-f-]+$`))
+  await expect(page).toHaveURL(new RegExp(`/o/${organization.slug}/p/[0-9a-f-]+$`))
 
   // On a wide screen the sidebar is always there, without the menu button.
   await page.setViewportSize({ width: 1280, height: 800 })

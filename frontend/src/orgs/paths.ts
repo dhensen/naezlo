@@ -1,8 +1,13 @@
 // Every page of an organization lives under /o/<slug>.
 
-/** The path of a page in the organization with this slug: `orgPath('acme', '/projects/1')`. */
+/** The path of a page in the organization with this slug: `orgPath('acme', '/settings')`. */
 export function orgPath(slug: string, rest = ''): string {
   return `/o/${encodeURIComponent(slug)}${rest}`
+}
+
+/** The page of a project: `/o/<slug>/p/<project id>`. */
+export function projectPath(slug: string, projectId: string): string {
+  return orgPath(slug, `/p/${encodeURIComponent(projectId)}`)
 }
 
 const LAST_ORGANIZATION_KEY = 'lastOrganization'

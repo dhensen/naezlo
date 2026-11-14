@@ -19,6 +19,7 @@ Rules (DECISIONS.md, "ACL"):
 
 import enum
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import cast
 
@@ -91,6 +92,44 @@ async def effective_project_role(
     if can_manage_organization(membership_role):
         return ProjectRole.ADMIN
     return grant_role
+
+
+async def effective_project_roles(
+    session: AsyncSession, principal: Principal, projects: Collection[Project]
+) -> dict[uuid.UUID, ProjectRole]:
+    """The principal's role on each of the projects, by project id; a project that does not
+    exist for the principal is left out.
+
+    The same rules as `effective_project_role`, for several projects in two queries.
+    """
+    in_organization = [
+        project.id for project in projects if project.organization_id == principal.organization_id
+    ]
+    if not in_organization:
+        return {}
+    if principal.kind is PrincipalKind.AGENT:
+        granted = ProjectGrant.agent_id == principal.id
+    else:
+        membership_role = await session.scalar(
+            select(Membership.role).where(
+                Membership.organization_id == principal.organization_id,
+                Membership.user_id == principal.id,
+            )
+        )
+        if membership_role is None:
+            return {}
+        if can_manage_organization(membership_role):
+            return dict.fromkeys(in_organization, ProjectRole.ADMIN)
+        granted = ProjectGrant.user_id == principal.id
+    rows = await session.execute(
+        select(ProjectGrant.project_id, ProjectGrant.role).where(
+            ProjectGrant.project_id.in_(in_organization), granted
+        )
+    )
+    roles: dict[uuid.UUID, ProjectRole] = {}
+    for project_id, role in rows:
+        roles[project_id] = role
+    return roles
 
 
 async def effective_list_role(

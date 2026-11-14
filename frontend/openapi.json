@@ -1002,6 +1002,10 @@
             "title": "Name",
             "type": "string"
           },
+          "open_item_count": {
+            "title": "Open Item Count",
+            "type": "integer"
+          },
           "position": {
             "title": "Position",
             "type": "integer"
@@ -1029,6 +1033,7 @@
           "description",
           "mode",
           "position",
+          "open_item_count",
           "created_by",
           "created_at",
           "updated_at"
@@ -1281,6 +1286,9 @@
             "title": "Organization Id",
             "type": "string"
           },
+          "role": {
+            "$ref": "#/components/schemas/ProjectRole"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -1294,7 +1302,8 @@
           "description",
           "created_by",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "role"
         ],
         "title": "ProjectOut",
         "type": "object"

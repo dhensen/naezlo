@@ -379,3 +379,16 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
 - E2E with a second person: `const context = await browser.newContext()`, a page from it, and
   `signIn(thatPage, { user: uniqueUser('Grace Hopper') })`; close the context at the end
   (`frontend/e2e/organization-settings.spec.ts`).
+- Projects in the UI: the page is `/o/:orgSlug/p/:projectId` (`projectPath(slug, id)` in
+  `src/orgs/paths.ts`, `src/pages/ProjectPage.tsx`), hooks in `src/projects/hooks.ts` (`useProject`,
+  `useProjectLists`, `projectKey`, `projectListsKey`, `useCreateProject`, `useUpdateProject`,
+  `useDeleteProject`, `roleAtLeast(role, 'editor')`). `ProjectOut.role` is the caller's effective
+  role (`effective_project_roles` in `permissions.py` for several projects); `ListOut.open_item_count`
+  the items that are not done. Hide a control the role does not allow; never disable it.
+- A new dialog is built on `<Dialog title onClose>` (`src/components/Dialog.tsx`, with the
+  `DIALOG_*` class names for its inputs and buttons); it is rendered outside the sidebar's `<aside>`.
+  Test fixtures: `project(ACME, id, name, { role })` and `todoList(project, id, name, { mode })`;
+  a test that renders a project page mocks `GET /api/projects/<id>` and `.../lists`.
+- A new field on an API model: add it to the exact-key assertions in the backend tests
+  (`set(body) == {...}`), run `gen:api`, and add it to the fixtures in `frontend/src/test/api.ts`.
+

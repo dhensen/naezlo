@@ -63,7 +63,9 @@ async def test_create_returns_the_project(client: AsyncClient, db_session: Async
         "created_by",
         "created_at",
         "updated_at",
+        "role",
     }
+    assert body["role"] == "admin"
     assert await db_session.get(Project, uuid.UUID(body["id"])) is not None
 
 
@@ -310,3 +312,32 @@ async def test_deleting_the_creator_keeps_the_project(
     )
     assert await project_count(db_session) == 1
     assert created_by is None
+
+
+async def test_every_answer_has_the_callers_role(
+    client: AsyncClient, other_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    org_id, url = await ada_org(client)
+    website = await create(client, url)
+    shop = await create(client, url, "Shop")
+    hidden = await create(client, url, "Hidden")
+    grace = await sign_in(other_client, "grace@example.com", "Grace")
+    grace_id = grace["user"]["id"]
+    await add_member(db_session, org_id, grace_id, MembershipRole.MEMBER)
+    await grant_project_role(db_session, website["id"], grace_id, ProjectRole.VIEWER)
+    await grant_project_role(db_session, shop["id"], grace_id, ProjectRole.EDITOR)
+
+    # The owner is admin everywhere, a member has the role of their grant.
+    assert [p["role"] for p in (await client.get(url)).json()] == ["admin"] * 3
+    listed = (await other_client.get(url)).json()
+    assert [(p["name"], p["role"]) for p in listed] == [("Website", "viewer"), ("Shop", "editor")]
+    assert hidden["id"] not in [p["id"] for p in listed]
+
+    one = await other_client.get(f"/api/projects/{website['id']}")
+    assert one.json()["role"] == "viewer"
+    renamed = await other_client.patch(f"/api/projects/{shop['id']}", json={"name": "Store"})
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["role"] == "editor"
+
+    # A project a member creates is theirs to administer.
+    assert (await create(other_client, url, "Mine"))["role"] == "admin"

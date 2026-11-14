@@ -12,6 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter
 from pydantic import BaseModel, StringConstraints, field_validator
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.api.deps import (
     ListAdminContextDep,
@@ -22,6 +23,7 @@ from todolist.api.deps import (
 )
 from todolist.db import SessionDep
 from todolist.models import ListMode, Project, TodoList
+from todolist.services.items import count_items
 from todolist.services.lists import create_list, delete_list, update_list
 
 project_router = APIRouter(prefix="/projects/{project_id}/lists", tags=["lists"])
@@ -64,12 +66,14 @@ class ListOut(BaseModel):
     description: str | None
     mode: ListMode
     position: int
+    # Items that are not done yet.
+    open_item_count: int
     created_by: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
 
-def _list_out(todo_list: TodoList, project: Project) -> ListOut:
+def _list_out(todo_list: TodoList, project: Project, open_item_count: int) -> ListOut:
     return ListOut(
         id=todo_list.id,
         project_id=todo_list.project_id,
@@ -78,15 +82,23 @@ def _list_out(todo_list: TodoList, project: Project) -> ListOut:
         description=todo_list.description,
         mode=todo_list.mode,
         position=todo_list.position,
+        open_item_count=open_item_count,
         created_by=todo_list.created_by,
         created_at=todo_list.created_at,
         updated_at=todo_list.updated_at,
     )
 
 
+async def _open_item_count(session: AsyncSession, todo_list: TodoList) -> int:
+    return (await count_items(session, [todo_list.id]))[todo_list.id].open
+
+
 @project_router.get("")
-async def list_lists_route(ctx: ProjectListsContextDep) -> list[ListOut]:
-    return [_list_out(todo_list, ctx.project) for todo_list in ctx.todo_lists]
+async def list_lists_route(ctx: ProjectListsContextDep, session: SessionDep) -> list[ListOut]:
+    counts = await count_items(session, [todo_list.id for todo_list in ctx.todo_lists])
+    return [
+        _list_out(todo_list, ctx.project, counts[todo_list.id].open) for todo_list in ctx.todo_lists
+    ]
 
 
 @project_router.post("", status_code=201)
@@ -96,12 +108,12 @@ async def create_list_route(
     todo_list = await create_list(
         session, ctx.principal, ctx.project, body.name, body.description, body.mode
     )
-    return _list_out(todo_list, ctx.project)
+    return _list_out(todo_list, ctx.project, 0)
 
 
 @router.get("")
-async def get_list_route(ctx: ListContextDep) -> ListOut:
-    return _list_out(ctx.todo_list, ctx.project)
+async def get_list_route(ctx: ListContextDep, session: SessionDep) -> ListOut:
+    return _list_out(ctx.todo_list, ctx.project, await _open_item_count(session, ctx.todo_list))
 
 
 @router.patch("")
@@ -117,7 +129,7 @@ async def update_list_route(
         set_description="description" in body.model_fields_set,
         mode=body.mode,
     )
-    return _list_out(todo_list, ctx.project)
+    return _list_out(todo_list, ctx.project, await _open_item_count(session, todo_list))
 
 
 @router.delete("", status_code=204)

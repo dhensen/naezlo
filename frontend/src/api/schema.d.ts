@@ -1125,6 +1125,8 @@ export interface components {
             mode: components["schemas"]["ListMode"];
             /** Name */
             name: string;
+            /** Open Item Count */
+            open_item_count: number;
             /** Position */
             position: number;
             /**
@@ -1239,6 +1241,7 @@ export interface components {
              * Format: uuid
              */
             organization_id: string;
+            role: components["schemas"]["ProjectRole"];
             /**
              * Updated At
              * Format: date-time

@@ -19,7 +19,8 @@ from todolist.api.deps import (
     ProjectEditorContextDep,
 )
 from todolist.db import SessionDep
-from todolist.models import Project
+from todolist.models import Project, ProjectRole
+from todolist.permissions import effective_project_roles
 from todolist.services.projects import (
     create_project,
     delete_project,
@@ -63,9 +64,11 @@ class ProjectOut(BaseModel):
     created_by: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+    # The caller's effective role on the project: what the UI may offer.
+    role: ProjectRole
 
 
-def _project_out(project: Project) -> ProjectOut:
+def _project_out(project: Project, role: ProjectRole) -> ProjectOut:
     return ProjectOut(
         id=project.id,
         organization_id=project.organization_id,
@@ -74,13 +77,15 @@ def _project_out(project: Project) -> ProjectOut:
         created_by=project.created_by,
         created_at=project.created_at,
         updated_at=project.updated_at,
+        role=role,
     )
 
 
 @org_router.get("")
 async def list_projects_route(org: OrgContextDep, session: SessionDep) -> list[ProjectOut]:
     projects = await list_projects(session, org.principal)
-    return [_project_out(project) for project in projects]
+    roles = await effective_project_roles(session, org.principal, projects)
+    return [_project_out(project, roles[project.id]) for project in projects if project.id in roles]
 
 
 @org_router.post("", status_code=201)
@@ -88,12 +93,14 @@ async def create_project_route(
     body: ProjectIn, org: OrgContextDep, session: SessionDep
 ) -> ProjectOut:
     project = await create_project(session, org.principal, body.name, body.description)
-    return _project_out(project)
+    # The creator is the project's admin (their grant, or their role in the organization).
+    roles = await effective_project_roles(session, org.principal, [project])
+    return _project_out(project, roles[project.id])
 
 
 @router.get("")
 async def get_project_route(ctx: ProjectContextDep) -> ProjectOut:
-    return _project_out(ctx.project)
+    return _project_out(ctx.project, ctx.role)
 
 
 @router.patch("")
@@ -108,7 +115,7 @@ async def update_project_route(
         description=body.description,
         set_description="description" in body.model_fields_set,
     )
-    return _project_out(project)
+    return _project_out(project, ctx.role)
 
 
 @router.delete("", status_code=204)

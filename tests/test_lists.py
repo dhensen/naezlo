@@ -94,10 +94,12 @@ async def test_create_returns_the_list(client: AsyncClient, db_session: AsyncSes
         "description",
         "mode",
         "position",
+        "open_item_count",
         "created_by",
         "created_at",
         "updated_at",
     }
+    assert body["open_item_count"] == 0
     assert await db_session.get(TodoList, uuid.UUID(body["id"])) is not None
 
 
@@ -537,3 +539,23 @@ async def test_effective_list_role_is_the_project_role_without_a_list_grant(
         await effective_list_role(db_session, Principal.for_agent(agent), todo_list, project)
         is None
     )
+
+
+async def test_lists_come_with_their_open_item_count(client: AsyncClient) -> None:
+    _, project_id, url = await ada_project(client)
+    busy = await create(client, url, "Busy")
+    empty = await create(client, url, "Empty")
+    items_url = f"/api/lists/{busy['id']}/items"
+    for title in ("One", "Two", "Three"):
+        item = await client.post(items_url, json={"title": title})
+        assert item.status_code == 201, item.text
+    done = await client.patch(f"/api/items/{item.json()['id']}", json={"status": "done"})
+    assert done.status_code == 200, done.text
+
+    listed = (await client.get(url)).json()
+    assert [(row["name"], row["open_item_count"]) for row in listed] == [("Busy", 2), ("Empty", 0)]
+    assert (await client.get(f"/api/lists/{busy['id']}")).json()["open_item_count"] == 2
+    renamed = await client.patch(f"/api/lists/{busy['id']}", json={"name": "Busier"})
+    assert renamed.json()["open_item_count"] == 2
+    assert (await client.get(f"/api/lists/{empty['id']}")).json()["open_item_count"] == 0
+    assert project_id == busy["project_id"]

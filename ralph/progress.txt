@@ -37,6 +37,10 @@
   linked from the sidebar's "Organization" nav. Member, invitation and rename hooks are in
   src/orgs/hooks.ts. E2E with two people: a second `browser.newContext()` (see
   frontend/e2e/organization-settings.spec.ts).
+- Projects in the UI (since US-032): `/o/:orgSlug/p/:projectId` (src/pages/ProjectPage.tsx, `projectPath`
+  in src/orgs/paths.ts), hooks in src/projects/hooks.ts. `ProjectOut.role` is the caller's role
+  (hide controls with `roleAtLeast`), `ListOut.open_item_count` the open items. Dialogs use
+  `<Dialog>` (src/components/Dialog.tsx). Fixtures: `project(...)`, `todoList(...)` in src/test/api.ts.
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -1043,4 +1047,37 @@
     that wants a pending invitation must use an email that never signed in.
   - Next is US-032 (projects in the UI): `OrganizationPage` is still the placeholder start page and
     the sidebar's project links lead to a not-yet-existing `/o/<slug>/projects/<id>`.
+---
+
+## 2026-11-15 00:30 - US-032
+- Projects in the UI: "New project" in the sidebar (dialog with name and description, opens the new
+  project), the project page `/o/:orgSlug/p/:projectId` (name, description, lists with mode badge and
+  open item count, empty state, "Project not found"), "Edit" (name + description) for editors and
+  "Delete" with a confirmation dialog for admins; both hidden when the role is too low. The sidebar
+  follows create, rename and delete through the query cache.
+- Backend: `ProjectOut.role` (the caller's effective role; `effective_project_roles` in
+  permissions.py) and `ListOut.open_item_count` on every project / list route. No schema change.
+- Sidebar project links moved from `/projects/<id>` to `/p/<id>` (the story's path; DECISIONS.md).
+- Files changed: src/todolist/api/projects.py, api/lists.py, permissions.py, tests/test_projects.py,
+  tests/test_lists.py, frontend/openapi.json + src/api/schema.d.ts (generated),
+  frontend/src/projects/hooks.ts, pages/ProjectPage.tsx (+ test), components/Dialog.tsx,
+  NewProjectDialog.tsx, NewOrganizationDialog.tsx (now on `Dialog`), Sidebar.tsx, App.tsx,
+  orgs/paths.ts, test/api.ts, AppLayout.test.tsx, e2e/projects.spec.ts, e2e/shell.spec.ts,
+  DECISIONS.md, CLAUDE.md
+- Checks: ruff, pyright, pytest (678), eslint, tsc, vitest (64), Playwright (7) all pass.
+- Browser check: done with the Chrome DevTools tools on the e2e backend (project page with three
+  lists, delete dialog); looked right at desktop width. Phone width was not looked at by hand.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - `dict(rows)` / a dict comprehension over a two-column result trips ruff C416; fill the dict in a
+    loop (pyright strict accepts the unpacked row types).
+  - A dialog opened from the sidebar must not be rendered inside the `<aside>`: the drawer is
+    `absolute z-10`, so the sticky header (z-20) would cover the dialog's backdrop at phone width.
+  - Visual check without Playwright: `uv run python -m todolist.e2e --port 8766 &`, open
+    `http://localhost:8766/login`, sign in with `fetch('/api/auth/dev-login', ...)` from the page.
+    Stop it afterwards (`pkill -f "todolist.e2e --port 8766"`).
+  - `userEvent.keyboard('{Escape}')` closes a dialog in vitest only while the focus is inside it
+    (the `autoFocus` input takes care of that).
+  - Next is US-033 (lists in the UI): the list rows on the project page are plain rows; the hooks
+    `useProjectLists` / `projectListsKey` are there to extend, and `ListOut` has no caller role yet.
 ---

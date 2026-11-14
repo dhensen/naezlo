@@ -344,3 +344,14 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **Remove and leave ask first**, in the row itself ("Yes, remove" / "Cancel"), not with a browser dialog. Revoking an invitation does not ask: inviting again is one step.
 - **After leaving** the organization is taken out of the cached `/api/me` and the app goes to `/`, which leads to another organization or the empty start.
 - **The note after inviting** is the `message` of the API's answer, so the two outcomes (invited, or added at once because the account exists) are worded in one place.
+
+## Projects in the UI (2026-11-15, US-032)
+
+- **Address**: a project's page is `/o/:orgSlug/p/:projectId` (the story's path). This replaces the `/o/<slug>/projects/<id>` that the sidebar links of US-030 pointed to; nothing answered there yet.
+- **The API tells the caller's role**: `ProjectOut` has `role` (`viewer | editor | admin`, the effective role, so an organization owner or admin gets `admin`) on every project route, also in the list of an organization (`effective_project_roles` in the permission service: the rules of `effective_project_role` for several projects at once). The UI only uses it to hide controls: "Edit" from editor, "Delete" from admin. The API still decides.
+- **Open item count**: `ListOut` has `open_item_count` (items that are not done) on every list route, so the project page needs one request for its lists.
+- **Project page**: name, description, and the lists as rows with the name, a mode badge ("Humans only", "AI only", "Mixed") and "n open items". The rows are not links until the list view exists (US-034); creating a list comes with US-033. A project that the API answers 404 for, or one of another organization than the one in the address, shows "Project not found".
+- **New project** is a button under the projects in the sidebar, for every member (every member may create a project). The dialog asks for a name and an optional description; the new project is opened.
+- **Edit** is one dialog for the name and the description (an emptied description is removed). **Delete** asks in a dialog that names the project and says its lists and items go with it; afterwards the app goes to the organization's start page.
+- **Sidebar without a reload**: the three mutations write their answer into the cached project list of the organization (and the cached project), instead of asking for the list again.
+

@@ -61,7 +61,12 @@ export const BETA: Schemas['MyOrganizationOut'] = {
 export const ADA_IN_ORGS: Me = { ...ADA, organizations: [ACME, BETA] }
 
 /** A project as the API returns it. */
-export function project(organization: Schemas['MyOrganizationOut'], id: string, name: string): Schemas['ProjectOut'] {
+export function project(
+  organization: Schemas['MyOrganizationOut'],
+  id: string,
+  name: string,
+  overrides: Partial<Schemas['ProjectOut']> = {},
+): Schemas['ProjectOut'] {
   return {
     id,
     organization_id: organization.id,
@@ -70,6 +75,31 @@ export function project(organization: Schemas['MyOrganizationOut'], id: string, 
     created_by: ADA.user.id,
     created_at: '2026-11-01T10:00:00Z',
     updated_at: '2026-11-01T10:00:00Z',
+    role: 'admin',
+    ...overrides,
+  }
+}
+
+/** A list as the API returns it. */
+export function todoList(
+  of: Schemas['ProjectOut'],
+  id: string,
+  name: string,
+  overrides: Partial<Schemas['ListOut']> = {},
+): Schemas['ListOut'] {
+  return {
+    id,
+    project_id: of.id,
+    project_name: of.name,
+    name,
+    description: null,
+    mode: 'human_only',
+    position: 1,
+    open_item_count: 0,
+    created_by: ADA.user.id,
+    created_at: '2026-11-01T10:00:00Z',
+    updated_at: '2026-11-01T10:00:00Z',
+    ...overrides,
   }
 }
 

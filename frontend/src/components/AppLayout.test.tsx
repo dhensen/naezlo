@@ -30,7 +30,7 @@ test('the sidebar lists the projects of the current organization', async () => {
 
   const sidebar = await screen.findByRole('navigation', { name: 'Projects' })
   const website = await within(sidebar).findByRole('link', { name: 'Website' })
-  expect(website).toHaveAttribute('href', '/o/acme/projects/0190a000-0000-7000-8000-0000000000b1')
+  expect(website).toHaveAttribute('href', '/o/acme/p/0190a000-0000-7000-8000-0000000000b1')
   expect(within(sidebar).getByRole('link', { name: 'Launch' })).toBeInTheDocument()
   expect(within(sidebar).queryByText('No projects yet.')).not.toBeInTheDocument()
 })
