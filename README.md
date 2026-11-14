@@ -1,4 +1,6 @@
-# Naezlo
+<h1 align="center">
+  <img src="assets/naezlo-logo.png" alt="Naezlo" width="420">
+</h1>
 
 This is a todolist app. Will be built in public.
 
