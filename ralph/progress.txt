@@ -1168,4 +1168,8 @@
     "an agent"; a later story that wants names needs them in the API.
   - Stop a background `todolist.e2e --port 8766` with its own `pkill -f` command (exit code 144
     of that command is expected).
+  - Look at `git status --short` before `git add -A`: a local `.envrc` with a token (not made by
+    this iteration) appeared during the work and was staged; GitHub's push protection refused the
+    push, the commit was amended without it before anything was pushed, and `.envrc` is now in
+    .gitignore.
 ---
