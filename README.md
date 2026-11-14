@@ -21,3 +21,9 @@ This is a todolist app. Will be built in public.
 # Out of scope for v1
 
 - Billing
+
+# Technical requirements
+
+- Use FastAPI
+- Use uv
+- Use recent python
