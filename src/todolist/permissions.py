@@ -10,15 +10,22 @@ Rules (DECISIONS.md, "ACL"):
 - No role means the project does not exist for that principal (the caller answers 404).
 - On a list, a list grant replaces the project role for everyone but those owners and admins:
   it can raise it, lower it, take it away (`none`) or give access without any project role.
+- The list mode comes on top of the role (`list_access`, the one check for everything that
+  happens to a list or its items): a human-only list does not exist for agents, and in an
+  AI-only list people read but leave the items alone; only its admins still manage the list.
 """
 
+import enum
+from dataclasses import dataclass
 from typing import cast
 
 from sqlalchemy import Select, and_, false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from todolist.errors import AppError, ForbiddenError
 from todolist.models import (
     ListGrant,
+    ListMode,
     ListRole,
     Membership,
     MembershipRole,
@@ -89,7 +96,10 @@ async def effective_list_role(
     `project` is the list's project. Owners and admins of its organization are admin. For
     everyone else a grant on the list decides when there is one (`none` means no access),
     otherwise the role on the project. As on a project, a user must be a member of the
-    organization and an agent must belong to it. The list mode (US-017) comes on top of this.
+    organization and an agent must belong to it.
+
+    This is the role alone. What the principal may do with it also depends on the list mode:
+    check that with `list_access`.
     """
     if todo_list.project_id != project.id:
         raise ValueError("project is not the list's project")
@@ -136,11 +146,94 @@ async def effective_list_role(
     return project_role
 
 
-def visible_lists(principal: Principal, project: Project) -> Select[TodoList]:
-    """A query for the lists of the project that the principal has a role on, in no order.
+class ListAction(enum.Enum):
+    """What a principal wants to do with a list. `ListAccess` decides whether they may."""
 
-    The same rules as `effective_list_role`, for a whole project at once. It can give lists
-    to a principal without a role on the project itself (a list grant only).
+    # See the list and its items.
+    READ = "read"
+    # Create, edit, complete, reopen, move or delete items.
+    CHANGE_ITEMS = "change_items"
+    # Change the list's name, description or mode.
+    EDIT_LIST = "edit_list"
+    # Manage the list's grants, delete the list.
+    ADMINISTER = "administer"
+
+
+_MINIMUM_ROLE = {
+    ListAction.READ: ProjectRole.VIEWER,
+    ListAction.CHANGE_ITEMS: ProjectRole.EDITOR,
+    ListAction.EDIT_LIST: ProjectRole.EDITOR,
+    ListAction.ADMINISTER: ProjectRole.ADMIN,
+}
+
+LIST_AI_ONLY = "list_ai_only"
+
+
+@dataclass(frozen=True)
+class ListAccess:
+    """What one principal may do with one list: their role, the list mode and their kind
+    together. Get it from `list_access`; it exists only for a list the principal can see."""
+
+    role: ProjectRole
+    mode: ListMode
+    kind: PrincipalKind
+
+    def denial(self, action: ListAction) -> AppError | None:
+        """Why the principal may not do this, as the error to raise; None when they may.
+
+        The role is checked first (403 `forbidden`). Then the mode: in an AI-only list a
+        person cannot change items, and changes the list itself only as its admin (403
+        `list_ai_only`). Agents are not held back here: in a human-only list they have no
+        `ListAccess` at all.
+        """
+        minimum = _MINIMUM_ROLE[action]
+        if not role_at_least(self.role, minimum):
+            return ForbiddenError(f"This needs the {minimum.value} role on the list")
+        if self.mode is ListMode.AI_ONLY and self.kind is PrincipalKind.USER:
+            if action is ListAction.CHANGE_ITEMS:
+                return AppError(
+                    403, LIST_AI_ONLY, "This list is AI-only: people can read its items only"
+                )
+            if action is ListAction.EDIT_LIST and self.role is not ProjectRole.ADMIN:
+                return AppError(
+                    403, LIST_AI_ONLY, "This list is AI-only: only its admins can change it"
+                )
+        return None
+
+    def allows(self, action: ListAction) -> bool:
+        return self.denial(action) is None
+
+    def require(self, action: ListAction) -> None:
+        """Raise the 403 for this action when the principal may not do it."""
+        denial = self.denial(action)
+        if denial is not None:
+            raise denial
+
+
+async def list_access(
+    session: AsyncSession, principal: Principal, todo_list: TodoList, project: Project
+) -> ListAccess | None:
+    """The one check for every operation on a list or its items: the principal's role on the
+    list (`effective_list_role`) combined with the list mode and the principal's kind.
+
+    None when the list does not exist for the principal (the caller answers 404): they have
+    no role on it, or they are an agent and the list is human-only, whatever their grants.
+    Otherwise ask the result with `allows(action)` or `require(action)`.
+    """
+    if principal.kind is PrincipalKind.AGENT and todo_list.mode is ListMode.HUMAN_ONLY:
+        return None
+    role = await effective_list_role(session, principal, todo_list, project)
+    if role is None:
+        return None
+    return ListAccess(role=role, mode=todo_list.mode, kind=principal.kind)
+
+
+def visible_lists(principal: Principal, project: Project) -> Select[TodoList]:
+    """A query for the lists of the project that the principal can see, in no order.
+
+    The same rules as `list_access`, for a whole project at once: a role on the list, and for
+    an agent a list that is not human-only. It can give lists to a principal without a role
+    on the project itself (a list grant only).
     """
     in_project = select(TodoList).where(TodoList.project_id == project.id)
     if principal.organization_id != project.organization_id:
@@ -167,7 +260,7 @@ def visible_lists(principal: Principal, project: Project) -> Select[TodoList]:
         and_(list_role.is_(None), has_project_role),
     )
     if not is_user:
-        return in_project.where(granted)
+        return in_project.where(granted, TodoList.mode != ListMode.HUMAN_ONLY)
     membership_role = (
         select(Membership.role)
         .where(

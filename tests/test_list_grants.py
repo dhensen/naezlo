@@ -20,6 +20,7 @@ from tests.helpers import (
 from todolist.models import (
     Agent,
     ListGrant,
+    ListMode,
     ListRole,
     MembershipRole,
     PrincipalKind,
@@ -298,6 +299,9 @@ async def test_effective_list_role_and_visible_lists_for_an_agent(
     assert project is not None
     assert launch is not None
     assert backlog is not None
+    # The lists were made before the agent, so they are human-only: invisible to any agent.
+    launch.mode = backlog.mode = ListMode.MIXED
+    await db_session.flush()
     principal = Principal.for_agent(agent)
 
     async def roles() -> tuple[ProjectRole | None, ProjectRole | None, list[str]]:

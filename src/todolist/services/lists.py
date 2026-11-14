@@ -1,7 +1,7 @@
 """Lists: create, list, change and delete the todo lists of a project.
 
-The callers check the acting principal's role (`require_project_role` / `require_list_role`,
-see `todolist.permissions`).
+The callers check what the acting principal may do (`effective_project_role` / `list_access`
+in `todolist.permissions`).
 """
 
 import uuid

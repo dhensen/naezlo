@@ -87,6 +87,10 @@
   services/organizations.py); extend it when a new grant table appears.
 
 ---
+- Access to a list or its items: `list_access(session, principal, todo_list, project)`
+  (permissions.py) gives None (404) or a `ListAccess`; `access.require(ListAction.X)` raises the
+  403 (`forbidden` or `list_ai_only`). It includes the list mode. Don't decide on
+  `effective_list_role` alone. A list made in a test without a mode is human_only: no agent sees it.
 
 ## 2026-11-14 - US-001
 - Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
@@ -516,4 +520,26 @@
   - The bulk shift keeps `updated_at` of the shifted items (`updated_at=Item.updated_at`), and
     `synchronize_session="fetch"` updates the positions of items already loaded in the session.
   - `move_item` and `delete_item` take a `Principal` they don't use yet; US-018 (audit) will.
+---
+
+## 2026-11-14 23:40 - US-017
+- List mode enforcement: `list_access` + `ListAccess` + `ListAction` in the permission service
+  combine the role on the list with the mode and the principal kind. human_only: no access for
+  agents (also left out of `visible_lists`). ai_only: users read, item changes are 403
+  `list_ai_only`, changing the list (name, description, mode) needs admin. mixed: by role.
+  The list and item dependencies are now `require_list_action` / `require_item_action`; adding an
+  item uses the new `ListItemEditorContextDep`. Decisions: DECISIONS.md ("List mode enforcement").
+- Files changed: src/todolist/permissions.py, api/deps.py, api/items.py, api/lists.py,
+  services/items.py and services/lists.py (docstrings), tests/test_list_modes.py (new),
+  tests/test_list_grants.py, DECISIONS.md, CLAUDE.md
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - The services still trust the caller: an MCP tool must call `list_access(...)` and
+    `access.require(ListAction.X)` itself before `create_item` / `update_item` / `move_item` / ...
+  - An organization owner is also bound by ai_only for items (they are a user), but can always
+    change the mode back.
+  - An agent editor may change a list's mode (not restricted by a story). US-021+ (MCP tools)
+    should decide whether a tool for that exists at all.
+  - Tests that build an agent Principal on a list created through the API without a mode must set
+    the mode first: the default is human_only while the organization has no agent.
 ---

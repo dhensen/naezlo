@@ -1,7 +1,7 @@
 """Items: list, add, change, complete, move and delete the items of a list.
 
 Shared by the HTTP API and the MCP tools. The callers check the acting principal's role on
-the list (`require_list_role` / `require_item_role`, see `todolist.permissions`).
+the list and the list mode (`list_access` in `todolist.permissions`).
 """
 
 import uuid

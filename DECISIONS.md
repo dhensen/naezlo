@@ -177,3 +177,12 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **No-ops are fine**: moving an item before itself, before the item that already follows it, or to the end when it is last answers 200 and changes nothing (also not `updated_at`).
 - **`updated_at`**: a move updates it on the moved item only. The items that shift (by a move or a delete) keep theirs: their content did not change.
 - **Service**: `move_item(session, principal, item, before_item_id)` in `services/items.py`; the principal is the actor for the audit log (US-018).
+
+## List mode enforcement (2026-11-14, US-017)
+
+- **One check**: `list_access(session, principal, todo_list, project)` in `todolist.permissions` combines `effective_list_role` with the list mode and the principal kind. It returns None when the list does not exist for the principal (404), otherwise a `ListAccess` (`role`, `mode`, `kind`) that answers `allows(action)` / `require(action)` / `denial(action)` for a `ListAction`: `READ` (viewer), `CHANGE_ITEMS` (editor: create, edit, complete, reopen, move, delete), `EDIT_LIST` (editor: name, description, mode) and `ADMINISTER` (admin: grants, deleting the list). Every list and item route goes through it (`require_list_action` / `require_item_action` in `todolist.api.deps`); MCP tools call it directly. `effective_list_role` stays the role alone and is not a permission check by itself.
+- **human_only**: an agent has no `ListAccess`, whatever its grants, and `visible_lists` leaves the list out for agents. Grants for agents on such a list can still be stored; they start to count when the mode changes.
+- **ai_only**: a user (also an organization owner or admin) reads according to their role. `CHANGE_ITEMS` is a 403 with code `list_ai_only`. `EDIT_LIST` needs admin on the list instead of editor (403 `list_ai_only` for an editor), so only an admin can switch the mode back; `ADMINISTER` is unchanged. Agents act according to their role.
+- **mixed**: both kinds act according to their role.
+- **Order of the errors**: the role is checked first, so a viewer gets 403 `forbidden` and an editor or admin gets 403 `list_ai_only`.
+- **Not restricted**: an agent with the editor role may change a list's mode like a user with that role (also to `human_only`, which locks the agent itself out). Creating a list is a project permission and has no mode yet.

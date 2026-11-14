@@ -1,7 +1,8 @@
 """Items: listed and added in a list, then addressed by their own id.
 
-Access follows the caller's role on the item's list (see `todolist.permissions`): reading
-needs viewer, everything else (also moving) editor.
+Access follows the caller's role on the item's list and the list mode (`list_access` in
+`todolist.permissions`): reading needs viewer, everything else (also moving) editor. In an
+AI-only list people only read: changing anything is a 403 `list_ai_only`.
 """
 
 import uuid
@@ -15,7 +16,7 @@ from todolist.api.deps import (
     ItemContextDep,
     ItemEditorContextDep,
     ListContextDep,
-    ListEditorContextDep,
+    ListItemEditorContextDep,
 )
 from todolist.db import SessionDep
 from todolist.models import Item, ItemStatus, PrincipalKind
@@ -112,7 +113,7 @@ async def list_items_route(ctx: ListContextDep, session: SessionDep) -> list[Ite
 
 @list_router.post("", status_code=201)
 async def create_item_route(
-    body: ItemIn, ctx: ListEditorContextDep, session: SessionDep
+    body: ItemIn, ctx: ListItemEditorContextDep, session: SessionDep
 ) -> ItemOut:
     item = await create_item(session, ctx.principal, ctx.todo_list, body.title, body.notes)
     return _item_out(item)

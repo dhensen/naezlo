@@ -4,10 +4,11 @@ Org-scoped routes (`/orgs/{org_id}/...`) take `org: OrgContextDep`, or `org: Org
 when the action needs an owner or admin. Project-scoped routes (`/projects/{project_id}...`) take
 `ctx: ProjectContextDep` (viewer or higher), `ProjectEditorContextDep` or `ProjectAdminContextDep`,
 all built with `require_project_role(...)` on the permission service (`todolist.permissions`).
-List-scoped routes (`/lists/{list_id}...`) take `ctx: ListContextDep`, `ListEditorContextDep` or
-`ListAdminContextDep`, built with `require_list_role(...)`. Item-scoped routes
-(`/items/{item_id}...`) take `ctx: ItemContextDep` or `ItemEditorContextDep`, built with
-`require_item_role(...)`: the role is the caller's role on the item's list. The list index of
+List-scoped routes (`/lists/{list_id}...`) take `ctx: ListContextDep`, `ListItemEditorContextDep`,
+`ListEditorContextDep` or `ListAdminContextDep`, built with `require_list_action(...)`. Item-scoped
+routes (`/items/{item_id}...`) take `ctx: ItemContextDep` or `ItemEditorContextDep`, built with
+`require_item_action(...)`. Both ask `list_access` of the permission service, which combines the
+caller's role on the list with the list mode. The list index of
 a project takes `ctx: ProjectListsContextDep`, which also lets in a caller who can only see some
 of its lists.
 """
@@ -32,7 +33,13 @@ from todolist.models import (
     TodoList,
     User,
 )
-from todolist.permissions import effective_list_role, effective_project_role, role_at_least
+from todolist.permissions import (
+    ListAccess,
+    ListAction,
+    effective_project_role,
+    list_access,
+    role_at_least,
+)
 from todolist.principals import Principal
 from todolist.services.lists import list_lists
 from todolist.services.organizations import can_manage_organization, get_organization_membership
@@ -169,12 +176,17 @@ ProjectListsContextDep = Annotated[ProjectListsContext, Depends(project_lists_co
 
 @dataclass(frozen=True)
 class ListContext:
-    """The list in the path, its project and the caller's effective role on the list."""
+    """The list in the path, its project and what the caller may do with the list."""
 
     todo_list: TodoList
     project: Project
-    role: ProjectRole
+    access: ListAccess
     user: User
+
+    @property
+    def role(self) -> ProjectRole:
+        """The caller's effective role on the list."""
+        return self.access.role
 
     @property
     def principal(self) -> Principal:
@@ -183,54 +195,66 @@ class ListContext:
 
 
 async def list_context(list_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> ListContext:
-    """Resolve `{list_id}` for the signed-in user; 404 when they have no role on the list."""
+    """Resolve `{list_id}` for the signed-in user; 404 when the list does not exist for them."""
     todo_list = await session.get(TodoList, list_id)
     project = None if todo_list is None else await session.get(Project, todo_list.project_id)
-    role = (
+    access = (
         None
         if todo_list is None or project is None
-        else await effective_list_role(
+        else await list_access(
             session, Principal.for_user(user, project.organization_id), todo_list, project
         )
     )
-    if todo_list is None or project is None or role is None:
+    if todo_list is None or project is None or access is None:
         # Same answer for "does not exist" and "not yours": don't reveal which ids exist.
         raise NotFoundError("List not found")
-    return ListContext(todo_list=todo_list, project=project, role=role, user=user)
+    return ListContext(todo_list=todo_list, project=project, access=access, user=user)
 
 
-def require_list_role(minimum: ProjectRole) -> Callable[..., Awaitable[ListContext]]:
-    """A dependency that resolves `{list_id}` and needs at least the role `minimum` on the list.
+def require_list_action(action: ListAction) -> Callable[..., Awaitable[ListContext]]:
+    """A dependency that resolves `{list_id}` and needs the caller to be allowed `action` on
+    the list (`ListAccess` in the permission service: role and list mode).
 
-    404 when the caller has no role on the list, 403 when their role is too low. Use the
-    aliases below in route signatures.
+    404 when the list does not exist for the caller, 403 when their role is too low
+    (`forbidden`) or the list mode holds them back (`list_ai_only`). Use the aliases below in
+    route signatures.
     """
 
     async def dependency(
         ctx: Annotated[ListContext, Depends(list_context)],
     ) -> ListContext:
-        if not role_at_least(ctx.role, minimum):
-            raise ForbiddenError(f"This needs the {minimum.value} role on the list")
+        ctx.access.require(action)
         return ctx
 
     return dependency
 
 
-# Any role on the list (viewer or higher).
-ListContextDep = Annotated[ListContext, Depends(require_list_role(ProjectRole.VIEWER))]
-ListEditorContextDep = Annotated[ListContext, Depends(require_list_role(ProjectRole.EDITOR))]
-ListAdminContextDep = Annotated[ListContext, Depends(require_list_role(ProjectRole.ADMIN))]
+# Read the list and its items: any role on the list (viewer or higher).
+ListContextDep = Annotated[ListContext, Depends(require_list_action(ListAction.READ))]
+# Add items: editor, and not a person in an AI-only list.
+ListItemEditorContextDep = Annotated[
+    ListContext, Depends(require_list_action(ListAction.CHANGE_ITEMS))
+]
+# Change the list's name, description or mode: editor; admin for a person in an AI-only list.
+ListEditorContextDep = Annotated[ListContext, Depends(require_list_action(ListAction.EDIT_LIST))]
+# Grants and deleting the list: admin.
+ListAdminContextDep = Annotated[ListContext, Depends(require_list_action(ListAction.ADMINISTER))]
 
 
 @dataclass(frozen=True)
 class ItemContext:
-    """The item in the path, its list and project, and the caller's effective role on the list."""
+    """The item in the path, its list and project, and what the caller may do with the list."""
 
     item: Item
     todo_list: TodoList
     project: Project
-    role: ProjectRole
+    access: ListAccess
     user: User
+
+    @property
+    def role(self) -> ProjectRole:
+        """The caller's effective role on the item's list."""
+        return self.access.role
 
     @property
     def principal(self) -> Principal:
@@ -239,41 +263,42 @@ class ItemContext:
 
 
 async def item_context(item_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> ItemContext:
-    """Resolve `{item_id}` for the signed-in user; 404 when they have no role on its list."""
+    """Resolve `{item_id}` for the signed-in user; 404 when its list does not exist for them."""
     item = await session.get(Item, item_id)
     todo_list = None if item is None else await session.get(TodoList, item.list_id)
     project = None if todo_list is None else await session.get(Project, todo_list.project_id)
-    role = (
+    access = (
         None
         if todo_list is None or project is None
-        else await effective_list_role(
+        else await list_access(
             session, Principal.for_user(user, project.organization_id), todo_list, project
         )
     )
-    if item is None or todo_list is None or project is None or role is None:
+    if item is None or todo_list is None or project is None or access is None:
         # Same answer for "does not exist" and "not yours": don't reveal which ids exist.
         raise NotFoundError("Item not found")
-    return ItemContext(item=item, todo_list=todo_list, project=project, role=role, user=user)
+    return ItemContext(item=item, todo_list=todo_list, project=project, access=access, user=user)
 
 
-def require_item_role(minimum: ProjectRole) -> Callable[..., Awaitable[ItemContext]]:
-    """A dependency that resolves `{item_id}` and needs at least the role `minimum` on the
-    item's list.
+def require_item_action(action: ListAction) -> Callable[..., Awaitable[ItemContext]]:
+    """A dependency that resolves `{item_id}` and needs the caller to be allowed `action` on
+    the item's list (`ListAccess` in the permission service: role and list mode).
 
-    404 when the caller has no role on the list, 403 when their role is too low. Use the
-    aliases below in route signatures.
+    404 when the list does not exist for the caller, 403 when their role is too low
+    (`forbidden`) or the list mode holds them back (`list_ai_only`). Use the aliases below in
+    route signatures.
     """
 
     async def dependency(
         ctx: Annotated[ItemContext, Depends(item_context)],
     ) -> ItemContext:
-        if not role_at_least(ctx.role, minimum):
-            raise ForbiddenError(f"This needs the {minimum.value} role on the list")
+        ctx.access.require(action)
         return ctx
 
     return dependency
 
 
-# Any role on the item's list (viewer or higher).
-ItemContextDep = Annotated[ItemContext, Depends(require_item_role(ProjectRole.VIEWER))]
-ItemEditorContextDep = Annotated[ItemContext, Depends(require_item_role(ProjectRole.EDITOR))]
+# Read the item: any role on its list (viewer or higher).
+ItemContextDep = Annotated[ItemContext, Depends(require_item_action(ListAction.READ))]
+# Change, move or delete the item: editor, and not a person in an AI-only list.
+ItemEditorContextDep = Annotated[ItemContext, Depends(require_item_action(ListAction.CHANGE_ITEMS))]

@@ -137,11 +137,20 @@ uv run pytest
 - Lists: model `TodoList` / enum `ListMode` (`models/todo_list.py`), `services/lists.py`
   (`list_lists`, `create_list(session, principal, project, ...)`, `update_list`, `delete_list`,
   `default_list_mode`), routes in `api/lists.py` (`project_router` and `router`).
-- List-scoped routes (`/api/lists/{list_id}...`) take `ctx: ListContextDep` (viewer or higher),
-  `ListEditorContextDep` or `ListAdminContextDep` (built with `require_list_role(ProjectRole.X)`):
-  404 `List not found` without a role, 403 when it is too low. They give `ctx.todo_list`,
-  `ctx.project`, `ctx.role`, `ctx.user` and `ctx.principal`. The rule behind them is
-  `effective_list_role(session, principal, todo_list, project)` in `permissions.py`.
+- List-scoped routes (`/api/lists/{list_id}...`) take `ctx: ListContextDep` (read),
+  `ListItemEditorContextDep` (add items), `ListEditorContextDep` (change the list) or
+  `ListAdminContextDep` (grants, delete), built with `require_list_action(ListAction.X)`:
+  404 `List not found` when the list does not exist for the caller, 403 when the role is too low
+  (`forbidden`) or the list mode forbids it (`list_ai_only`). They give `ctx.todo_list`,
+  `ctx.project`, `ctx.access`, `ctx.role`, `ctx.user` and `ctx.principal`.
+- The one permission check for a list or its items is `list_access(session, principal, todo_list,
+  project)` in `permissions.py`: None (404) or a `ListAccess` with `allows(action)` /
+  `require(action)` for a `ListAction` (`READ`, `CHANGE_ITEMS`, `EDIT_LIST`, `ADMINISTER`). It
+  combines `effective_list_role` with the list mode and the principal kind; don't use
+  `effective_list_role` alone to decide access. New list or item operations (also MCP tools) pick
+  a `ListAction`; a new kind of operation gets a new member with its rule in `ListAccess.denial`.
+- A list created in a test without a mode is `human_only` (the organization has no agent yet), so
+  it is invisible to agents: create it with `"mode": "mixed"` or `"ai_only"` for agent tests.
 - List grants: model `ListGrant` / enum `ListRole` (`none | viewer | editor | admin`,
   `models/list_grant.py`), `services/list_grants.py` (`list_list_grants`, `set_list_grant`,
   `revoke_list_grant`), routes in `api/list_grants.py`. A list grant replaces the project role on
@@ -156,9 +165,9 @@ uv run pytest
 - Items: model `Item` / enum `ItemStatus` (`models/item.py`), `services/items.py` (`list_items`,
   `create_item(session, principal, todo_list, title, notes)`, `update_item(session, principal, item, ...)`,
   `delete_item`), routes in `api/items.py` (`list_router` and `router`). Item-scoped routes
-  (`/api/items/{item_id}...`) take `ctx: ItemContextDep` (viewer) or `ItemEditorContextDep` (built
-  with `require_item_role`): 404 `Item not found`, 403 when too low; they give `ctx.item`,
-  `ctx.todo_list`, `ctx.project`, `ctx.role`, `ctx.user` and `ctx.principal`.
+  (`/api/items/{item_id}...`) take `ctx: ItemContextDep` (read) or `ItemEditorContextDep` (change,
+  built with `require_item_action`): 404 `Item not found`, 403 as for a list; they give `ctx.item`,
+  `ctx.todo_list`, `ctx.project`, `ctx.access`, `ctx.role`, `ctx.user` and `ctx.principal`.
 - "Who did it" columns are a `<verb>_by_kind` + `<verb>_by_id` pair without a foreign key (see
   `Item.created_by_*`), filled from a `Principal`.
 - Item positions are 1 to n per list (unique constraint `uq_items_list_id_position`, deferred to the

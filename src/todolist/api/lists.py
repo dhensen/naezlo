@@ -1,8 +1,9 @@
 """Lists: created and listed in a project, then addressed by their own id.
 
-Access follows the caller's role on the list (see `todolist.permissions`): reading needs
-viewer, changing editor, deleting admin. Creating needs editor on the project; the index of a
-project gives the lists the caller can see.
+Access follows the caller's role on the list and the list mode (`list_access` in
+`todolist.permissions`): reading needs viewer, changing editor (admin when the list is
+AI-only), deleting admin. Creating needs editor on the project; the index of a project gives
+the lists the caller can see.
 """
 
 import uuid
