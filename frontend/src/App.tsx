@@ -6,6 +6,7 @@ import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OrganizationPage } from './pages/OrganizationPage'
+import { OrganizationSettingsPage } from './pages/OrganizationSettingsPage'
 
 // The routes only; the router and the query client come from main.tsx (or from
 // `renderApp` in tests). Every page except /login goes inside the guard. Pages of an
@@ -18,6 +19,7 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route path="/o/:orgSlug" element={<AppLayout />}>
           <Route index element={<OrganizationPage />} />
+          <Route path="settings" element={<OrganizationSettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route element={<AppLayout />}>

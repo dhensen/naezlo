@@ -12,7 +12,7 @@ interface SidebarProps {
   onNavigate: () => void
 }
 
-/** The projects of the current organization that the user can see. */
+/** The projects of the current organization that the user can see, and the link to its settings. */
 export function Sidebar({ organization, open, onNavigate }: SidebarProps) {
   const projects = useProjects(organization.id)
 
@@ -53,6 +53,19 @@ export function Sidebar({ organization, open, onNavigate }: SidebarProps) {
             ))}
           </ul>
         )}
+      </nav>
+      <nav aria-label="Organization" className="mt-auto flex flex-col border-t border-slate-200 p-3">
+        <NavLink
+          to={orgPath(organization.slug, '/settings')}
+          className={({ isActive }) =>
+            `block rounded-md px-2 py-1.5 text-sm hover:bg-slate-100 ${
+              isActive ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-700'
+            }`
+          }
+          onClick={onNavigate}
+        >
+          Settings
+        </NavLink>
       </nav>
     </aside>
   )

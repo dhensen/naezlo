@@ -45,3 +45,141 @@ export function useProjects(organizationId: string) {
       unwrap(api.GET('/api/orgs/{org_id}/projects', { params: { path: { org_id: organizationId } } })),
   })
 }
+
+export type Member = Schemas['MemberOut']
+export type Invitation = Schemas['InvitationOut']
+
+/** Rename an organization; the switcher and every page follow through `useMe`. The slug stays. */
+export function useRenameOrganization(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Schemas['OrganizationIn']) =>
+      unwrap(api.PATCH('/api/orgs/{org_id}', { params: { path: { org_id: organizationId } }, body })),
+    onSuccess: (organization) => {
+      queryClient.setQueryData<Me | null>(ME_KEY, (me) =>
+        me
+          ? {
+              ...me,
+              organizations: me.organizations.map((candidate) =>
+                candidate.id === organization.id ? organization : candidate,
+              ),
+            }
+          : me,
+      )
+    },
+  })
+}
+
+export function membersKey(organizationId: string) {
+  return ['orgs', organizationId, 'members'] as const
+}
+
+/** Everyone in the organization; every member may read this. */
+export function useMembers(organizationId: string) {
+  return useQuery({
+    queryKey: membersKey(organizationId),
+    queryFn: () =>
+      unwrap(api.GET('/api/orgs/{org_id}/members', { params: { path: { org_id: organizationId } } })),
+  })
+}
+
+/** Change a member's role. A change to the user's own role also reloads `useMe`. */
+export function useChangeMemberRole(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: Member['role'] }) =>
+      unwrap(
+        api.PATCH('/api/orgs/{org_id}/members/{user_id}', {
+          params: { path: { org_id: organizationId, user_id: userId } },
+          body: { role },
+        }),
+      ),
+    onSuccess: (member) => {
+      queryClient.setQueryData<Member[]>(membersKey(organizationId), (members) =>
+        members?.map((candidate) => (candidate.user_id === member.user_id ? member : candidate)),
+      )
+      if (queryClient.getQueryData<Me | null>(ME_KEY)?.user.id === member.user_id) {
+        return queryClient.invalidateQueries({ queryKey: ME_KEY })
+      }
+    },
+  })
+}
+
+/**
+ * Remove a member, or leave (the user's own id). After leaving, the caller navigates away
+ * and calls `forgetOrganization` in the same step, so no page of the organization is
+ * rendered without it.
+ */
+export function useRemoveMember(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: string) =>
+      unwrap(
+        api.DELETE('/api/orgs/{org_id}/members/{user_id}', {
+          params: { path: { org_id: organizationId, user_id: userId } },
+        }),
+      ),
+    onSuccess: (_nothing, userId) => {
+      queryClient.setQueryData<Member[]>(membersKey(organizationId), (members) =>
+        members?.filter((candidate) => candidate.user_id !== userId),
+      )
+    },
+  })
+}
+
+/** Take an organization the user is no longer in out of `useMe`, with everything loaded for it. */
+export function useForgetOrganization() {
+  const queryClient = useQueryClient()
+  return (organizationId: string) => {
+    queryClient.setQueryData<Me | null>(ME_KEY, (me) =>
+      me
+        ? { ...me, organizations: me.organizations.filter((candidate) => candidate.id !== organizationId) }
+        : me,
+    )
+    queryClient.removeQueries({ queryKey: ['orgs', organizationId] })
+  }
+}
+
+export function invitationsKey(organizationId: string) {
+  return ['orgs', organizationId, 'invitations'] as const
+}
+
+/** The pending invitations; only owners and admins may read them (`enabled`). */
+export function useInvitations(organizationId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: invitationsKey(organizationId),
+    queryFn: () =>
+      unwrap(api.GET('/api/orgs/{org_id}/invitations', { params: { path: { org_id: organizationId } } })),
+    enabled,
+  })
+}
+
+/** Invite an email address: someone with an account is a member at once, anyone else gets a pending invitation. */
+export function useInvite(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Schemas['InvitationIn']) =>
+      unwrap(api.POST('/api/orgs/{org_id}/invitations', { params: { path: { org_id: organizationId } }, body })),
+    onSuccess: (result) =>
+      queryClient.invalidateQueries({
+        queryKey: result.status === 'added' ? membersKey(organizationId) : invitationsKey(organizationId),
+      }),
+  })
+}
+
+export function useRevokeInvitation(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (invitationId: string) =>
+      unwrap(
+        api.DELETE('/api/orgs/{org_id}/invitations/{invitation_id}', {
+          params: { path: { org_id: organizationId, invitation_id: invitationId } },
+        }),
+      ),
+    onSuccess: (_nothing, invitationId) => {
+      queryClient.setQueryData<Invitation[]>(invitationsKey(organizationId), (invitations) =>
+        invitations?.filter((candidate) => candidate.id !== invitationId),
+      )
+    },
+  })
+}

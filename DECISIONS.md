@@ -335,3 +335,12 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **Project links** in the sidebar go to `/o/<slug>/projects/<id>`; that page comes with US-032 and is the layout's "Page not found" until then.
 - **Menus** (user menu, switcher) close on Escape, on a press outside and when the focus moves out (`useDismiss`). The earlier "close on blur" closed the menu before the click arrived in Safari, which does not focus a clicked button.
 - **Slug race (backend fix)**: `unique_slug` now takes a transaction-level PostgreSQL advisory lock (`SLUG_LOCK_KEY`) before it looks for a free slug. Without it two people with the same name signing up at the same moment picked the same slug and one got a 500 from the unique constraint; the parallel browser tests (all "Ada Lovelace") hit that. Creating organizations is rare, so one lock for all slugs is enough.
+
+## Organization settings page (US-031)
+
+- **Where**: `/o/:orgSlug/settings`, reached from a "Settings" link at the bottom of the sidebar (its own `nav` named "Organization"). No backend change: the page uses the existing organization, member and invitation routes.
+- **Who sees what**: every member sees the name and the members table. Owners and admins also get the rename form, the role selectors, the remove buttons and the invitations section; a plain member never asks for the invitations (the API answers 403 there) and gets one line that says only owners and admins can change the settings.
+- **Controls follow the API's rules, the API still decides**: an owner gets a selector (owner, admin, member) on every row; an admin gets one (admin, member) on rows that are not an owner and no controls on an owner's row. Everyone has "Leave" on their own row. The selector shows the stored role, so a refused change (such as `last_owner`) falls back by itself and the API's `detail` is shown above the table.
+- **Remove and leave ask first**, in the row itself ("Yes, remove" / "Cancel"), not with a browser dialog. Revoking an invitation does not ask: inviting again is one step.
+- **After leaving** the organization is taken out of the cached `/api/me` and the app goes to `/`, which leads to another organization or the empty start.
+- **The note after inviting** is the `message` of the API's answer, so the two outcomes (invited, or added at once because the account exists) are worded in one place.

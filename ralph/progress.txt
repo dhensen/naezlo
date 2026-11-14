@@ -33,6 +33,10 @@
   Vitest fixtures: `ADA_IN_ORGS`, `ACME`, `BETA`, `project(...)` in src/test/api.ts; mock
   `GET /api/orgs/${ACME.id}/projects` when rendering `/o/acme`. E2E: the user's slug comes from
   `GET /api/me` via `page.request` (see frontend/e2e/shell.spec.ts).
+- Organization settings (since US-031): `/o/:orgSlug/settings` (src/pages/OrganizationSettingsPage.tsx),
+  linked from the sidebar's "Organization" nav. Member, invitation and rename hooks are in
+  src/orgs/hooks.ts. E2E with two people: a second `browser.newContext()` (see
+  frontend/e2e/organization-settings.spec.ts).
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -1009,4 +1013,34 @@
     US-032 adds the page; `OrganizationPage` is a placeholder start page that US-032 can replace.
   - US-031 (organization settings) needs a link somewhere in the shell (switcher menu or sidebar).
   - Stop a background server by the pid from `ss -ltnp | grep :PORT`, not with pkill -f.
+---
+
+## 2026-11-15 00:30 - US-031
+- Organization settings page at `/o/:orgSlug/settings`, with a "Settings" link at the bottom of the
+  sidebar. Sections: name (rename form for owner and admin, plain text for a member), members table
+  (name, email, role; role selector and remove for owner and admin, "Leave" on one's own row, both
+  with a confirmation in the row), invitations (email + role form, the API's note about the next
+  sign-in, pending list with revoke; owner and admin only). The API's error text, such as the
+  last-owner one, is shown above the table and the selector falls back to the stored role.
+- No backend change; the existing routes were enough.
+- Checks: ruff, pyright, 676 pytest, eslint, tsc, 54 vitest (12 new), 5 Playwright tests (2 new:
+  rename + invite + second browser context + role change + remove; revoke + leave).
+- Browser check done with Chrome DevTools against `python -m todolist.e2e --port 8766`: the page as
+  an owner with a second member and a pending invitation, at desktop width and at a narrow width.
+  Looked right. (The DevTools window does not go below 500 px, so 390 px was not seen.)
+- Files: frontend/src/pages/OrganizationSettingsPage{,.test}.tsx, frontend/src/orgs/hooks.ts,
+  frontend/src/components/Sidebar.tsx, frontend/src/App.tsx, frontend/e2e/organization-settings.spec.ts,
+  CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt
+- Pushed: yes
+- **Learnings for future iterations:**
+  - A `<select>` inside its `<label>` gets the option texts in its accessible name; Playwright's
+    exact `getByLabel` then finds nothing. Use `htmlFor` or `aria-label`.
+  - TanStack `mutate` callbacks given at the call site are dropped when the component unmounts
+    before they run; a hook-level `onSuccess` that removes the current page from the cache does
+    exactly that. Do the cache change and the navigation together at the call site.
+  - `POST /api/auth/logout` answers 204 without a body (don't `.json()` it in a setup script).
+  - The invite API adds someone who already has an account at once (`status: "added"`), so a spec
+    that wants a pending invitation must use an email that never signed in.
+  - Next is US-032 (projects in the UI): `OrganizationPage` is still the placeholder start page and
+    the sidebar's project links lead to a not-yet-existing `/o/<slug>/projects/<id>`.
 ---

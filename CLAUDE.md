@@ -364,3 +364,18 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
   test does not create itself. The specs are type-checked without the DOM library.
 - `unique_slug` (`services/organizations.py`) holds an advisory lock until the transaction ends;
   anything else that must pick a free value and insert it under concurrency does the same.
+- Organization settings: `frontend/src/pages/OrganizationSettingsPage.tsx` (sections for the name, the
+  members and the invitations), hooks in `src/orgs/hooks.ts` (`useMembers`, `useChangeMemberRole`,
+  `useRemoveMember`, `useInvitations`, `useInvite`, `useRevokeInvitation`, `useRenameOrganization`,
+  `useForgetOrganization`). What a role may do in the UI is derived from `organization.role` (from
+  `/api/me`); a mutation that changes the user's own role or membership must update `ME_KEY` too.
+- A `select` gets its name from `aria-label` or a `<label htmlFor>` next to it. Wrapped inside a
+  `<label>`, its options become part of the name and `getByLabel('Role', { exact: true })` finds nothing.
+- A destructive row action asks in the row ("Yes, remove" / "Cancel", see `MembersSection`), not with
+  `window.confirm`. Sidebar links that are not projects go in the `nav` named "Organization".
+- `mutate(..., { onSuccess })` callbacks of a component do not run once it is unmounted: when a
+  success removes the page (leaving an organization), navigate and update the cache together in that
+  callback, not in the hook's own `onSuccess` first.
+- E2E with a second person: `const context = await browser.newContext()`, a page from it, and
+  `signIn(thatPage, { user: uniqueUser('Grace Hopper') })`; close the context at the end
+  (`frontend/e2e/organization-settings.spec.ts`).
