@@ -1,4 +1,4 @@
-# TaskBridge
+# Naezlo
 
 This is a todolist app. Will be built in public.
 
