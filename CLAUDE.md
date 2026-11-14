@@ -191,3 +191,19 @@ uv run pytest
   follows this shape: keyset on `(created_at, id)`, opaque cursor, `limit` 1 to 200 (default 50).
 - Several query parameters: a pydantic model taken as `query: Annotated[MyQuery, Query()]`
   (see `AuditQuery` in `api/audit.py`).
+- OAuth server for MCP clients (hand-written, not the SDK's provider; see DECISIONS.md): models in
+  `models/oauth.py` (`OAuthClient`, `OAuthAuthorizationCode`, `OAuthAccessToken`, `OAuthRefreshToken`),
+  logic in `services/oauth.py`, routes in `api/oauth.py`. Its `root_router` holds the spec-defined
+  paths at the app root (`/.well-known/...`, `/register`, later `/authorize`, `/token`, `/revoke`) and
+  is included in `app.py`; routes under `/api/oauth/...` go in a normal `router` in the same file.
+- OAuth endpoints raise `todolist.errors.OAuthError(error, description, status_code=400)` (body
+  `{"error", "error_description"}`), not `AppError`. They parse the body themselves so a bad request
+  is an OAuth error, not FastAPI's 422.
+- OAuth URLs are built from `Settings.oauth_issuer` (no trailing slash) and `Settings.mcp_resource_url`.
+  Build the SDK's metadata models with `Model.model_validate({... strings ...})`: `AnyHttpUrl("http://host")`
+  adds a trailing slash, and clients compare the issuer as a string.
+- Codes and tokens: `new_token()` gives the plain value, `hash_token()` what is stored and looked up
+  (`services/oauth.py`). Never store or log the plain value. The only scope is `MCP_SCOPE` (`mcp`).
+- For anything about MCP or its OAuth flow, read the installed SDK (`.venv/lib/python3.14/site-packages/mcp/`,
+  version 2.x: `MCPServer`, `mcp.server.auth`, `mcp.client.auth`) and the spec revision 2026-07-28
+  (`https://modelcontextprotocol.io/specification/latest/basic/authorization`) instead of memory.

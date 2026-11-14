@@ -355,8 +355,8 @@
         "Typecheck passes"
       ],
       "priority": 20,
-      "passes": false,
-      "notes": "Check the current MCP authorization spec revision; do not rely on memory for endpoint names and required metadata fields."
+      "passes": true,
+      "notes": "Check the current MCP authorization spec revision; do not rely on memory for endpoint names and required metadata fields. Done against MCP spec revision 2026-07-28 and mcp SDK 2.3.0; endpoints are hand-written (DECISIONS.md)."
     },
     {
       "id": "US-021",

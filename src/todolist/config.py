@@ -55,6 +55,19 @@ class Settings(BaseSettings):
         """The callback URL registered with Google as an authorized redirect URI."""
         return f"{self.public_base_url.rstrip('/')}/api/auth/google/callback"
 
+    @property
+    def oauth_issuer(self) -> str:
+        """The issuer identifier of the built-in OAuth authorization server (no trailing slash).
+
+        Clients compare it as a string with what they discovered, so build every OAuth URL from it.
+        """
+        return self.public_base_url.rstrip("/")
+
+    @property
+    def mcp_resource_url(self) -> str:
+        """The MCP endpoint: the OAuth resource (RFC 8707 / RFC 9728) that tokens are issued for."""
+        return f"{self.oauth_issuer}/mcp"
+
     @model_validator(mode="after")
     def _refuse_unsafe_production(self) -> Self:
         if self.environment == "production":

@@ -7,6 +7,7 @@ from fastapi import APIRouter, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from todolist.api import api_router
+from todolist.api.oauth import root_router as oauth_root_router
 from todolist.config import Settings, get_settings
 from todolist.db import create_engine, create_session_factory
 from todolist.errors import install_error_handlers
@@ -50,4 +51,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
     app.include_router(health_router)
     app.include_router(api_router)
+    app.include_router(oauth_root_router)
     return app

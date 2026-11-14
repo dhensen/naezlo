@@ -98,6 +98,15 @@
 - Audit log API: `GET /api/projects/{id}/audit` and `GET /api/lists/{id}/audit` (admins) answer
   `{events, next_cursor}`; params `limit`, `cursor`, `actor_kind`, `actor_id`, `action` (prefix).
   Service: `project_events` / `list_events` (services/audit.py). Tests: tests/test_audit_api.py.
+- OAuth server (US-020): hand-written endpoints, the SDK's authorization-server provider is not
+  used. models/oauth.py, services/oauth.py (`authorization_server_metadata`,
+  `protected_resource_metadata`, `register_client`, `new_token`, `hash_token`, `MCP_SCOPE`),
+  api/oauth.py (`root_router`, included in app.py, paths at the root). Errors: `OAuthError`
+  (todolist.errors) gives `{"error", "error_description"}`. Issuer: `settings.oauth_issuer`;
+  MCP resource: `settings.mcp_resource_url`. Tests register a client with
+  `register(client)` in tests/test_oauth_registration.py (`POST /register {"redirect_uris": [...]}`).
+- The `mcp` SDK is 2.3 (`MCPServer`, not FastMCP). Read its source in .venv and the docs at
+  https://py.sdk.modelcontextprotocol.io/run/authorization/ and /run/asgi/ before using it.
 
 ## 2026-11-14 - US-001
 - Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
@@ -595,4 +604,45 @@
     an `IN` subquery.
   - The event shape has `actor.name` (snapshot) and `details` with the target's name/title and
     `changes`; the Activity UI (US-038) can build its sentences from those alone.
+---
+
+## 2026-11-14 - US-020
+- OAuth server foundation: `mcp` SDK 2.3.0 added; tables `oauth_clients`,
+  `oauth_authorization_codes`, `oauth_access_tokens`, `oauth_refresh_tokens` (migration 8777c3cf118c);
+  `GET /.well-known/oauth-authorization-server` (RFC 8414), `GET /.well-known/oauth-protected-resource`
+  and `.../oauth-protected-resource/mcp` (RFC 9728), `POST /register` (RFC 7591, public clients,
+  redirect URIs https or loopback http). Decision recorded: endpoints are hand-written, the SDK's
+  authorization-server provider is not used; the SDK's metadata models and (later) its
+  resource-server side are.
+- Files changed: pyproject.toml, uv.lock, src/todolist/{app,config,errors}.py,
+  src/todolist/models/{__init__,oauth}.py, src/todolist/services/oauth.py, src/todolist/api/oauth.py,
+  migrations/versions/20261114_2304_8777c3cf118c_add_oauth_tables.py, tests/test_oauth_metadata.py,
+  tests/test_oauth_registration.py, .env.example, DECISIONS.md, CLAUDE.md, ralph/prd.json,
+  ralph/progress.txt.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - MCP spec revision is 2026-07-28. Clients find the protected resource metadata through the
+    `resource_metadata` parameter of the 401's `WWW-Authenticate`, else
+    `/.well-known/oauth-protected-resource/mcp`, else the root one. US-023's challenge should be
+    `Bearer resource_metadata="<issuer>/.well-known/oauth-protected-resource/mcp", scope="mcp"`.
+  - Clients MUST send `resource=<issuer>/mcp` (RFC 8707) to /authorize and /token; the code and
+    token tables have a `resource` column for it. The SDK's `AuthSettings(validate_token_resource=True)`
+    then checks `AccessToken.resource` against `resource_server_url` (US-023).
+  - Spec rules for US-021/022: redirect URI exact match; refresh tokens MUST rotate for public
+    clients; `iss` in the authorization response is a SHOULD. Add `iss` only together with
+    `authorization_response_iss_parameter_supported: true` in the metadata, never one without the
+    other (the SDK client rejects a missing `iss` when the flag is true, and a wrong one always).
+  - All registered clients are public (`token_endpoint_auth_method: none`): /token and /revoke
+    identify the client by the `client_id` form field, there is no client secret to check.
+  - Every token row has `authorization_code_id`; copy it to the new tokens on refresh so code
+    reuse can revoke the whole family.
+  - `AnyHttpUrl("http://localhost:8000")` serializes with a trailing slash; the SDK models keep the
+    string only when validated from a dict (`url_preserve_empty_path`). A test caught this.
+  - With `PUBLIC_BASE_URL=http://localhost:5173` (Vite) the dev server must also proxy
+    `/.well-known`, `/register`, `/authorize`, `/token`, `/revoke` and `/mcp` (US-027 or later).
+  - The SDK's streamable HTTP app accepts only localhost Host headers by default
+    (`transport_security=`) and needs `mcp.session_manager.run()` in the host app's lifespan (US-023).
+  - `uv run alembic downgrade base` on the dev database (the enum-drop check) deletes its data.
+  - Removing a member does not touch OAuth tokens that user approved; US-022/US-023 should decide
+    whether a token stays valid when its approver stops being owner or admin.
 ---

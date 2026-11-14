@@ -9,6 +9,12 @@ from todolist.models.audit_event import AuditAction, AuditEvent
 from todolist.models.invitation import Invitation, InvitationRole
 from todolist.models.item import Item, ItemStatus
 from todolist.models.list_grant import ListGrant, ListRole
+from todolist.models.oauth import (
+    OAuthAccessToken,
+    OAuthAuthorizationCode,
+    OAuthClient,
+    OAuthRefreshToken,
+)
 from todolist.models.organization import Membership, MembershipRole, Organization
 from todolist.models.project import Project
 from todolist.models.project_grant import PrincipalKind, ProjectGrant, ProjectRole
@@ -28,6 +34,10 @@ __all__ = [
     "ListRole",
     "Membership",
     "MembershipRole",
+    "OAuthAccessToken",
+    "OAuthAuthorizationCode",
+    "OAuthClient",
+    "OAuthRefreshToken",
     "Organization",
     "PrincipalKind",
     "Project",

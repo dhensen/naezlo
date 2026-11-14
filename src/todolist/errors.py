@@ -41,6 +41,18 @@ class ConflictError(AppError):
         super().__init__(409, code, detail)
 
 
+class OAuthError(Exception):
+    """An error of an OAuth endpoint (/register, /token, /revoke), in the shape OAuth clients
+    expect: `{"error": "<code from the RFC>", "error_description": "<message>"}` (RFC 6749 5.2).
+    """
+
+    def __init__(self, error: str, description: str, status_code: int = 400) -> None:
+        super().__init__(description)
+        self.status_code = status_code
+        self.error = error
+        self.description = description
+
+
 async def _handle_app_error(_request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)
     return JSONResponse(
@@ -48,5 +60,15 @@ async def _handle_app_error(_request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def _handle_oauth_error(_request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, OAuthError)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": exc.error, "error_description": exc.description},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, _handle_app_error)
+    app.add_exception_handler(OAuthError, _handle_oauth_error)
