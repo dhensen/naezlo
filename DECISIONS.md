@@ -49,3 +49,14 @@ Decisions that `README.md` does not cover. Append new ones at the bottom with a 
 - **Enums** are native PostgreSQL enum types that store the lowercase values (`owner`, not `OWNER`), built with `todolist.db.value_enum`. Python side: `enum.StrEnum`.
 - **Deleting a user** deletes their memberships (`ON DELETE CASCADE`), like deleting an organization does. v1 has no user deletion feature; this only keeps the schema consistent.
 - **Relationships** are declared with `lazy="raise"`: async code cannot lazy-load, so a forgotten `selectinload` fails loudly instead of with `MissingGreenlet`.
+
+## Sessions and sign-in (2026-11-14, US-004)
+
+- **Session**: Starlette `SessionMiddleware`, a signed cookie named `session` that holds only the user id (14 days, HttpOnly, SameSite=Lax). It is `Secure` when `ENVIRONMENT=production`; development and tests run on plain http.
+- **`SESSION_SECRET`** has an insecure development default so a fresh checkout runs. With `ENVIRONMENT=production` the app refuses to start when the secret is unset, and also when `DEV_LOGIN=true`: dev-login signs in as any email address without a password.
+- **Dev-login when disabled** answers 404 to every request, before the body is validated, like a route that does not exist. The route stays in the OpenAPI schema so the generated frontend types do not depend on the environment.
+- **Error body**: `{"detail": "<message>", "code": "<snake_case>"}`. Raise a `todolist.errors.AppError` (or a subclass); clients branch on `code`. FastAPI's own errors (422 validation, unknown route) have `detail` only.
+- **Default organization**: named "<name>'s organization", slug derived from the user's name ("Ada Lovelace" → `ada-lovelace`). Slugs are ASCII `[a-z0-9-]`; a taken slug gets a number (`ada-2`, `ada-3`), and a name without usable characters becomes `org`.
+- **`get_or_create_user`** finds a user by `google_sub` when one is given, otherwise by email. An existing user keeps their stored name and email; a missing `google_sub` is filled in. Only creation makes a default organization.
+- **`/api/me` and dev-login** return `{"user": {...}, "organizations": [{id, name, slug, role}]}`, organizations in the order the user joined them.
+- **Correction to "Primary keys" above**: the UUIDv7 default is applied by SQLAlchemy at flush time, so `obj.id` is `None` until the first flush. Link new objects through relationships (`Membership(organization=org, ...)`) or flush first.

@@ -1,9 +1,14 @@
 """Application settings, read from environment variables and an optional `.env` file."""
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal, Self
 
+from fastapi import Depends, Request
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Signs session cookies when SESSION_SECRET is not set. Fine on a laptop, refused in production.
+DEV_SESSION_SECRET = "dev-only-session-secret-not-for-production"
 
 
 class Settings(BaseSettings):
@@ -22,7 +27,39 @@ class Settings(BaseSettings):
     # Only the test suite uses this one; it wipes and re-migrates that database.
     test_database_url: str = "postgresql+asyncpg://todolist:todolist@localhost:5435/todolist_test"
 
+    # Signs the session cookie. Generate one with: openssl rand -hex 32
+    session_secret: str = DEV_SESSION_SECRET
+    # Enables POST /api/auth/dev-login, which signs in as any email without a password.
+    dev_login: bool = False
+
+    @property
+    def session_cookie_secure(self) -> bool:
+        """The session cookie is HTTPS-only everywhere except local development and tests."""
+        return self.environment == "production"
+
+    @property
+    def google_login_enabled(self) -> bool:
+        # US-005 adds the Google client settings; until then Google login is never available.
+        return False
+
+    @model_validator(mode="after")
+    def _refuse_unsafe_production(self) -> Self:
+        if self.environment == "production":
+            if self.session_secret == DEV_SESSION_SECRET:
+                raise ValueError("SESSION_SECRET must be set when ENVIRONMENT=production")
+            if self.dev_login:
+                raise ValueError("DEV_LOGIN must not be enabled when ENVIRONMENT=production")
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def _app_settings(request: Request) -> Settings:
+    return request.app.state.settings
+
+
+# Use this in route signatures: `settings: SettingsDep` (the `Settings` the app was built with).
+SettingsDep = Annotated[Settings, Depends(_app_settings)]

@@ -4,9 +4,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
+from starlette.middleware.sessions import SessionMiddleware
 
+from todolist.api import api_router
 from todolist.config import Settings, get_settings
 from todolist.db import create_engine, create_session_factory
+from todolist.errors import install_error_handlers
 
 health_router = APIRouter(tags=["health"])
 
@@ -30,5 +33,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
+    # Signed cookie session. Starlette always sets HttpOnly on it.
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.session_secret,
+        same_site="lax",
+        https_only=settings.session_cookie_secure,
+    )
+    install_error_handlers(app)
     app.include_router(health_router)
+    app.include_router(api_router)
     return app

@@ -6,7 +6,9 @@ Stack, domain model and rules: `DECISIONS.md` (it wins over personal preference)
 ## Layout
 
 - `src/todolist/`: backend package (`app.py` has the `create_app()` factory, `config.py` the
-  `Settings`, `db.py` the SQLAlchemy `Base`, mixins, engine and `get_session`, `models/` the ORM models)
+  `Settings`, `db.py` the SQLAlchemy `Base`, mixins, engine and `get_session`, `models/` the ORM models,
+  `services/` the domain logic, `api/` the routers under `/api`, `auth.py` the session helpers and
+  `current_user`, `errors.py` the API errors)
 - `migrations/`: Alembic environment and `versions/`
 - `docker-compose.yml`: PostgreSQL 18 on host port 5435 with the databases `todolist` and `todolist_test`
 - `tests/`: pytest tests
@@ -22,6 +24,10 @@ uv run uvicorn todolist.app:create_app --factory --reload
 ```
 
 Health check: `GET http://localhost:8000/healthz`.
+
+To sign in locally without Google, set `DEV_LOGIN=true` in `.env` and
+`POST /api/auth/dev-login {"email": ..., "name": ...}`. It is off by default and must stay off
+in production (the app refuses to start with it there).
 
 ## Database and migrations
 
@@ -74,3 +80,13 @@ uv run pytest
   to `downgrade()` by hand, and check with `alembic upgrade head && alembic downgrade base`.
 - Relationships are `lazy="raise"`; load them with `selectinload(...)` or query explicitly.
 - Emails are stored lowercased; look users up with `todolist.models.normalize_email(email)`.
+- A new object's `id` is `None` until the first flush. Link new objects through relationships
+  (`Membership(organization=org, ...)`) or flush before using the id.
+- Routers live in `src/todolist/api/<area>.py` and are included in `api/__init__.py` (prefix `/api`).
+  Logic that the MCP tools will share goes in `src/todolist/services/`; routes stay thin.
+- Routes that need a signed-in user take `user: CurrentUser` (from `todolist.auth`); settings come
+  from `settings: SettingsDep` (from `todolist.config`), never from `get_settings()` in a route.
+- Errors: raise `todolist.errors.AppError(status, code, detail)` or a subclass (`NotFoundError`,
+  `NotAuthenticatedError`). The body is `{"detail": ..., "code": ...}`. Don't raise `HTTPException`.
+- Tests sign in with `await sign_in(client, email, name)` from `tests/helpers.py`. The test
+  settings have `dev_login=True`; a second user in one test needs a second `AsyncClient` on `app`.

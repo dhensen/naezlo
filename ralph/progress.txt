@@ -19,6 +19,14 @@
 - Enum column: `value_enum(MyStrEnum, "pg_type_name")` (todolist.db). Add
   `sa.Enum(name="pg_type_name").drop(op.get_bind())` to the migration's downgrade by hand.
 - Relationships are `lazy="raise"`: use `selectinload` or a join. Emails: `normalize_email()`.
+- Signed-in user in a route: `user: CurrentUser` (todolist.auth). Settings: `settings: SettingsDep`.
+  Errors: raise `AppError` / `NotFoundError` (todolist.errors), body `{"detail", "code"}`.
+- Routers: src/todolist/api/<area>.py, included in api/__init__.py. Shared logic: src/todolist/services/.
+- Tests sign in with `await sign_in(client, email, name)` (tests/helpers.py, uses dev-login, returns
+  the /api/me body). For a second user in one test, open another `AsyncClient` on the `app` fixture.
+- `obj.id` is None until the first flush: link new rows through relationships or flush first.
+- New organization: `create_organization(session, name, owner)` (services/organizations.py) gives
+  it a unique slug and an owner membership.
 - Testing a constraint: add the bad row, then flush inside `async with session.begin_nested()`
   under `pytest.raises(IntegrityError)` (see tests/test_models_tenancy.py); the session stays usable.
 
@@ -92,4 +100,35 @@
   - Models can use forward references without quotes (`Mapped[list[Membership]]`): Python 3.14
     evaluates annotations lazily.
   - Slug generation and the default organization are not here; they belong to US-004.
+---
+
+## 2026-11-14 - US-004
+- Signed cookie session (SessionMiddleware; `SESSION_SECRET`, HttpOnly, SameSite=Lax, Secure in
+  production), `get_or_create_user` with the default organization, slug helpers and
+  `create_organization`, the `current_user` dependency (`CurrentUser`), `POST /api/auth/dev-login`
+  (404 unless `DEV_LOGIN=true`), `POST /api/auth/logout`, `GET /api/me`, `GET /api/config`, and an
+  `AppError` type with a `{"detail", "code"}` body. Settings refuse to load in production without
+  `SESSION_SECRET` or with `DEV_LOGIN=true`.
+- Files changed: src/todolist/{app,config,auth,errors}.py, src/todolist/api/{__init__,auth,config,me}.py,
+  src/todolist/services/{__init__,organizations,users}.py, tests/{conftest,helpers,test_auth,
+  test_services_users}.py, pyproject.toml, uv.lock (itsdangerous, pydantic[email]), .env.example,
+  CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
+- Checked by hand with uvicorn on the dev database: dev-login, /api/me, logout, 401 afterwards,
+  and 404 for dev-login without `DEV_LOGIN`. The user created for this was deleted again.
+- Pushed: no (there is no remote named origin)
+- **Learnings for future iterations:**
+  - `google_login_enabled` is a `Settings` property that returns False; US-005 makes it depend on
+    the Google client settings. `get_or_create_user` already takes `google_sub`, looks it up first
+    and links it to an existing user that has none. It does not handle a user whose stored
+    `google_sub` differs from the one given; US-005 has to decide that case.
+  - Two first sign-ins for the same new email at the same moment: the second fails on the unique
+    constraint (500). Not handled; a retry works.
+  - A check that must win over body validation (dev-login's 404) goes in
+    `dependencies=[Depends(...)]` on the route; a check inside the handler runs after the 422.
+  - `EmailStr` (email-validator) rejects special-use domains such as `.test`, `.example` and
+    `localhost`; use `@example.com` addresses in tests and e2e.
+  - Don't stop a background uvicorn with `pkill -f <pattern>` from the same shell command: the
+    pattern matches the shell itself. Start it with `&`, keep `$!` and `kill` that.
+  - `Result.tuples()` is deprecated in SQLAlchemy 2.1; iterate the result rows directly.
+  - pyright strict: `request.session` values are `Any`; narrow with `isinstance` (see auth.py).
 ---
