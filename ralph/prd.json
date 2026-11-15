@@ -655,7 +655,7 @@
         "Verify in a browser if browser tools are available"
       ],
       "priority": 37,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

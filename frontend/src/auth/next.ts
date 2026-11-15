@@ -19,7 +19,10 @@ export function loginPath(path: string): string {
   return path === '/' ? '/login' : `/login?next=${encodeURIComponent(path)}`
 }
 
-/** Leave the single-page app for a path the backend answers (a full page load). */
-export function leaveTo(path: string): void {
-  window.location.assign(path)
+/**
+ * Leave the single-page app with a full page load: for a path the backend answers, or the URL
+ * of another site that the backend gave (the redirect back to an OAuth client).
+ */
+export function leaveTo(url: string): void {
+  window.location.assign(url)
 }

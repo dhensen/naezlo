@@ -58,6 +58,10 @@
   components/AgentDialogs.tsx and ConnectAgentDialog.tsx; hooks in src/agents/hooks.ts). The MCP setup
   texts per tool are data in src/agents/connect.ts; their sources are in DECISIONS.md (US-036).
   `/api/config` has `mcp_url`; `AgentOut` has `project_count` and `list_count`.
+- Consent page (since US-037): `/oauth/consent?request=<id>` (src/pages/ConsentPage.tsx, hooks in
+  src/oauth/hooks.ts), guarded but outside `AppLayout`. Tests: src/pages/ConsentPage.test.tsx and
+  e2e/consent.spec.ts (`startFlow(page, clientName)` registers a client and makes the PKCE pair; the
+  callback URL is answered with `page.route`).
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -1253,4 +1257,36 @@
     kills the shell that runs it (exit 144) and the rest never runs.
   - `claude` and `codex` are installed here; their `mcp add --help` is the quickest check of the syntax.
   - There is still no UI for the audit log.
+---
+
+## 2026-11-15 - US-037
+- Implemented the OAuth consent page of the SPA: `/oauth/consent?request=<id>` loads the pending
+  request and shows the client name, the redirect host, who is signed in and the eligible agents as
+  radio buttons grouped by organization. "Allow" (disabled until an agent is picked; a single agent
+  is preselected) calls approve, "Deny" calls deny, and both send the browser to the returned
+  redirect URL. Without an eligible agent the page explains that one must be created and links to
+  the agents page of each organization the user manages (new tab). Expired, answered and unknown
+  requests (404, 422, no `request` parameter) show an error and never redirect. Signed-out users go
+  through /login (the guard, and `/authorize` itself) and come back. No backend change was needed:
+  the consent API of US-021 already had everything.
+- Files: frontend/src/pages/ConsentPage.tsx + ConsentPage.test.tsx (new), frontend/src/oauth/hooks.ts
+  (new), frontend/e2e/consent.spec.ts (new), frontend/src/App.tsx, frontend/src/auth/next.ts (doc of
+  `leaveTo`), DECISIONS.md, CLAUDE.md
+- Checks: ruff, pyright, pytest (694), eslint, tsc, vitest (123), Playwright (17) all pass. The
+  Playwright spec also exchanges the code at /token with the PKCE verifier.
+- Browser check: the chrome-devtools browser was in use by another session, so screenshots were
+  made with a throw-away Playwright script on the e2e backend (port 8766): the page with three
+  agents in two organizations at desktop and phone width, the page without an agent and the
+  not-found error. They looked right. Not looked at in a browser: the "Returning to the
+  application…" state and the note for a redirect host that is not loopback (vitest covers both).
+- Pushed: yes
+- **Learnings for future iterations:**
+  - A radio inside a `<label>` that also holds a description gets the whole text as its name; give
+    it `aria-labelledby` (the name) and `aria-describedby` (the description).
+  - A redirect to a URL where nothing listens: `page.route('<url>*', route => route.fulfill(...))`
+    and read `route.request().url()`; register the route before the click.
+  - `leaveTo` is mocked in vitest with `vi.mock(import('../auth/next'), ...)`; clear it in a
+    `beforeEach` when several tests assert on it.
+  - A throw-away Playwright script must lie inside frontend/ to resolve `@playwright/test` (copy it
+    in, run it, delete it).
 ---

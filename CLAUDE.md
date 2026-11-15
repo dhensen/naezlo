@@ -443,4 +443,12 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
 - A copyable text is `<CopyButton text label />` (`src/components/CopyButton.tsx`, named "Copy <label>").
   In Playwright a labelled code block needs `getByLabel('Command', { exact: true })`, or the copy
   button matches too.
-
+- Consent page: `/oauth/consent?request=<id>` (`frontend/src/pages/ConsentPage.tsx`, hooks in
+  `src/oauth/hooks.ts`: `useAuthorizationRequest`, `useAnswerAuthorizationRequest`). It is the one
+  guarded route outside `AppLayout`. It leaves the app with `leaveTo(redirect_url)` (`src/auth/next.ts`);
+  a vitest test mocks that module (`vi.mock(import('../auth/next'), ...)`, see `ConsentPage.test.tsx`).
+- A radio (or checkbox) inside a `<label>` that also holds a description gets `aria-labelledby` for
+  the name and `aria-describedby` for the description, so `getByRole('radio', { name })` finds it.
+- E2E of the OAuth flow: `startFlow(page, clientName)` in `frontend/e2e/consent.spec.ts` registers a
+  client, builds the `/authorize` URL with PKCE and answers the callback URL (nothing listens there)
+  with `page.route`; `flow.callback` resolves with the URL the browser was sent to.
