@@ -6,6 +6,25 @@ import { projectListsKey } from '../projects/hooks'
 import type { TodoList } from '../projects/hooks'
 
 export type Item = Schemas['ItemOut']
+/** Someone an item is or can be assigned to: a person or an agent. */
+export type Assignee = Schemas['AssigneeOut']
+
+export function sameAssignee(one: Pick<Assignee, 'kind' | 'id'>, other: Pick<Assignee, 'kind' | 'id'>): boolean {
+  return one.kind === other.kind && one.id === other.id
+}
+
+export function assigneesKey(listId: string) {
+  return ['lists', listId, 'assignees'] as const
+}
+
+/** Everyone an item of the list can be assigned to: the people and agents that may change its items. */
+export function useAssignees(listId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: assigneesKey(listId),
+    queryFn: () => unwrap(api.GET('/api/lists/{list_id}/assignees', { params: { path: { list_id: listId } } })),
+    enabled,
+  })
+}
 
 export function itemsKey(listId: string) {
   return ['lists', listId, 'items'] as const
@@ -33,6 +52,8 @@ export type ItemChange =
   /** Put the item before another item of the list, or at the end (null). */
   | { kind: 'move'; item: Item; beforeItemId: string | null }
   | { kind: 'delete'; item: Item }
+  /** Give the item to someone, or to nobody (null). */
+  | { kind: 'assign'; item: Item; assignee: Assignee | null }
 
 /** An "add" change: a new item with this title at the end of the list. */
 export function addItem(listId: string, title: string): ItemChange {
@@ -79,6 +100,7 @@ export function applyItemChange(items: Item[], change: ItemChange, userId: strin
         created_by: { kind: 'user', id: userId },
         completed_by: null,
         completed_at: null,
+        assignee: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -101,6 +123,10 @@ export function applyItemChange(items: Item[], change: ItemChange, userId: strin
     }
     case 'delete':
       return renumbered(items.filter((item) => item.id !== change.item.id))
+    case 'assign':
+      return items.map((item) =>
+        item.id === change.item.id ? (saved ?? { ...item, assignee: change.assignee }) : item,
+      )
   }
 }
 
@@ -127,6 +153,17 @@ async function send(change: ItemChange): Promise<Item | undefined> {
     case 'delete':
       await unwrap(api.DELETE('/api/items/{item_id}', { params: { path: { item_id: change.item.id } } }))
       return undefined
+    case 'assign': {
+      const params = { path: { item_id: change.item.id } }
+      return change.assignee === null
+        ? unwrap(api.DELETE('/api/items/{item_id}/assignee', { params }))
+        : unwrap(
+            api.PUT('/api/items/{item_id}/assignee', {
+              params,
+              body: { kind: change.assignee.kind, id: change.assignee.id },
+            }),
+          )
+    }
   }
 }
 

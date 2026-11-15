@@ -28,7 +28,9 @@ def create_mcp_server(settings: Settings, session_scope: SessionScope) -> MCPSer
         settings.app_name,
         instructions=(
             "Todo lists shared by people and AI agents. You act as one agent and see only "
-            "the lists that agent was given access to."
+            "the lists that agent was given access to. Before you start working on an item, "
+            "call claim_item so that people and other agents see it is taken; leave items "
+            "alone that are assigned to someone else."
         ),
         token_verifier=AgentTokenVerifier(session_scope),
         # This app is a resource server here; its own OAuth endpoints (api/oauth.py) are the

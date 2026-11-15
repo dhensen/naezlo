@@ -51,6 +51,21 @@ function listOf(event: AuditEvent, context: DescribeContext, preposition: string
   return preposition === 'in' ? '' : ` ${preposition} a list`
 }
 
+function isActor(event: AuditEvent, principal: Record<string, unknown>): boolean {
+  return principal.kind === event.actor.kind && principal.id === event.actor.id
+}
+
+/** `picked up "X"` for the actor's own assignment, `assigned "X" to Grace` for someone else's. */
+function assignmentSentence(event: AuditEvent, item: string): string {
+  const key = event.action === 'item.assigned' ? 'assignee' : 'previous_assignee'
+  const principal = isRecord(event.details[key]) ? event.details[key] : {}
+  const name = text(principal.name, principal.kind === 'agent' ? 'an agent' : 'someone')
+  if (event.action === 'item.assigned') {
+    return isActor(event, principal) ? `picked up ${item}` : `assigned ${item} to ${name}`
+  }
+  return isActor(event, principal) ? `released ${item}` : `unassigned ${item} from ${name}`
+}
+
 function grantSentence(event: AuditEvent, where: string): string {
   const principal = isRecord(event.details.principal) ? event.details.principal : {}
   const name = text(principal.name, principal.kind === 'agent' ? 'an agent' : 'someone')
@@ -99,6 +114,9 @@ export function describeEvent(event: AuditEvent, context: DescribeContext): stri
       return `moved ${item}`
     case 'item.deleted':
       return `deleted ${item}`
+    case 'item.assigned':
+    case 'item.unassigned':
+      return assignmentSentence(event, item)
     case 'project_grant.set':
     case 'project_grant.revoked':
       return grantSentence(event, 'on the project')
@@ -114,6 +132,7 @@ const FIELD_LABELS: Record<string, string> = {
   name: 'Name',
   description: 'Description',
   mode: 'Mode',
+  assignment_required: 'Assignment required',
   title: 'Title',
   notes: 'Notes',
   position: 'Position',
@@ -130,10 +149,13 @@ function shown(field: string, value: unknown): string {
   if (field === 'role') {
     return roleLabel(value)
   }
+  if (typeof value === 'boolean') {
+    return value ? 'on' : 'off'
+  }
   if (typeof value === 'string') {
     return `"${value}"`
   }
-  return typeof value === 'number' || typeof value === 'boolean' ? String(value) : JSON.stringify(value)
+  return typeof value === 'number' ? String(value) : JSON.stringify(value)
 }
 
 /**

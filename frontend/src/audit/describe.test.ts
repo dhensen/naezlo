@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import { ACME, auditEvent, project, todoList } from '../test/api'
+import { ACME, ADA, auditEvent, project, todoList } from '../test/api'
 import { describeEvent, eventChanges } from './describe'
 
 const WEBSITE = project(ACME, 'p1', 'Website')
@@ -8,6 +8,8 @@ const BACKLOG = todoList(WEBSITE, 'l1', 'Backlog')
 const IN_LIST = { scope: 'list' } as const
 const IN_PROJECT = { scope: 'project', listNames: new Map([[BACKLOG.id, BACKLOG.name]]) } as const
 const GRACE = { kind: 'user', id: 'u2', name: 'Grace Hopper' }
+// The actor of the `auditEvent` fixture.
+const ADA_ACTOR = { kind: 'user', id: ADA.user.id, name: ADA.user.name }
 
 test.each([
   ['project.created', { name: 'Website' }, 'created the project "Website"'],
@@ -22,6 +24,10 @@ test.each([
   ['item.reopened', { title: 'Buy milk' }, 'reopened "Buy milk"'],
   ['item.moved', { title: 'Buy milk', changes: {} }, 'moved "Buy milk"'],
   ['item.deleted', { title: 'Buy milk' }, 'deleted "Buy milk"'],
+  ['item.assigned', { title: 'Buy milk', assignee: GRACE, previous_assignee: null }, 'assigned "Buy milk" to Grace Hopper'],
+  ['item.assigned', { title: 'Buy milk', assignee: ADA_ACTOR, previous_assignee: GRACE }, 'picked up "Buy milk"'],
+  ['item.unassigned', { title: 'Buy milk', previous_assignee: GRACE }, 'unassigned "Buy milk" from Grace Hopper'],
+  ['item.unassigned', { title: 'Buy milk', previous_assignee: ADA_ACTOR }, 'released "Buy milk"'],
   ['project_grant.set', { principal: GRACE, role: { old: null, new: 'editor' } }, 'gave Grace Hopper the role Editor on the project'],
   ['project_grant.set', { principal: GRACE, role: { old: 'viewer', new: 'editor' } }, 'changed the role of Grace Hopper on the project'],
   ['project_grant.revoked', { principal: GRACE, role: 'editor' }, 'removed the role Editor of Grace Hopper on the project'],

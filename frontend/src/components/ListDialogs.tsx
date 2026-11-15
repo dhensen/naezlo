@@ -59,12 +59,25 @@ interface ListFieldsProps {
   name: string
   description: string
   mode: ListMode
+  assignmentRequired: boolean
   onName: (name: string) => void
   onDescription: (description: string) => void
   onMode: (mode: ListMode) => void
+  onAssignmentRequired: (required: boolean) => void
 }
 
-function ListFields({ name, description, mode, onName, onDescription, onMode }: ListFieldsProps) {
+function ListFields({
+  name,
+  description,
+  mode,
+  assignmentRequired,
+  onName,
+  onDescription,
+  onMode,
+  onAssignmentRequired,
+}: ListFieldsProps) {
+  const id = useId()
+
   return (
     <>
       <label className={DIALOG_LABEL}>
@@ -93,6 +106,25 @@ function ListFields({ name, description, mode, onName, onDescription, onMode }: 
         />
       </label>
       <ModeChoice value={mode} onChange={onMode} />
+      <div className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          id={`${id}-assignment`}
+          checked={assignmentRequired}
+          onChange={(event) => onAssignmentRequired(event.target.checked)}
+          aria-describedby={`${id}-assignment-explanation`}
+          className="mt-1"
+        />
+        <div className="flex min-w-0 flex-col">
+          <label htmlFor={`${id}-assignment`} className="text-sm font-medium text-slate-900">
+            Assignment required
+          </label>
+          <p id={`${id}-assignment-explanation`} className="text-xs text-slate-600">
+            Only the assignee can complete an item. People and agents pick an item up before they work on it, so
+            nobody does the same work twice.
+          </p>
+        </div>
+      </div>
     </>
   )
 }
@@ -113,6 +145,7 @@ export function NewListDialog({ project, onClose }: { project: Project; onClose:
   // null: not chosen by hand, so the default is shown (and follows a newer answer).
   const [chosenMode, setChosenMode] = useState<ListMode | null>(null)
   const mode = chosenMode ?? project.default_list_mode
+  const [assignmentRequired, setAssignmentRequired] = useState(false)
 
   // The default changes when the organization gets its first agent or loses its last one,
   // which the cached project does not know: ask again whenever the dialog opens.
@@ -122,7 +155,10 @@ export function NewListDialog({ project, onClose }: { project: Project; onClose:
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    create.mutate({ name, description: descriptionOrNull(description), mode }, { onSuccess: onClose })
+    create.mutate(
+      { name, description: descriptionOrNull(description), mode, assignment_required: assignmentRequired },
+      { onSuccess: onClose },
+    )
   }
 
   return (
@@ -132,9 +168,11 @@ export function NewListDialog({ project, onClose }: { project: Project; onClose:
           name={name}
           description={description}
           mode={mode}
+          assignmentRequired={assignmentRequired}
           onName={setName}
           onDescription={setDescription}
           onMode={setChosenMode}
+          onAssignmentRequired={setAssignmentRequired}
         />
         <ErrorMessage error={create.error} />
         <div className="flex justify-end gap-2">
@@ -150,12 +188,14 @@ export function NewListDialog({ project, onClose }: { project: Project; onClose:
   )
 }
 
-/** Rename a list, change its description or its mode. Only what changed is sent. */
+/** Rename a list, change its description, its mode or whether assignment is required. Only
+ * what changed is sent. */
 export function EditListDialog({ list, onClose }: { list: TodoList; onClose: () => void }) {
   const update = useUpdateList(list)
   const [name, setName] = useState(list.name)
   const [description, setDescription] = useState(list.description ?? '')
   const [mode, setMode] = useState<ListMode>(list.mode)
+  const [assignmentRequired, setAssignmentRequired] = useState(list.assignment_required)
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -168,6 +208,9 @@ export function EditListDialog({ list, onClose }: { list: TodoList; onClose: () 
     }
     if (mode !== list.mode) {
       body.mode = mode
+    }
+    if (assignmentRequired !== list.assignment_required) {
+      body.assignment_required = assignmentRequired
     }
     if (Object.keys(body).length === 0) {
       onClose()
@@ -183,9 +226,11 @@ export function EditListDialog({ list, onClose }: { list: TodoList; onClose: () 
           name={name}
           description={description}
           mode={mode}
+          assignmentRequired={assignmentRequired}
           onName={setName}
           onDescription={setDescription}
           onMode={setMode}
+          onAssignmentRequired={setAssignmentRequired}
         />
         <ErrorMessage error={update.error} />
         <div className="flex justify-end gap-2">

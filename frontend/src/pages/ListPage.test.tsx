@@ -17,6 +17,11 @@ const BACKLOG = todoList(WEBSITE, '0190a000-0000-7000-8000-0000000000c1', 'Backl
 const PAGE = `/o/acme/l/${BACKLOG.id}`
 const AGENT = { kind: 'agent', id: '0190a000-0000-7000-8000-0000000000f1' } as const
 
+const ME = { kind: 'user', id: ADA_IN_ORGS.user.id, name: ADA_IN_ORGS.user.name } as const
+const GRACE_ASSIGNEE = { kind: 'user', id: '0190a000-0000-7000-8000-000000000002', name: 'Grace Hopper' } as const
+const CLAUDE = { ...AGENT, name: 'Claude' } as const
+const STRICT = { ...BACKLOG, assignment_required: true }
+
 const MILK = item(BACKLOG, 'i1', 'Buy milk')
 const BREAD = item(BACKLOG, 'i2', 'Bake bread', { position: 2, notes: 'Sourdough.' })
 const EGGS = item(BACKLOG, 'i3', 'Boil eggs', { position: 3 })
@@ -34,6 +39,7 @@ function routes(list: Schemas['ListOut'] = BACKLOG, items: Item[] = [MILK, BREAD
     [`GET /api/orgs/${BETA.id}/projects`]: json([]),
     [`GET /api/lists/${list.id}`]: json(list),
     [`GET /api/lists/${list.id}/items`]: json(items),
+    [`GET /api/lists/${list.id}/assignees`]: json([ME, GRACE_ASSIGNEE, CLAUDE]),
   }
 }
 
@@ -383,4 +389,80 @@ test('a list on the project page links to its own page', async () => {
   await userEvent.click(await screen.findByRole('link', { name: 'Backlog' }))
   expect(screen.getByTestId('location')).toHaveTextContent(PAGE)
   expect(await screen.findByRole('heading', { level: 1, name: 'Backlog' })).toBeInTheDocument()
+})
+
+test('an item is picked up, given to someone else and unassigned', async () => {
+  const put = recorded((body: { kind: 'user' | 'agent'; id: string }) =>
+    json({ ...MILK, assignee: [ME, GRACE_ASSIGNEE, CLAUDE].find((assignee) => assignee.id === body.id) ?? null }),
+  )
+  const remove = recorded(() => json({ ...MILK, assignee: null }))
+  mockApi({
+    ...routes(),
+    [`PUT /api/items/${MILK.id}/assignee`]: put.route,
+    [`DELETE /api/items/${MILK.id}/assignee`]: remove.route,
+  })
+  renderApp(PAGE)
+
+  const select = await screen.findByRole('combobox', { name: 'Assignee of Buy milk' })
+  expect(select).toHaveValue('')
+  await waitFor(() =>
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Unassigned',
+      `${ME.name} (you)`,
+      'Grace Hopper',
+      'Claude (agent)',
+    ]),
+  )
+
+  await userEvent.click(screen.getByRole('button', { name: 'Pick up Buy milk' }))
+  await waitFor(() => expect(select).toHaveValue(`user:${ME.id}`))
+  expect(screen.queryByRole('button', { name: 'Pick up Buy milk' })).not.toBeInTheDocument()
+
+  await userEvent.selectOptions(select, 'Claude (agent)')
+  await waitFor(() => expect(select).toHaveValue(`agent:${CLAUDE.id}`))
+  expect(put.bodies).toEqual([
+    { kind: 'user', id: ME.id },
+    { kind: 'agent', id: CLAUDE.id },
+  ])
+
+  await userEvent.selectOptions(select, 'Unassigned')
+  await waitFor(() => expect(remove.bodies).toHaveLength(1))
+  expect(select).toHaveValue('')
+  expect(screen.getByRole('button', { name: 'Pick up Buy milk' })).toBeInTheDocument()
+})
+
+test('where assignment is required only your own items can be ticked off', async () => {
+  const items = [
+    { ...MILK, assignee: ME },
+    { ...BREAD, assignee: CLAUDE },
+    EGGS,
+    TEA,
+  ]
+  mockApi(routes(STRICT, items))
+  renderApp(PAGE)
+
+  await openItems()
+  const main = screen.getByRole('main')
+  expect(within(main).getByText('Assignment required')).toBeInTheDocument()
+  expect(screen.getByRole('note')).toHaveTextContent('Only the assignee can complete an item in this list.')
+  expect(screen.getByRole('checkbox', { name: 'Mark Buy milk as done' })).toBeEnabled()
+  // Claude's item and the one nobody picked up yet: no checkbox.
+  expect(screen.queryByRole('checkbox', { name: 'Mark Bake bread as done' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('checkbox', { name: 'Mark Boil eggs as done' })).not.toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'Assignee of Bake bread' })).toHaveValue(`agent:${CLAUDE.id}`)
+  expect(await screen.findByRole('button', { name: 'Pick up Boil eggs' })).toBeInTheDocument()
+  // A done item can be reopened by anyone.
+  await userEvent.click(screen.getByRole('button', { name: 'Done (1)' }))
+  expect(screen.getByRole('checkbox', { name: 'Mark Make tea as done' })).toBeChecked()
+})
+
+test('a viewer reads who an item is assigned to', async () => {
+  const viewed = { ...BACKLOG, role: 'viewer', actions: ['read'] } satisfies Schemas['ListOut']
+  mockApi(routes(viewed, [{ ...MILK, assignee: CLAUDE }, BREAD]))
+  renderApp(PAGE)
+
+  const rows = within(await openItems()).getAllByRole('listitem')
+  expect(rows[0]).toHaveTextContent('Assigned to Claude (agent)')
+  expect(rows[1]).not.toHaveTextContent('Assigned to')
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
 })

@@ -9,8 +9,8 @@ import { ErrorMessage } from '../components/ErrorMessage'
 import { ModeBadge, ModeIcon } from '../components/ModeBadge'
 import { ShareListDialog } from '../components/ShareDialogs'
 import { TabPanel, Tabs } from '../components/Tabs'
-import { addItem, isUnsaved, useChangeItems, useItems } from '../items/hooks'
-import type { Item, ItemChange } from '../items/hooks'
+import { addItem, isUnsaved, sameAssignee, useAssignees, useChangeItems, useItems } from '../items/hooks'
+import type { Assignee, Item, ItemChange } from '../items/hooks'
 import { listAllows, useList } from '../lists/hooks'
 import { useCurrentOrganization, useProjects } from '../orgs/hooks'
 import type { Organization } from '../orgs/hooks'
@@ -85,6 +85,12 @@ function ListView({ organization, listId }: { organization: Organization; listId
             : 'You can read this list, but not change its items.'}
         </p>
       )}
+      {canChange && current.assignment_required && (
+        <p role="note" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Only the assignee can complete an item in this list. Pick an item up before you start on it, so nobody else
+          does the same work.
+        </p>
+      )}
       {items.isPending && (
         <p role="status" className="text-sm text-slate-500">
           Loading…
@@ -113,6 +119,11 @@ function ListView({ organization, listId }: { organization: Organization; listId
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="min-w-0 text-2xl font-semibold tracking-tight break-words">{current.name}</h1>
           <ModeBadge mode={current.mode} />
+          {current.assignment_required && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+              Assignment required
+            </span>
+          )}
           {listAllows(current, 'administer') && (
             <button
               type="button"
@@ -159,7 +170,16 @@ type Direction = 'up' | 'down'
 function ItemsSection({ list, items, canChange }: { list: TodoList; items: Item[]; canChange: boolean }) {
   const me = useMe()
   const [error, setError] = useState<unknown>(null)
-  const change = useChangeItems(list, me.data?.user.id ?? '', setError)
+  const userId = me.data?.user.id ?? ''
+  const change = useChangeItems(list, userId, setError)
+  // Who an item can be given to; only someone who changes items needs to know.
+  const assignees = useAssignees(list.id, canChange)
+  const assignment: Assignment = {
+    required: list.assignment_required,
+    userId,
+    assignees: assignees.data ?? [],
+    me: assignees.data?.find((assignee) => assignee.kind === 'user' && assignee.id === userId) ?? null,
+  }
   const [title, setTitle] = useState('')
   const [doneShown, setDoneShown] = useState(false)
   const addInput = useRef<HTMLInputElement>(null)
@@ -254,6 +274,7 @@ function ItemsSection({ list, items, canChange }: { list: TodoList; items: Item[
               key={item.id}
               item={item}
               canChange={canChange}
+              assignment={assignment}
               onChange={apply}
               onMove={(direction) => move(item, direction)}
               canMoveUp={index > 0}
@@ -288,7 +309,7 @@ function ItemsSection({ list, items, canChange }: { list: TodoList; items: Item[
           {doneShown && (
             <ul id={doneListId} aria-label="Done items" className={ITEM_LIST}>
               {done.map((item) => (
-                <ItemRow key={item.id} item={item} canChange={canChange} onChange={apply} />
+                <ItemRow key={item.id} item={item} canChange={canChange} assignment={assignment} onChange={apply} />
               ))}
             </ul>
           )}
@@ -298,9 +319,21 @@ function ItemsSection({ list, items, canChange }: { list: TodoList; items: Item[
   )
 }
 
+/** What the rows need to know about assigning items in this list. */
+interface Assignment {
+  /** Only the assignee can complete an item. */
+  required: boolean
+  userId: string
+  /** Everyone an item can be given to; empty until it is known. */
+  assignees: Assignee[]
+  /** The user as an assignee; null when they cannot be one (or it is not known yet). */
+  me: Assignee | null
+}
+
 interface ItemRowProps {
   item: Item
   canChange: boolean
+  assignment: Assignment
   onChange: (change: ItemChange) => void
   /** Left out for a done item: only open items have an order to work through. */
   onMove?: (direction: Direction) => void
@@ -308,7 +341,15 @@ interface ItemRowProps {
   canMoveDown?: boolean
 }
 
-function ItemRow({ item, canChange, onChange, onMove, canMoveUp = false, canMoveDown = false }: ItemRowProps) {
+function ItemRow({
+  item,
+  canChange,
+  assignment,
+  onChange,
+  onMove,
+  canMoveUp = false,
+  canMoveDown = false,
+}: ItemRowProps) {
   const [notesShown, setNotesShown] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const notesId = useId()
@@ -316,11 +357,14 @@ function ItemRow({ item, canChange, onChange, onMove, canMoveUp = false, canMove
   // Not stored yet, so there is no id to send a change for: its controls wait.
   const waiting = isUnsaved(item)
   const titleStyle = done ? 'text-slate-500 line-through' : 'text-slate-900'
+  const mine = item.assignee !== null && sameAssignee(item.assignee, { kind: 'user', id: assignment.userId })
+  // Where assignment is required only the assignee ticks an item off; anyone reopens it.
+  const canTick = canChange && (done || !assignment.required || mine)
 
   return (
     <li aria-busy={waiting || undefined} className="flex flex-col gap-2 px-4 py-2.5">
       <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
-        {canChange ? (
+        {canTick ? (
           <input
             type="checkbox"
             aria-label={`Mark ${item.title} as done`}
@@ -352,6 +396,16 @@ function ItemRow({ item, canChange, onChange, onMove, canMoveUp = false, canMove
               {item.created_by.kind === 'agent' && <AgentMarker>Added by an agent</AgentMarker>}
               {done && item.completed_by?.kind === 'agent' && <AgentMarker>Completed by an agent</AgentMarker>}
             </span>
+          )}
+          {canChange && !waiting ? (
+            <AssigneeControl item={item} assignment={assignment} mine={mine} onChange={onChange} />
+          ) : (
+            item.assignee !== null && (
+              <span className="px-1 text-xs text-slate-600">
+                Assigned to {item.assignee.name}
+                {item.assignee.kind === 'agent' && ' (agent)'}
+              </span>
+            )
           )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
@@ -419,6 +473,63 @@ function ItemRow({ item, canChange, onChange, onMove, canMoveUp = false, canMove
         </div>
       )}
     </li>
+  )
+}
+
+interface AssigneeControlProps {
+  item: Item
+  assignment: Assignment
+  mine: boolean
+  onChange: (change: ItemChange) => void
+}
+
+function assigneeValue(assignee: Pick<Assignee, 'kind' | 'id'>): string {
+  return `${assignee.kind}:${assignee.id}`
+}
+
+/** Who works on the item, as a select to give it to someone else, with "Pick up" for a free one. */
+function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlProps) {
+  const { assignees, me } = assignment
+  // The current assignee is always a choice, also before the others are known.
+  const current = item.assignee
+  const choices =
+    current === null || assignees.some((assignee) => sameAssignee(assignee, current)) ? assignees : [current, ...assignees]
+
+  return (
+    <span className="flex flex-wrap items-center gap-2 px-1">
+      <select
+        aria-label={`Assignee of ${item.title}`}
+        value={current === null ? '' : assigneeValue(current)}
+        onChange={(event) =>
+          onChange({
+            kind: 'assign',
+            item,
+            assignee: choices.find((assignee) => assigneeValue(assignee) === event.target.value) ?? null,
+          })
+        }
+        className={`rounded-md border px-1.5 py-0.5 text-xs focus:border-slate-500 focus:outline-none ${
+          mine ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-300 bg-white text-slate-700'
+        }`}
+      >
+        <option value="">Unassigned</option>
+        {choices.map((assignee) => (
+          <option key={assigneeValue(assignee)} value={assigneeValue(assignee)}>
+            {assignee.name}
+            {assignee.kind === 'agent' ? ' (agent)' : me !== null && sameAssignee(assignee, me) ? ' (you)' : ''}
+          </option>
+        ))}
+      </select>
+      {current === null && item.status === 'open' && me !== null && (
+        <button
+          type="button"
+          aria-label={`Pick up ${item.title}`}
+          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          onClick={() => onChange({ kind: 'assign', item, assignee: me })}
+        >
+          Pick up
+        </button>
+      )}
+    </span>
   )
 }
 

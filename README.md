@@ -15,6 +15,8 @@ This is a todolist app. Will be built in public.
 - New user gets a default organization, does not have to be a business per se, it's just there in case user wants to expand
 - Allow AI agents to use lists
 - Mark a list as AI-only, human only or mixed (default if AI is onboarded)
+- Assign an item to a person or an agent; a list can require assignment, so that only the
+  assignee completes an item and a person and an agent never do the same work
 - Easy MCP setup with instructions for claude, codex
 - Auditlog per project, per list
 - User interface, Oauth login (at least Google)

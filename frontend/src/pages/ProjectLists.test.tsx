@@ -89,7 +89,9 @@ test('"New list" preselects the default mode of the organization and adds the li
   await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
 
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  expect(bodies).toEqual([{ name: 'Launch', description: 'Go live.', mode: 'human_only' }])
+  expect(bodies).toEqual([
+    { name: 'Launch', description: 'Go live.', mode: 'human_only', assignment_required: false },
+  ])
   const [row] = await rows()
   expect(row).toHaveTextContent('Launch')
   expect(row).toHaveTextContent('Go live.')
@@ -116,7 +118,9 @@ test('the preselected mode is Mixed in an organization with an agent, and can be
   await userEvent.type(within(dialog).getByLabelText('Name'), 'Queue')
   await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
 
-  await waitFor(() => expect(bodies).toEqual([{ name: 'Queue', description: null, mode: 'ai_only' }]))
+  await waitFor(() =>
+    expect(bodies).toEqual([{ name: 'Queue', description: null, mode: 'ai_only', assignment_required: false }]),
+  )
   expect((await rows())[0]).toHaveTextContent('AI only')
 })
 
@@ -299,4 +303,37 @@ test('a list created while the lists are still loading is not lost to the older 
 
   expect((await rows())[0]).toHaveTextContent('Launch')
   expect(screen.queryByText('This project has no lists yet.')).not.toBeInTheDocument()
+})
+
+test('"Assignment required" is chosen for a new list and switched on an existing one', async () => {
+  const api = routes(WEBSITE, [BACKLOG])
+  const created: unknown[] = []
+  const patched: unknown[] = []
+  api[`POST /api/projects/${WEBSITE.id}/lists`] = async (request) => {
+    created.push(await request.json())
+    return json(todoList(WEBSITE, 'l9', 'Strict', { assignment_required: true, position: 2 }), 201)
+  }
+  api[`PATCH /api/lists/${BACKLOG.id}`] = async (request) => {
+    patched.push(await request.json())
+    return json({ ...BACKLOG, assignment_required: true })
+  }
+  mockApi(api)
+  renderApp(PAGE)
+
+  await userEvent.click(await screen.findByRole('button', { name: 'New list' }))
+  let dialog = screen.getByRole('dialog', { name: 'New list' })
+  const toggle = within(dialog).getByRole('checkbox', { name: 'Assignment required' })
+  expect(toggle).not.toBeChecked()
+  expect(toggle).toHaveAccessibleDescription(/Only the assignee can complete an item/)
+  await userEvent.type(within(dialog).getByLabelText('Name'), 'Strict')
+  await userEvent.click(toggle)
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+  await waitFor(() => expect(created).toHaveLength(1))
+  expect(created[0]).toMatchObject({ name: 'Strict', assignment_required: true })
+
+  await userEvent.click(await screen.findByRole('button', { name: `Edit ${BACKLOG.name}` }))
+  dialog = screen.getByRole('dialog', { name: 'Edit list' })
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Assignment required' }))
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+  await waitFor(() => expect(patched).toEqual([{ assignment_required: true }]))
 })

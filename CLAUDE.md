@@ -464,3 +464,17 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
   `auditEvent(list, action, details, overrides)` and `CLAUDE_ACTOR` (`src/test/api.ts`).
 - A list of rows that tests count with `getByRole('listitem')` must not nest another list: details
   inside a row are a `<dl>` (see `EventRow`).
+- Assignees: `Item.assignee_kind` / `assignee_id`, `assign_item(session, principal, item, todo_list,
+  project, kind, id, only_if_free=...)`, `unassign_item` and `item_assignees(session, todo_list,
+  project, items)` (item id -> `Principal`) in `services/items.py`; who can be assigned is
+  `assignable_principals(session, todo_list, project)` in `permissions.py`. Routes: `PUT` / `DELETE
+  /api/items/{id}/assignee`, `GET /api/lists/{id}/assignees`. An item goes out through
+  `_one_out(session, ctx, item)` (`api/items.py`) or `_changed_item(ctx, item)` (MCP tools), which
+  look the assignee up; never show `assignee_id` without `item_assignees`.
+- `TodoList.assignment_required`: only the assignee completes an item (`_require_assignee` in
+  `update_item`; 409 `item_not_assigned` / `item_assigned_to_other`). A new rule about who may
+  complete an item goes there, not in a route or a tool. MCP: `claim_item`, `release_item`.
+- Assignment in the UI: an `assign` `ItemChange` (`src/items/hooks.ts`, with `useAssignees`,
+  `sameAssignee`), `AssigneeControl` in `ListPage.tsx`, the toggle in `ListFields`
+  (`components/ListDialogs.tsx`). Tests: `tests/test_assignment.py`, `frontend/e2e/assignment.spec.ts`.
+
