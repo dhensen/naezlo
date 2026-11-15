@@ -59,7 +59,7 @@ function Agents({ organization }: { organization: Organization }) {
   }
 
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-6">
+    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Agents</h1>

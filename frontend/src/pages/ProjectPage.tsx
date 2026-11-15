@@ -63,7 +63,7 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
   }
   if (project.data === undefined) {
     return (
-      <main className="flex flex-1 flex-col gap-4 p-6">
+      <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
         {project.isPending && (
           <p role="status" className="text-slate-500">
             Loading…
@@ -83,7 +83,7 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
   const lists = <ListsSection project={current} organization={organization} />
 
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-6">
+    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight break-words">{current.name}</h1>
@@ -147,8 +147,8 @@ function openItems(count: number): string {
   return count === 1 ? '1 open item' : `${count} open items`
 }
 
-const ROW_BUTTON = 'rounded-md px-2 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-const ROW_DANGER_BUTTON = 'rounded-md px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50'
+const ROW_BUTTON = 'min-h-9 rounded-md px-2 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+const ROW_DANGER_BUTTON = 'min-h-9 rounded-md px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50'
 
 type ListDialog = { kind: 'new' } | { kind: 'edit' | 'delete'; list: TodoList }
 
@@ -218,8 +218,9 @@ function ListRow({ list, to, onEdit, onDelete }: ListRowProps) {
 
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Link to={to} className="font-medium break-words text-slate-900 hover:underline">
+      {/* At phone width the name has the whole line; the rest follows below it. */}
+      <div className="flex min-w-0 basis-full flex-col sm:flex-1 sm:basis-0">
+        <Link to={to} className="py-1 font-medium wrap-anywhere text-slate-900 hover:underline sm:py-0">
           {list.name}
         </Link>
         {list.description !== null && (
@@ -227,9 +228,9 @@ function ListRow({ list, to, onEdit, onDelete }: ListRowProps) {
         )}
       </div>
       <ModeBadge mode={list.mode} />
-      <span className="w-28 text-right text-sm text-slate-600 tabular-nums">{openItems(list.open_item_count)}</span>
+      <span className="text-sm text-slate-600 tabular-nums sm:w-28 sm:text-right">{openItems(list.open_item_count)}</span>
       {(canEdit || canDelete) && (
-        <div className="flex shrink-0 gap-1">
+        <div className="ml-auto flex shrink-0 gap-1 sm:ml-0">
           {canEdit && (
             <button type="button" aria-label={`Edit ${list.name}`} className={ROW_BUTTON} onClick={onEdit}>
               Edit

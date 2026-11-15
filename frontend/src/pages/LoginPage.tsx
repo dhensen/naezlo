@@ -96,7 +96,7 @@ export function LoginPage() {
     '/api/auth/google/login' + (next === null ? '' : `?next=${encodeURIComponent(next)}`)
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 text-slate-900">
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 text-slate-900 sm:px-6">
       <div className="flex w-full max-w-sm flex-col gap-5 rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Sign in to {APP_NAME}</h1>

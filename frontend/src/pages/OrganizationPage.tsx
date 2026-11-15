@@ -8,7 +8,7 @@ export function OrganizationPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col gap-2 p-6">
+    <main className="flex flex-1 flex-col gap-2 p-4 sm:p-6">
       <h1 className="text-2xl font-semibold tracking-tight">{organization.name}</h1>
       <p className="text-slate-600">Choose a project from the list of projects.</p>
     </main>

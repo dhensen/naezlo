@@ -28,7 +28,7 @@ function Code({ label, text }: { label: string; text: string }) {
         <pre
           aria-label={label}
           tabIndex={0}
-          className="min-w-0 flex-1 overflow-x-auto rounded-md bg-slate-900 px-3 py-2 text-xs leading-5 text-slate-100"
+          className="min-w-0 flex-1 overflow-x-auto rounded-md bg-slate-900 px-3 py-2 text-xs leading-5 break-all whitespace-pre-wrap text-slate-100 sm:break-normal sm:whitespace-pre"
         >
           <code>{text}</code>
         </pre>
@@ -81,7 +81,7 @@ export function ConnectAgentDialog({ agent, first = false, onClose }: ConnectAge
           <>
             <Code label="MCP server URL" text={mcpUrl} />
             <div>
-              <div role="tablist" aria-label="AI tool" className="flex flex-wrap gap-1 border-b border-slate-200">
+              <div role="tablist" aria-label="AI tool" className="flex gap-1 overflow-x-auto border-b border-slate-200">
                 {guides.map((candidate) => (
                   <button
                     key={candidate.id}
@@ -98,7 +98,7 @@ export function ConnectAgentDialog({ agent, first = false, onClose }: ConnectAge
                         tabs.current.delete(candidate.id)
                       }
                     }}
-                    className={`-mb-px rounded-t-md border-b-2 px-3 py-1.5 text-sm font-medium ${
+                    className={`-mb-px shrink-0 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap sm:py-1.5 ${
                       candidate.id === selected
                         ? 'border-slate-900 text-slate-900'
                         : 'border-transparent text-slate-500 hover:text-slate-800'

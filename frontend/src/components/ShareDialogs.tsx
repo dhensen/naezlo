@@ -215,7 +215,7 @@ function AddGrant<Role extends ListRole>({ organizationId, roles, taken, busy, s
             required
             value={picked}
             onChange={(event) => setPicked(event.target.value)}
-            className={`${SELECT} min-w-0 flex-1`}
+            className={`${SELECT} w-full min-w-0 sm:w-auto sm:flex-1`}
           >
             <option value="">{loaded ? 'Choose a person or an agent…' : 'Loading…'}</option>
             {people.length > 0 && (

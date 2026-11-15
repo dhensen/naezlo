@@ -26,9 +26,11 @@ const INPUT = 'rounded-md border border-slate-300 bg-white px-3 py-2 text-sm tex
 const PRIMARY_BUTTON =
   'rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60'
 const SMALL_BUTTON =
-  'rounded-md border border-slate-300 px-2.5 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60'
+  'rounded-md border border-slate-300 px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 sm:py-1'
 const DANGER_BUTTON =
-  'rounded-md border border-red-300 px-2.5 py-1 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60'
+  'rounded-md border border-red-300 px-2.5 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60 sm:py-1'
+// Below `sm` a member is a block of lines (name, email, then role and action) instead of a table row.
+const MEMBER_ROW = 'flex flex-wrap items-center gap-x-3 py-2 sm:table-row'
 const SECTION = 'flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4'
 
 /** Settings of an organization (`/o/:orgSlug/settings`): name, members and invitations. */
@@ -40,7 +42,7 @@ export function OrganizationSettingsPage() {
   const canManage = organization.role === 'owner' || organization.role === 'admin'
 
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-6">
+    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Organization settings</h1>
         {!canManage && (
@@ -165,7 +167,7 @@ function MembersSection({ organization, canManage }: SectionProps) {
       {members.data && (
         <div className="overflow-x-auto">
           <table aria-labelledby="settings-members" className="w-full text-left text-sm">
-            <thead className="text-xs tracking-wide text-slate-500 uppercase">
+            <thead className="hidden text-xs tracking-wide text-slate-500 uppercase sm:table-header-group">
               <tr>
                 <th scope="col" className="py-2 pr-3 font-medium">
                   Name
@@ -181,20 +183,20 @@ function MembersSection({ organization, canManage }: SectionProps) {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 border-t border-slate-200">
+            <tbody className="block divide-y divide-slate-100 border-t border-slate-200 sm:table-row-group">
               {members.data.map((member) => {
                 const isSelf = member.user_id === myId
                 const choices = roleChoices(organization.role, member)
                 const mayRemove = isSelf || (canManage && choices !== null)
                 const action = isSelf ? 'Leave' : 'Remove'
                 return (
-                  <tr key={member.user_id}>
-                    <th scope="row" className="py-2 pr-3 font-medium text-slate-900">
+                  <tr key={member.user_id} className={MEMBER_ROW}>
+                    <th scope="row" className="basis-full font-medium text-slate-900 sm:py-2 sm:pr-3">
                       {member.name}
                       {isSelf && <span className="font-normal text-slate-500"> (you)</span>}
                     </th>
-                    <td className="py-2 pr-3 text-slate-700">{member.email}</td>
-                    <td className="py-2 pr-3 text-slate-700">
+                    <td className="basis-full break-all text-slate-700 sm:py-2 sm:pr-3">{member.email}</td>
+                    <td className="pt-1 text-slate-700 sm:py-2 sm:pr-3">
                       {choices ? (
                         <select
                           aria-label={`Role of ${member.name}`}
@@ -204,7 +206,7 @@ function MembersSection({ organization, canManage }: SectionProps) {
                             remove.reset()
                             changeRole.mutate({ userId: member.user_id, role: event.target.value as Role })
                           }}
-                          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+                          className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm sm:py-1"
                         >
                           {choices.map((role) => (
                             <option key={role} value={role}>
@@ -216,7 +218,7 @@ function MembersSection({ organization, canManage }: SectionProps) {
                         ROLE_LABELS[member.role]
                       )}
                     </td>
-                    <td className="py-2 text-right whitespace-nowrap">
+                    <td className="ml-auto pt-1 text-right whitespace-nowrap sm:py-2">
                       {mayRemove &&
                         (confirming === member.user_id ? (
                           <span className="inline-flex items-center gap-2">
@@ -273,10 +275,12 @@ function InvitationsSection({ organization }: { organization: Organization }) {
         Invitations
       </h2>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
-        <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium text-slate-700">
+        <label className="flex w-full min-w-0 flex-col gap-1 text-sm font-medium text-slate-700 sm:w-auto sm:flex-1">
           Email address
           <input
             type="email"
+            inputMode="email"
+            autoCapitalize="none"
             required
             autoComplete="off"
             value={email}
@@ -285,7 +289,7 @@ function InvitationsSection({ organization }: { organization: Organization }) {
           />
         </label>
         {/* Not wrapped in the label: the options would become part of its name. */}
-        <div className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+        <div className="flex flex-1 flex-col gap-1 text-sm font-medium text-slate-700 sm:flex-none">
           <label htmlFor={roleId}>Role</label>
           <select
             id={roleId}

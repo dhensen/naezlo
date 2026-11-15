@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import { ApiError } from '../api/client'
@@ -60,7 +60,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
   }
   if (list.data === undefined) {
     return (
-      <main className="flex flex-1 flex-col gap-4 p-6">
+      <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
         {list.isPending && (
           <p role="status" className="text-slate-500">
             Loading…
@@ -104,7 +104,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
   const projectIsVisible = projects.data?.some((project) => project.id === current.project_id) ?? false
 
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-5 p-6">
+    <main className="flex w-full max-w-3xl flex-1 flex-col gap-5 p-4 sm:p-6">
       <header className="flex flex-col gap-1">
         <p className="text-sm text-slate-600">
           <span className="sr-only">Project: </span>
@@ -117,7 +117,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
           )}
         </p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="min-w-0 text-2xl font-semibold tracking-tight break-words">{current.name}</h1>
+          <h1 className="min-w-0 text-2xl font-semibold tracking-tight wrap-anywhere">{current.name}</h1>
           <ModeBadge mode={current.mode} />
           {current.assignment_required && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
@@ -160,9 +160,10 @@ function ListView({ organization, listId }: { organization: Organization; listId
 
 const TEXT_INPUT =
   'rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-slate-500 focus:outline-none'
-const SMALL_BUTTON =
-  'rounded-md px-2 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:text-slate-300 disabled:hover:bg-transparent'
-const SMALL_DANGER_BUTTON = 'rounded-md px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50 disabled:text-red-300'
+// At phone width a row button is at least 36px in both directions: big enough for a thumb.
+const ROW_BUTTON_SIZE = 'inline-flex min-h-9 min-w-9 items-center justify-center gap-1 sm:min-h-0 sm:min-w-0'
+const SMALL_BUTTON = `${ROW_BUTTON_SIZE} rounded-md px-2 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:text-slate-300 disabled:hover:bg-transparent`
+const SMALL_DANGER_BUTTON = `${ROW_BUTTON_SIZE} rounded-md px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50 disabled:text-red-300`
 const ITEM_LIST = 'divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white'
 
 type Direction = 'up' | 'down'
@@ -244,13 +245,14 @@ function ItemsSection({ list, items, canChange }: { list: TodoList; items: Item[
             placeholder="Add an item…"
             maxLength={500}
             autoComplete="off"
+            enterKeyHint="done"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             className={`min-w-0 flex-1 ${TEXT_INPUT}`}
           />
           <button
             type="submit"
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 sm:px-3"
           >
             Add
           </button>
@@ -289,7 +291,7 @@ function ItemsSection({ list, items, canChange }: { list: TodoList; items: Item[
             type="button"
             aria-expanded={doneShown}
             aria-controls={doneListId}
-            className="flex items-center gap-1.5 self-start rounded-md px-2 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+            className="flex min-h-9 items-center gap-1.5 self-start rounded-md px-2 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0"
             onClick={() => setDoneShown(!doneShown)}
           >
             <svg
@@ -352,7 +354,10 @@ function ItemRow({
 }: ItemRowProps) {
   const [notesShown, setNotesShown] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  // At phone width moving and deleting wait behind "More"; wider screens always show them.
+  const [moreShown, setMoreShown] = useState(false)
   const notesId = useId()
+  const moreId = useId()
   const done = item.status === 'done'
   // Not stored yet, so there is no id to send a change for: its controls wait.
   const waiting = isUnsaved(item)
@@ -362,105 +367,150 @@ function ItemRow({
   const canTick = canChange && (done || !assignment.required || mine)
 
   return (
-    <li aria-busy={waiting || undefined} className="flex flex-col gap-2 px-4 py-2.5">
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
+    <li aria-busy={waiting || undefined} className="flex flex-col gap-2 px-3 py-2.5 sm:px-4">
+      <div className="flex items-start gap-x-1">
         {canTick ? (
-          <input
-            type="checkbox"
-            aria-label={`Mark ${item.title} as done`}
-            checked={done}
-            disabled={waiting}
-            onChange={() => onChange({ kind: 'update', item, patch: { status: done ? 'open' : 'done' } })}
-            className="mt-1.5 size-4 shrink-0 accent-slate-900"
-          />
+          // The label is the part that is pressed: 40px, around a much smaller box.
+          <label className="-my-1.5 -ml-2 flex size-10 shrink-0 cursor-pointer items-center justify-center">
+            <input
+              type="checkbox"
+              aria-label={`Mark ${item.title} as done`}
+              checked={done}
+              disabled={waiting}
+              onChange={() => onChange({ kind: 'update', item, patch: { status: done ? 'open' : 'done' } })}
+              className="size-5 accent-slate-900 sm:size-4"
+            />
+          </label>
         ) : (
-          <span className="mt-0.5 w-4 shrink-0 text-center text-slate-500">
+          <span className="-ml-2 flex h-7 w-10 shrink-0 items-center justify-center text-slate-500">
             <span aria-hidden="true">{done ? '✓' : '○'}</span>
             <span className="sr-only">{done ? 'Done:' : 'Open:'}</span>
           </span>
         )}
-        <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
-          {canChange && !waiting ? (
-            <EditableTitle
-              item={item}
-              className={titleStyle}
-              onSave={(title) => onChange({ kind: 'update', item, patch: { title } })}
-            />
-          ) : (
-            <span data-title className={`px-1 py-0.5 break-words ${titleStyle}`}>
-              {item.title}
-            </span>
-          )}
-          {(item.created_by.kind === 'agent' || (done && item.completed_by?.kind === 'agent')) && (
-            <span className="flex flex-wrap gap-1 px-1">
-              {item.created_by.kind === 'agent' && <AgentMarker>Added by an agent</AgentMarker>}
-              {done && item.completed_by?.kind === 'agent' && <AgentMarker>Completed by an agent</AgentMarker>}
-            </span>
-          )}
-          {canChange && !waiting ? (
-            <AssigneeControl item={item} assignment={assignment} mine={mine} onChange={onChange} />
-          ) : (
-            item.assignee !== null && (
-              <span className="px-1 text-xs text-slate-600">
-                Assigned to {item.assignee.name}
-                {item.assignee.kind === 'agent' && ' (agent)'}
+        {/*
+          At phone width the title has the whole line. Below it stand the assignee and
+          "Notes", with the rest behind "More" on a line of its own. From `sm` everything is
+          shown, to the right of the title.
+        */}
+        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-x-0.5">
+          <div className="flex min-w-0 flex-col items-start gap-1 sm:col-start-1 sm:mr-3">
+            {canChange && !waiting ? (
+              <EditableTitle
+                item={item}
+                className={titleStyle}
+                onSave={(title) => onChange({ kind: 'update', item, patch: { title } })}
+              />
+            ) : (
+              <span data-title className={`px-1 py-0.5 wrap-anywhere ${titleStyle}`}>
+                {item.title}
               </span>
-            )
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-0.5">
-          {confirming ? (
-            <>
-              <button
-                type="button"
-                autoFocus
-                className={SMALL_DANGER_BUTTON}
-                onClick={() => onChange({ kind: 'delete', item })}
-              >
-                Yes, delete
-              </button>
-              <button type="button" className={SMALL_BUTTON} onClick={() => setConfirming(false)}>
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
+            )}
+            {(item.created_by.kind === 'agent' || (done && item.completed_by?.kind === 'agent')) && (
+              <span className="flex flex-wrap gap-1 px-1">
+                {item.created_by.kind === 'agent' && <AgentMarker>Added by an agent</AgentMarker>}
+                {done && item.completed_by?.kind === 'agent' && <AgentMarker>Completed by an agent</AgentMarker>}
+              </span>
+            )}
+          </div>
+          <div className="flex items-start gap-x-2 sm:contents">
+            <div className="min-w-0 flex-1 sm:col-start-1 sm:row-start-2 sm:mr-3">
+              {canChange && !waiting ? (
+                <AssigneeControl item={item} assignment={assignment} mine={mine} onChange={onChange} />
+              ) : (
+                item.assignee !== null && (
+                  <span className="flex min-h-9 items-center px-1 text-sm text-slate-600 sm:min-h-0 sm:text-xs">
+                    Assigned to {item.assignee.name}
+                    {item.assignee.kind === 'agent' && ' (agent)'}
+                  </span>
+                )
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5 sm:col-start-2 sm:row-start-1">
               {(canChange || item.notes !== null) && (
                 <button
                   type="button"
                   aria-label={`Notes of ${item.title}`}
                   aria-expanded={notesShown}
                   aria-controls={notesId}
-                  className={SMALL_BUTTON}
+                  className={`relative ${SMALL_BUTTON}`}
                   onClick={() => setNotesShown(!notesShown)}
                 >
-                  Notes
-                  {item.notes !== null && <span aria-hidden="true"> •</span>}
+                  <RowIcon className="sm:hidden">
+                    <path d="M4 2.5h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1ZM5.5 6h5M5.5 8.5h5M5.5 11h3" />
+                  </RowIcon>
+                  <span className="hidden sm:inline">Notes</span>
+                  {item.notes !== null && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-1 right-1 size-2 rounded-full bg-sky-600 sm:static sm:size-1.5 sm:bg-current"
+                    />
+                  )}
                 </button>
-              )}
-              {canChange && onMove && (
-                <>
-                  <MoveButton item={item} direction="up" disabled={waiting || !canMoveUp} onMove={onMove} />
-                  <MoveButton item={item} direction="down" disabled={waiting || !canMoveDown} onMove={onMove} />
-                </>
               )}
               {canChange && (
                 <button
                   type="button"
-                  aria-label={`Delete ${item.title}`}
-                  disabled={waiting}
-                  className={SMALL_DANGER_BUTTON}
-                  onClick={() => setConfirming(true)}
+                  aria-label={`More actions for ${item.title}`}
+                  aria-expanded={moreShown}
+                  aria-controls={moreId}
+                  className={`sm:hidden ${SMALL_BUTTON} ${moreShown ? 'bg-slate-100 text-slate-900' : ''}`}
+                  onClick={() => setMoreShown(!moreShown)}
                 >
-                  Delete
+                  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="size-5">
+                    <circle cx="3" cy="8" r="1.4" />
+                    <circle cx="8" cy="8" r="1.4" />
+                    <circle cx="13" cy="8" r="1.4" />
+                  </svg>
                 </button>
               )}
-            </>
+            </div>
+          </div>
+          {canChange && (
+            <div
+              id={moreId}
+              className={`${
+                moreShown ? 'flex' : 'hidden'
+              } items-center justify-end gap-1 sm:col-start-3 sm:row-start-1 sm:flex sm:gap-0.5`}
+            >
+              {confirming ? (
+                <>
+                  <button
+                    type="button"
+                    autoFocus
+                    className={SMALL_DANGER_BUTTON}
+                    onClick={() => onChange({ kind: 'delete', item })}
+                  >
+                    Yes, delete
+                  </button>
+                  <button type="button" className={SMALL_BUTTON} onClick={() => setConfirming(false)}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  {onMove && (
+                    <>
+                      <MoveButton item={item} direction="up" disabled={waiting || !canMoveUp} onMove={onMove} />
+                      <MoveButton item={item} direction="down" disabled={waiting || !canMoveDown} onMove={onMove} />
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={`Delete ${item.title}`}
+                    disabled={waiting}
+                    className={SMALL_DANGER_BUTTON}
+                    onClick={() => setConfirming(true)}
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
       {notesShown && (
-        <div id={notesId} className="pl-7">
+        <div id={notesId} className="pl-9">
           {canChange && !waiting ? (
             <NotesEditor
               item={item}
@@ -496,7 +546,7 @@ function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlPr
     current === null || assignees.some((assignee) => sameAssignee(assignee, current)) ? assignees : [current, ...assignees]
 
   return (
-    <span className="flex flex-wrap items-center gap-2 px-1">
+    <span className="flex items-center gap-2 px-1">
       <select
         aria-label={`Assignee of ${item.title}`}
         value={current === null ? '' : assigneeValue(current)}
@@ -507,7 +557,7 @@ function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlPr
             assignee: choices.find((assignee) => assigneeValue(assignee) === event.target.value) ?? null,
           })
         }
-        className={`rounded-md border px-1.5 py-0.5 text-xs focus:border-slate-500 focus:outline-none ${
+        className={`h-9 min-w-0 shrink truncate rounded-md border px-1.5 text-xs focus:border-slate-500 focus:outline-none sm:h-auto sm:py-0.5 ${
           mine ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-300 bg-white text-slate-700'
         }`}
       >
@@ -523,7 +573,7 @@ function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlPr
         <button
           type="button"
           aria-label={`Pick up ${item.title}`}
-          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:h-auto sm:px-2 sm:py-0.5 sm:text-xs"
           onClick={() => onChange({ kind: 'assign', item, assignee: me })}
         >
           Pick up
@@ -540,6 +590,24 @@ function AgentMarker({ children }: { children: string }) {
       <ModeIcon mode="ai_only" className="size-3" />
       {children}
     </span>
+  )
+}
+
+/** A 16px line icon for a row button. */
+function RowIcon({ className = '', children }: { className?: string; children: ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={`size-5 shrink-0 ${className}`}
+    >
+      {children}
+    </svg>
   )
 }
 
@@ -572,6 +640,7 @@ function MoveButton({ item, direction, disabled, onMove }: MoveButtonProps) {
       >
         {direction === 'up' ? <path d="M8 13V3.5M3.5 7.5 8 3l4.5 4.5" /> : <path d="M8 3v9.5M3.5 8.5 8 13l4.5-4.5" />}
       </svg>
+      <span className="sm:hidden">{direction === 'up' ? 'Up' : 'Down'}</span>
     </button>
   )
 }
@@ -608,7 +677,7 @@ function EditableTitle({ item, className, onSave }: EditableTitleProps) {
         aria-label={`Edit title of ${item.title}`}
         title="Edit title"
         data-title
-        className={`rounded-md px-1 py-0.5 text-left break-words hover:bg-slate-100 ${className}`}
+        className={`rounded-md px-1 py-0.5 text-left wrap-anywhere hover:bg-slate-100 ${className}`}
         onClick={() => setDraft(item.title)}
       >
         {item.title}
@@ -685,7 +754,7 @@ function NotesEditor({ item, onSave, onClose }: NotesEditorProps) {
         <button
           type="submit"
           disabled={!changed}
-          className="rounded-md bg-slate-900 px-2.5 py-1 text-sm font-medium text-white hover:bg-slate-700 disabled:bg-slate-300"
+          className="min-h-9 rounded-md bg-slate-900 px-2.5 py-1 text-sm font-medium text-white hover:bg-slate-700 disabled:bg-slate-300 sm:min-h-0"
         >
           Save notes
         </button>

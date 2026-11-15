@@ -1,1 +1,25 @@
 @import 'tailwindcss';
+
+/*
+ * On a phone, Safari zooms the page in when a field with text smaller than 16px gets the
+ * focus, and does not zoom back out. Not in a layer: it must win from `text-sm` on a field.
+ */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+}
+
+@layer base {
+  /* No 300ms wait and no double-tap zoom on anything that is pressed. */
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label {
+    touch-action: manipulation;
+  }
+}

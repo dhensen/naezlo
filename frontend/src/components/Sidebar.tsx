@@ -24,8 +24,8 @@ export function Sidebar({ organization, open, onNavigate }: SidebarProps) {
       <aside
         id="sidebar"
         className={`${
-          open ? 'absolute inset-y-0 left-0 z-10 flex shadow-lg' : 'hidden'
-        } w-64 max-w-[85vw] shrink-0 flex-col border-r border-slate-200 bg-white md:static md:flex md:shadow-none`}
+          open ? 'fixed top-14 bottom-0 left-0 z-20 flex overflow-y-auto overscroll-contain shadow-lg' : 'hidden'
+        } w-72 max-w-[85vw] shrink-0 flex-col border-r border-slate-200 bg-white md:static md:z-auto md:flex md:w-64 md:overflow-visible md:shadow-none`}
       >
         <nav aria-label="Projects" className="flex flex-col gap-1 p-3">
           <h2 className="px-2 py-1 text-xs font-medium tracking-wide text-slate-500 uppercase">Projects</h2>
@@ -45,7 +45,7 @@ export function Sidebar({ organization, open, onNavigate }: SidebarProps) {
                   <NavLink
                     to={projectPath(organization.slug, project.id)}
                     className={({ isActive }) =>
-                      `block truncate rounded-md px-2 py-1.5 text-sm hover:bg-slate-100 ${
+                      `block truncate rounded-md px-2 py-2.5 hover:bg-slate-100 md:py-1.5 md:text-sm ${
                         isActive ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-700'
                       }`
                     }
@@ -60,7 +60,7 @@ export function Sidebar({ organization, open, onNavigate }: SidebarProps) {
           {/* Every member of the organization may create a project. */}
           <button
             type="button"
-            className="mt-1 rounded-md px-2 py-1.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
+            className="mt-1 rounded-md px-2 py-2.5 text-left font-medium text-slate-700 hover:bg-slate-100 md:py-1.5 md:text-sm"
             onClick={() => setCreating(true)}
           >
             + New project
@@ -75,7 +75,7 @@ export function Sidebar({ organization, open, onNavigate }: SidebarProps) {
               key={link.to}
               to={orgPath(organization.slug, link.to)}
               className={({ isActive }) =>
-                `block rounded-md px-2 py-1.5 text-sm hover:bg-slate-100 ${
+                `block rounded-md px-2 py-2.5 hover:bg-slate-100 md:py-1.5 md:text-sm ${
                   isActive ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-700'
                 }`
               }

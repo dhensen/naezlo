@@ -11,7 +11,8 @@ import { UserMenu } from './UserMenu'
 /**
  * The frame of every signed-in page: a top bar with the organization switcher and the user
  * menu, and for a page of an organization (`/o/:orgSlug/...`) a sidebar with its projects.
- * Below the `md` width the sidebar is a drawer behind the menu button.
+ * Below the `md` width the sidebar is a drawer behind the menu button; it hangs under the
+ * top bar (`h-14` there, `top-14` here and in the sidebar) and stays put while it is open.
  */
 export function AppLayout() {
   const { slug, organization } = useCurrentOrganization()
@@ -24,16 +25,22 @@ export function AppLayout() {
     }
   }, [currentSlug])
 
+  // Behind the open drawer the page stays where it is (the drawer only exists below `md`).
+  useEffect(() => {
+    document.body.classList.toggle('max-md:overflow-hidden', navOpen)
+    return () => document.body.classList.remove('max-md:overflow-hidden')
+  }, [navOpen])
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
+    <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-2 sm:px-3">
         {organization && (
           <button
             type="button"
             aria-label={navOpen ? 'Close navigation' : 'Open navigation'}
             aria-expanded={navOpen}
             aria-controls="sidebar"
-            className="rounded-md p-1.5 text-slate-700 hover:bg-slate-100 md:hidden"
+            className="flex size-10 shrink-0 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 md:hidden"
             onClick={() => setNavOpen((value) => !value)}
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" className="size-5 fill-current">
@@ -58,7 +65,7 @@ export function AppLayout() {
                 type="button"
                 aria-label="Close navigation"
                 tabIndex={-1}
-                className="absolute inset-0 bg-slate-900/30 md:hidden"
+                className="fixed inset-0 top-14 z-10 bg-slate-900/30 md:hidden"
                 onClick={() => setNavOpen(false)}
               />
             )}

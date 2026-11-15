@@ -60,8 +60,8 @@ export function ConsentPage() {
   const requestId = params.get('request')
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 py-10 text-slate-900">
-      <div className="flex w-full max-w-md flex-col gap-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 py-10 text-slate-900 sm:px-6">
+      <div className="flex w-full max-w-md flex-col gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         {requestId === null || requestId === '' ? (
           <>
             <h1 className="text-2xl font-semibold tracking-tight">Connect an application</h1>
