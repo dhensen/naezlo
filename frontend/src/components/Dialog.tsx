@@ -5,11 +5,13 @@ interface DialogProps {
   title: string
   /** Escape and a press next to the dialog close it; the content brings its own Cancel button. */
   onClose: () => void
+  /** More room, for a dialog with rows of data instead of a small form. */
+  wide?: boolean
   children: ReactNode
 }
 
 /** A modal dialog, named by its heading. */
-export function Dialog({ title, onClose, children }: DialogProps) {
+export function Dialog({ title, onClose, wide = false, children }: DialogProps) {
   const titleId = useId()
 
   return (
@@ -25,7 +27,7 @@ export function Dialog({ title, onClose, children }: DialogProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl"
+        className={`max-h-full w-full overflow-y-auto rounded-lg bg-white p-5 shadow-xl ${wide ? 'max-w-xl' : 'max-w-sm'}`}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             onClose()

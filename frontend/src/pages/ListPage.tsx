@@ -6,6 +6,7 @@ import { ApiError } from '../api/client'
 import { useMe } from '../auth/hooks'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { ModeBadge, ModeIcon } from '../components/ModeBadge'
+import { ShareListDialog } from '../components/ShareDialogs'
 import { addItem, isUnsaved, useChangeItems, useItems } from '../items/hooks'
 import type { Item, ItemChange } from '../items/hooks'
 import { listAllows, useList } from '../lists/hooks'
@@ -29,6 +30,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
   const list = useList(listId)
   const items = useItems(listId)
   const projects = useProjects(organization.id)
+  const [sharing, setSharing] = useState(false)
 
   const notFound =
     (list.error instanceof ApiError && (list.error.status === 404 || list.error.status === 422)) ||
@@ -79,6 +81,15 @@ function ListView({ organization, listId }: { organization: Organization; listId
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="min-w-0 text-2xl font-semibold tracking-tight break-words">{current.name}</h1>
           <ModeBadge mode={current.mode} />
+          {listAllows(current, 'administer') && (
+            <button
+              type="button"
+              className="ml-auto rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              onClick={() => setSharing(true)}
+            >
+              Share
+            </button>
+          )}
         </div>
         {current.description !== null && (
           <p className="break-words whitespace-pre-line text-slate-600">{current.description}</p>
@@ -98,6 +109,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
       )}
       <ErrorMessage error={items.error} />
       {items.data && <ItemsSection list={current} items={items.data} canChange={canChange} />}
+      {sharing && <ShareListDialog list={current} onClose={() => setSharing(false)} />}
     </main>
   )
 }

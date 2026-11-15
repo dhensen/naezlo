@@ -598,6 +598,79 @@ async def test_the_grants_routes_need_list_admin(
         assert [g["role"] for g in linus] == ["viewer"]
 
 
+async def test_inherited_gives_the_project_grants_to_a_list_admin(
+    client: AsyncClient,
+    other_client: AsyncClient,
+    third_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    world = await make_world(client)
+    # Grace administers Launch without a role on the project; Linus is a viewer of the project.
+    grace_id = await join(db_session, other_client, world, None, ListRole.ADMIN)
+    linus_id = await join(
+        db_session, third_client, world, ProjectRole.VIEWER, email="linus@example.com", name="Linus"
+    )
+    agent_id = await create_agent(client, world.org_id)
+    project_grants_url = f"/api/projects/{world.project_id}/grants"
+    assert (
+        await client.put(project_grants_url, json=agent_grant(agent_id, "editor"))
+    ).status_code == 200
+    ada_id = (await client.get("/api/me")).json()["user"]["id"]
+
+    response = await other_client.get(f"{world.grants_url}/inherited")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [(g["principal_kind"], g["principal_id"], g["name"], g["role"]) for g in body] == [
+        ("user", ada_id, "Ada", "admin"),
+        ("user", linus_id, "Linus", "viewer"),
+        ("agent", agent_id, "Claude", "editor"),
+    ]
+    assert set(body[0]) == {
+        "id",
+        "principal_kind",
+        "principal_id",
+        "name",
+        "email",
+        "role",
+        "created_at",
+        "updated_at",
+    }
+    # The same rows as the project's own grants API, which stays closed to Grace.
+    assert body == (await client.get(project_grants_url)).json()
+    assert (await other_client.get(project_grants_url)).status_code == 404
+    assert grace_id not in [g["principal_id"] for g in body]
+
+
+@pytest.mark.parametrize(
+    ("project_role", "list_role", "expected"),
+    [
+        (None, None, 404),
+        (ProjectRole.ADMIN, ListRole.NONE, 404),
+        (ProjectRole.EDITOR, None, 403),
+        (ProjectRole.ADMIN, ListRole.EDITOR, 403),
+        (ProjectRole.ADMIN, None, 200),
+    ],
+)
+async def test_inherited_needs_list_admin(
+    client: AsyncClient,
+    other_client: AsyncClient,
+    db_session: AsyncSession,
+    project_role: ProjectRole | None,
+    list_role: ListRole | None,
+    expected: int,
+) -> None:
+    world = await make_world(client)
+    await join(db_session, other_client, world, project_role, list_role)
+
+    response = await other_client.get(f"{world.grants_url}/inherited")
+
+    assert response.status_code == expected
+    assert (await client.get(f"/api/lists/{uuid.uuid7()}/grants/inherited")).json() == (
+        LIST_NOT_FOUND
+    )
+
+
 async def test_a_list_admin_can_hide_the_list_from_themselves(
     client: AsyncClient, other_client: AsyncClient, db_session: AsyncSession
 ) -> None:
@@ -613,7 +686,8 @@ async def test_a_list_admin_can_hide_the_list_from_themselves(
 
 
 @pytest.mark.parametrize(
-    ("method", "suffix"), [("GET", ""), ("PUT", ""), ("DELETE", f"/{uuid.uuid7()}")]
+    ("method", "suffix"),
+    [("GET", ""), ("GET", "/inherited"), ("PUT", ""), ("DELETE", f"/{uuid.uuid7()}")],
 )
 async def test_routes_need_a_signed_in_user(client: AsyncClient, method: str, suffix: str) -> None:
     response = await client.request(method, f"/api/lists/{uuid.uuid7()}/grants{suffix}")

@@ -133,3 +133,55 @@ export function item(
 export function config(overrides: Partial<AppConfig> = {}): Response {
   return json({ dev_login_enabled: false, google_login_enabled: false, ...overrides })
 }
+
+export const GRACE: Schemas['MemberOut'] = {
+  user_id: '0190a000-0000-7000-8000-000000000002',
+  email: 'grace@example.com',
+  name: 'Grace Hopper',
+  role: 'member',
+}
+
+/** Ada as the owner of Acme, as the members API returns her. */
+export const ADA_MEMBER: Schemas['MemberOut'] = {
+  user_id: ADA.user.id,
+  email: ADA.user.email,
+  name: ADA.user.name,
+  role: 'owner',
+}
+
+export const CLAUDE_AGENT: Schemas['AgentOut'] = {
+  id: '0190a000-0000-7000-8000-0000000000f1',
+  name: 'Claude',
+  description: null,
+  created_by: ADA.user.id,
+  created_at: '2026-11-01T10:00:00Z',
+  updated_at: '2026-11-01T10:00:00Z',
+}
+
+/** A grant for a member as the project and the list grants API return it. */
+export function userGrant<Role extends Schemas['ListRole']>(id: string, member: Schemas['MemberOut'], role: Role) {
+  return {
+    id,
+    principal_kind: 'user' as const,
+    principal_id: member.user_id,
+    name: member.name,
+    email: member.email,
+    role,
+    created_at: '2026-11-01T10:00:00Z',
+    updated_at: '2026-11-01T10:00:00Z',
+  }
+}
+
+/** A grant for an agent as the project and the list grants API return it. */
+export function agentGrant<Role extends Schemas['ListRole']>(id: string, agent: Schemas['AgentOut'], role: Role) {
+  return {
+    id,
+    principal_kind: 'agent' as const,
+    principal_id: agent.id,
+    name: agent.name,
+    email: null,
+    role,
+    created_at: '2026-11-01T10:00:00Z',
+    updated_at: '2026-11-01T10:00:00Z',
+  }
+}

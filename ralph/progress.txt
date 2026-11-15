@@ -50,6 +50,10 @@
   in src/items/hooks.ts. All item changes go through `useChangeItems` as an `ItemChange` (optimistic
   via `applyItemChange`, rollback + message on error, serial per list). `ListOut.organization_id`
   exists. Tests: src/pages/ListPage.test.tsx, e2e/items.spec.ts (`saved(page, method, action)`).
+- Sharing in the UI (since US-035): "Share" on the project page and the list page opens
+  components/ShareDialogs.tsx (hooks in src/sharing/hooks.ts, incl. `useAgents`). Inherited project
+  grants for a list admin: `GET /api/lists/{id}/grants/inherited`. Tests: components/ShareDialogs.test.tsx,
+  e2e/sharing.spec.ts (two people in one organization).
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -1172,4 +1176,37 @@
     this iteration) appeared during the work and was staged; GitHub's push protection refused the
     push, the commit was amended without it before anything was pushed, and `.envrc` is now in
     .gitignore.
+---
+
+## 2026-11-15 01:25 - US-035
+- "Share" buttons (admins only) on the project page and the list page open a dialog with the current
+  grants: name, a Person / Agent marker, email, a role select that saves on change, and "Remove"
+  (asks in the row). A picker adds a member or an agent of the organization with a role.
+- The list dialog shows "Access to this list only" (with the "No access" role) apart from "Access
+  from the project <name>" (read-only; a role replaced by a list grant is struck through), and on a
+  human_only list a note that agents cannot access it whatever the grants.
+- Backend: `GET /api/lists/{list_id}/grants/inherited` (list admin) gives the project's grants, so a
+  list admin without a project role can see the inherited access. `_grant_out` in
+  api/project_grants.py became public (`grant_out`). No schema change.
+- Files changed: src/todolist/api/list_grants.py, api/project_grants.py, tests/test_list_grants.py,
+  frontend/openapi.json + src/api/schema.d.ts (generated), frontend/src/sharing/hooks.ts (new),
+  components/ShareDialogs.tsx (new) + ShareDialogs.test.tsx (new), components/Dialog.tsx (`wide`,
+  scrolls when taller than the window), pages/ProjectPage.tsx, pages/ListPage.tsx, test/api.ts,
+  e2e/sharing.spec.ts (new), DECISIONS.md, CLAUDE.md
+- Checks: ruff, pyright, pytest (693), eslint, tsc, vitest (99), Playwright (13) all pass.
+- Browser check: the Chrome DevTools tools could not start (their browser profile was in use by
+  another session), so the dialogs were looked at through screenshots made with Playwright on the
+  e2e backend (port 8766): the project dialog and the list dialog at desktop width, the list dialog
+  at phone width. They looked right; after that the name column got a minimum width so the role
+  select wraps under the name on a phone, and that last change was not looked at again.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - A generic component over the project and list grants needs the mutation variables to be the
+    small shape (`GrantRef`: id + principal), not the full API row, or the two hooks do not fit one prop type.
+  - When the DevTools browser is taken, a throw-away node script that imports
+    `frontend/node_modules/@playwright/test/index.mjs`, sets data up with `context.request` and calls
+    `page.screenshot()` gives pictures to look at with the Read tool. Keep it outside the repo.
+  - `getByRole('combobox', { name: 'Role', exact: true })` is needed next to the "Role of <name>" selects.
+  - There is still no UI for agents (create, rename, delete) or for the audit log; the picker shows
+    agents made through the API.
 ---

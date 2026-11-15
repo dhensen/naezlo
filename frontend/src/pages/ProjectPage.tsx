@@ -7,6 +7,7 @@ import { Dialog, DIALOG_CANCEL, DIALOG_DANGER, DIALOG_INPUT, DIALOG_LABEL, DIALO
 import { ErrorMessage } from '../components/ErrorMessage'
 import { DeleteListDialog, EditListDialog, NewListDialog } from '../components/ListDialogs'
 import { ModeBadge } from '../components/ModeBadge'
+import { ShareProjectDialog } from '../components/ShareDialogs'
 import { listAllows } from '../lists/hooks'
 import { useCurrentOrganization } from '../orgs/hooks'
 import type { Organization, Project } from '../orgs/hooks'
@@ -32,7 +33,7 @@ export function ProjectPage() {
 
 function ProjectView({ organization, projectId }: { organization: Organization; projectId: string }) {
   const project = useProject(projectId)
-  const [dialog, setDialog] = useState<'edit' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'edit' | 'share' | 'delete' | null>(null)
 
   const notFound =
     (project.error instanceof ApiError && (project.error.status === 404 || project.error.status === 422)) ||
@@ -64,6 +65,7 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
 
   const current = project.data
   const canEdit = roleAtLeast(current.role, 'editor')
+  // Sharing and deleting are for the project's admins.
   const canDelete = roleAtLeast(current.role, 'admin')
 
   return (
@@ -83,6 +85,11 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
               </button>
             )}
             {canDelete && (
+              <button type="button" className={HEADER_BUTTON} onClick={() => setDialog('share')}>
+                Share
+              </button>
+            )}
+            {canDelete && (
               <button type="button" className={HEADER_DANGER_BUTTON} onClick={() => setDialog('delete')}>
                 Delete
               </button>
@@ -92,6 +99,7 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
       </header>
       <ListsSection project={current} organization={organization} />
       {dialog === 'edit' && <EditProjectDialog project={current} onClose={() => setDialog(null)} />}
+      {dialog === 'share' && <ShareProjectDialog project={current} onClose={() => setDialog(null)} />}
       {dialog === 'delete' && (
         <DeleteProjectDialog project={current} organization={organization} onClose={() => setDialog(null)} />
       )}

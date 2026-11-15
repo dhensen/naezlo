@@ -36,7 +36,7 @@ class GrantOut(BaseModel):
     updated_at: datetime
 
 
-def _grant_out(view: GrantView) -> GrantOut:
+def grant_out(view: GrantView) -> GrantOut:
     return GrantOut(
         id=view.grant.id,
         principal_kind=view.grant.principal_kind,
@@ -51,7 +51,7 @@ def _grant_out(view: GrantView) -> GrantOut:
 
 @router.get("")
 async def list_grants_route(ctx: ProjectAdminContextDep, session: SessionDep) -> list[GrantOut]:
-    return [_grant_out(view) for view in await list_project_grants(session, ctx.project)]
+    return [grant_out(view) for view in await list_project_grants(session, ctx.project)]
 
 
 @router.put("")
@@ -61,7 +61,7 @@ async def set_grant_route(
     view = await set_project_grant(
         session, ctx.principal, ctx.project, body.principal_kind, body.principal_id, body.role
     )
-    return _grant_out(view)
+    return grant_out(view)
 
 
 @router.delete("/{grant_id}", status_code=204)

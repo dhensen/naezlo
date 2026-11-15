@@ -2190,6 +2190,54 @@
         ]
       }
     },
+    "/api/lists/{list_id}/grants/inherited": {
+      "get": {
+        "description": "The grants on the list's project: the role of everyone without a grant on the list itself.\n\nA list admin may read them without a role on the project, to see who else gets in.",
+        "operationId": "list_inherited_grants_route_api_lists__list_id__grants_inherited_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "list_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "List Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GrantOut"
+                  },
+                  "title": "Response List Inherited Grants Route Api Lists  List Id  Grants Inherited Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Inherited Grants Route",
+        "tags": [
+          "list grants"
+        ]
+      }
+    },
     "/api/lists/{list_id}/grants/{grant_id}": {
       "delete": {
         "operationId": "revoke_grant_route_api_lists__list_id__grants__grant_id__delete",

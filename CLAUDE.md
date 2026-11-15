@@ -421,3 +421,13 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
 - Vitest fixture `item(list, id, title, overrides)` (`src/test/api.ts`); a test that renders a list
   page mocks `GET /api/lists/<id>` and `GET /api/lists/<id>/items`. `recorded(answer)` in
   `src/pages/ListPage.test.tsx` gives a route that keeps the request bodies.
+- Sharing in the UI: `frontend/src/components/ShareDialogs.tsx` (`ShareProjectDialog`, `ShareListDialog`,
+  both on the generic `Grants` section with its picker), hooks in `src/sharing/hooks.ts` (`useAgents`,
+  `useProjectGrants`, `useListGrants`, `useInheritedGrants`, `useSet*Grant`, `useRevoke*Grant`). The
+  project grants of a list for its admins: `GET /api/lists/{id}/grants/inherited`. A grant mutation
+  reloads the page's queries only when the grant is the user's own (`isMe`).
+- `<Dialog wide>` is for a dialog with rows of data. Vitest fixtures for sharing: `GRACE`, `ADA_MEMBER`,
+  `CLAUDE_AGENT`, `userGrant(id, member, role)`, `agentGrant(id, agent, role)` (`src/test/api.ts`); a test
+  that opens a share dialog mocks `GET /api/orgs/<id>/members` and `.../agents` for the picker.
+- E2E: a second person joins the first one's organization with `page.request.post('/api/orgs/<id>/invitations',
+  { data: { email } })` after they signed in once in their own context (`frontend/e2e/sharing.spec.ts`).

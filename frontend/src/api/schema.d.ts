@@ -248,6 +248,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lists/{list_id}/grants/inherited": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Inherited Grants Route
+         * @description The grants on the list's project: the role of everyone without a grant on the list itself.
+         *
+         *     A list admin may read them without a role on the project, to see who else gets in.
+         */
+        get: operations["list_inherited_grants_route_api_lists__list_id__grants_inherited_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lists/{list_id}/grants/{grant_id}": {
         parameters: {
             query?: never;
@@ -1808,6 +1830,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListGrantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_inherited_grants_route_api_lists__list_id__grants_inherited_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                list_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantOut"][];
                 };
             };
             /** @description Validation Error */

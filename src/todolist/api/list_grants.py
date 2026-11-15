@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from todolist.api.deps import ListAdminContextDep
+from todolist.api.project_grants import GrantOut, grant_out
 from todolist.db import SessionDep
 from todolist.models import ListRole, PrincipalKind
 from todolist.services.list_grants import (
@@ -15,6 +16,7 @@ from todolist.services.list_grants import (
     revoke_list_grant,
     set_list_grant,
 )
+from todolist.services.project_grants import list_project_grants
 
 router = APIRouter(prefix="/lists/{list_id}/grants", tags=["list grants"])
 
@@ -53,6 +55,17 @@ def _grant_out(view: ListGrantView) -> ListGrantOut:
 @router.get("")
 async def list_grants_route(ctx: ListAdminContextDep, session: SessionDep) -> list[ListGrantOut]:
     return [_grant_out(view) for view in await list_list_grants(session, ctx.todo_list)]
+
+
+@router.get("/inherited")
+async def list_inherited_grants_route(
+    ctx: ListAdminContextDep, session: SessionDep
+) -> list[GrantOut]:
+    """The grants on the list's project: the role of everyone without a grant on the list itself.
+
+    A list admin may read them without a role on the project, to see who else gets in.
+    """
+    return [grant_out(view) for view in await list_project_grants(session, ctx.project)]
 
 
 @router.put("")

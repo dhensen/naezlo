@@ -619,7 +619,7 @@
         "Verify in a browser if browser tools are available"
       ],
       "priority": 35,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
