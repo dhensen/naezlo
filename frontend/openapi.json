@@ -1,6 +1,16 @@
 {
   "components": {
     "schemas": {
+      "ActionGroup": {
+        "description": "The actions as a reader sorts them: what happened to items, to the lists (and the\nproject they are in), or to who has access.",
+        "enum": [
+          "items",
+          "lists",
+          "sharing"
+        ],
+        "title": "ActionGroup",
+        "type": "string"
+      },
       "ActorOut": {
         "description": "Who did something: a user or an agent.",
         "properties": {
@@ -2077,6 +2087,22 @@
               ],
               "title": "Action"
             }
+          },
+          {
+            "in": "query",
+            "name": "group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ActionGroup"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group"
+            }
           }
         ],
         "responses": {
@@ -3535,6 +3561,22 @@
                 }
               ],
               "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ActionGroup"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group"
             }
           }
         ],

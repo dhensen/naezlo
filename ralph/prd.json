@@ -673,8 +673,8 @@
         "Verify in a browser if browser tools are available"
       ],
       "priority": 38,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Browser check done with a throw-away Playwright script (screenshots), because the chrome-devtools browser was in use by another session."
     }
   ]
 }

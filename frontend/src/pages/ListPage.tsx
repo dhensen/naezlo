@@ -1,12 +1,14 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 
 import { ApiError } from '../api/client'
 import { useMe } from '../auth/hooks'
+import { ActivityLog } from '../components/ActivityLog'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { ModeBadge, ModeIcon } from '../components/ModeBadge'
 import { ShareListDialog } from '../components/ShareDialogs'
+import { TabPanel, Tabs } from '../components/Tabs'
 import { addItem, isUnsaved, useChangeItems, useItems } from '../items/hooks'
 import type { Item, ItemChange } from '../items/hooks'
 import { listAllows, useList } from '../lists/hooks'
@@ -15,7 +17,15 @@ import type { Organization } from '../orgs/hooks'
 import { orgPath, projectPath } from '../orgs/paths'
 import type { TodoList } from '../projects/hooks'
 
-/** A list (`/o/:orgSlug/l/:listId`): its name, mode, project and items. */
+const LIST_TABS = [
+  { id: 'items', label: 'Items' },
+  { id: 'activity', label: 'Activity' },
+] as const
+
+/**
+ * A list (`/o/:orgSlug/l/:listId`): its name, mode, project and items. Its admins also get
+ * the "Activity" tab with the audit log (`?tab=activity`).
+ */
 export function ListPage() {
   const { organization } = useCurrentOrganization()
   const { listId } = useParams()
@@ -31,6 +41,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
   const items = useItems(listId)
   const projects = useProjects(organization.id)
   const [sharing, setSharing] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const notFound =
     (list.error instanceof ApiError && (list.error.status === 404 || list.error.status === 422)) ||
@@ -62,6 +73,27 @@ function ListView({ organization, listId }: { organization: Organization; listId
 
   const current = list.data
   const canChange = listAllows(current, 'change_items')
+  // The audit log is for the list's admins; everyone else has no tabs at all.
+  const canAdminister = listAllows(current, 'administer')
+  const tab = canAdminister && searchParams.get('tab') === 'activity' ? 'activity' : 'items'
+  const itemsView = (
+    <>
+      {!canChange && (
+        <p role="note" className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          {current.mode === 'ai_only'
+            ? 'AI agents manage this list. You can read it, but not change its items.'
+            : 'You can read this list, but not change its items.'}
+        </p>
+      )}
+      {items.isPending && (
+        <p role="status" className="text-sm text-slate-500">
+          Loading…
+        </p>
+      )}
+      <ErrorMessage error={items.error} />
+      {items.data && <ItemsSection list={current} items={items.data} canChange={canChange} />}
+    </>
+  )
   // Someone with a grant on the list alone cannot open the project: no link for them.
   const projectIsVisible = projects.data?.some((project) => project.id === current.project_id) ?? false
 
@@ -95,20 +127,21 @@ function ListView({ organization, listId }: { organization: Organization; listId
           <p className="break-words whitespace-pre-line text-slate-600">{current.description}</p>
         )}
       </header>
-      {!canChange && (
-        <p role="note" className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-          {current.mode === 'ai_only'
-            ? 'AI agents manage this list. You can read it, but not change its items.'
-            : 'You can read this list, but not change its items.'}
-        </p>
+      {canAdminister ? (
+        <>
+          <Tabs
+            label="Views of this list"
+            tabs={LIST_TABS}
+            selected={tab}
+            onSelect={(id) => setSearchParams(id === 'items' ? {} : { tab: id }, { replace: true })}
+          />
+          <TabPanel tab={tab} className="flex flex-col gap-5">
+            {tab === 'activity' ? <ActivityLog scope={{ kind: 'list', id: current.id }} /> : itemsView}
+          </TabPanel>
+        </>
+      ) : (
+        itemsView
       )}
-      {items.isPending && (
-        <p role="status" className="text-sm text-slate-500">
-          Loading…
-        </p>
-      )}
-      <ErrorMessage error={items.error} />
-      {items.data && <ItemsSection list={current} items={items.data} canChange={canChange} />}
       {sharing && <ShareListDialog list={current} onClose={() => setSharing(false)} />}
     </main>
   )

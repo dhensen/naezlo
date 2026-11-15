@@ -17,6 +17,7 @@ from todolist.models import AuditEvent, PrincipalKind
 from todolist.services.audit import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
+    ActionGroup,
     EventFilter,
     EventPage,
     list_events,
@@ -34,11 +35,16 @@ class AuditQuery(BaseModel):
     actor_id: uuid.UUID | None = None
     # The start of the action: "item." for every item event.
     action: str | None = Field(None, max_length=100)
+    # All actions of one kind: items, lists (with the project's own events) or sharing (grants).
+    group: ActionGroup | None = None
 
     @property
     def filters(self) -> EventFilter:
         return EventFilter(
-            actor_kind=self.actor_kind, actor_id=self.actor_id, action_prefix=self.action
+            actor_kind=self.actor_kind,
+            actor_id=self.actor_id,
+            action_prefix=self.action,
+            group=self.group,
         )
 
 

@@ -452,3 +452,15 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
 - E2E of the OAuth flow: `startFlow(page, clientName)` in `frontend/e2e/consent.spec.ts` registers a
   client, builds the `/authorize` URL with PKCE and answers the callback URL (nothing listens there)
   with `page.route`; `flow.callback` resolves with the URL the browser was sent to.
+- Audit log in the UI: `frontend/src/components/ActivityLog.tsx` (`<ActivityLog scope={{ kind, id }} listNames />`),
+  hooks in `src/audit/hooks.ts` (`useActivity`, an infinite query on the API cursor), wording in
+  `src/audit/describe.ts` (`describeEvent`, `eventChanges`). A new `AuditAction` gets a sentence there
+  (and a row in `describe.test.ts`) and must start with a prefix of an `ActionGroup`
+  (`services/audit.py`; the `group` query parameter of the audit routes).
+- Page tabs: `<Tabs label tabs selected onSelect />` and `<TabPanel tab>` (`src/components/Tabs.tsx`);
+  the selected tab lives in the address as `?tab=<id>` (`useSearchParams`, `{ replace: true }`). The
+  "Activity" tab of the project and the list page is for admins; others get no tab list.
+- Role labels for the UI: `ROLE_LABELS` in `src/sharing/roles.ts`. Vitest fixtures for the log:
+  `auditEvent(list, action, details, overrides)` and `CLAUDE_ACTOR` (`src/test/api.ts`).
+- A list of rows that tests count with `getByRole('listitem')` must not nest another list: details
+  inside a row are a `<dl>` (see `EventRow`).

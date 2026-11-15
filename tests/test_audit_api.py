@@ -11,12 +11,14 @@ from tests.helpers import add_member, grant_list_role, sign_in
 from tests.test_items import ada_list, create, join
 from todolist.models import (
     Agent,
+    AuditAction,
     ListRole,
     MembershipRole,
     ProjectRole,
     TodoList,
 )
 from todolist.principals import Principal
+from todolist.services.audit import action_group
 from todolist.services.items import create_item
 
 
@@ -362,3 +364,46 @@ async def test_organization_admin_reads_the_logs(
 
     assert len(await actions(other_client, f"/api/projects/{project_id}/audit")) == 2
     assert len(await actions(other_client, f"/api/lists/{list_id}/audit")) == 1
+
+
+async def test_group_filter(client: AsyncClient, db_session: AsyncSession) -> None:
+    await sign_in(client)
+    org_id, project_id, list_id, items_url = await ada_list(client)
+    response = await client.patch(f"/api/lists/{list_id}", json={"mode": "mixed"})
+    assert response.status_code == 200, response.text
+    await create(client, items_url, "Buy domain")
+    agent = await agent_item(db_session, org_id, list_id, "Write tests")
+    grant = {"principal_kind": "agent", "principal_id": str(agent.id), "role": "editor"}
+    response = await client.put(f"/api/lists/{list_id}/grants", json=grant)
+    assert response.status_code == 200, response.text
+    response = await client.put(f"/api/projects/{project_id}/grants", json=grant)
+    assert response.status_code == 200, response.text
+
+    project_url, list_url = f"/api/projects/{project_id}/audit", f"/api/lists/{list_id}/audit"
+    for url in (project_url, list_url):
+        assert await actions(client, url, group="items") == ["item.created", "item.created"]
+        assert await actions(client, url, group="items", actor_kind="agent") == ["item.created"]
+        # Both filters must hold.
+        assert await actions(client, url, group="items", action="list.") == []
+        response = await client.get(url, params={"group": "everything"})
+        assert response.status_code == 422, response.text
+
+    # The project's own events are with the lists.
+    assert await actions(client, project_url, group="lists") == [
+        "list.updated",
+        "list.created",
+        "project.created",
+    ]
+    assert await actions(client, list_url, group="lists") == ["list.updated", "list.created"]
+    assert await actions(client, project_url, group="sharing") == [
+        "project_grant.set",
+        "list_grant.set",
+    ]
+    assert await actions(client, list_url, group="sharing") == ["list_grant.set"]
+
+
+def test_every_action_is_in_a_group() -> None:
+    assert all(action_group(action.value) is not None for action in AuditAction)
+    assert action_group("list_grant.set") == "sharing"
+    assert action_group("list.updated") == "lists"
+    assert action_group("something.else") is None

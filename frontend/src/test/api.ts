@@ -189,3 +189,34 @@ export function agentGrant<Role extends Schemas['ListRole']>(id: string, agent: 
     updated_at: '2026-11-01T10:00:00Z',
   }
 }
+
+let auditEvents = 0
+
+/**
+ * An audit event as the API returns it, done by Ada in a list. Every call gets its own id
+ * and a later minute; `details` is what the action's service records (DECISIONS.md).
+ */
+export function auditEvent(
+  of: Schemas['ListOut'],
+  action: string,
+  details: Record<string, unknown>,
+  overrides: Partial<Schemas['AuditEventOut']> = {},
+): Schemas['AuditEventOut'] {
+  auditEvents += 1
+  const number = String(auditEvents).padStart(4, '0')
+  return {
+    id: `0190a000-0000-7000-8000-00000000${number}`,
+    created_at: `2026-11-02T10:${String(auditEvents % 60).padStart(2, '0')}:00Z`,
+    actor: { kind: 'user', id: ADA.user.id, name: ADA.user.name },
+    action,
+    target_kind: action.split('.')[0],
+    target_id: `0190a000-0000-7000-8000-10000000${number}`,
+    project_id: of.project_id,
+    list_id: of.id,
+    details,
+    ...overrides,
+  }
+}
+
+/** Claude as the actor of an audit event. */
+export const CLAUDE_ACTOR: Schemas['AuditActorOut'] = { kind: 'agent', id: CLAUDE_AGENT.id, name: CLAUDE_AGENT.name }

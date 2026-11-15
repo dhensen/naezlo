@@ -77,14 +77,41 @@ async def record_event(
     return event
 
 
+class ActionGroup(enum.StrEnum):
+    """The actions as a reader sorts them: what happened to items, to the lists (and the
+    project they are in), or to who has access."""
+
+    ITEMS = "items"
+    LISTS = "lists"
+    SHARING = "sharing"
+
+
+# Every `AuditAction` starts with one of these (tests/test_audit_api.py checks it).
+_GROUP_PREFIXES: dict[ActionGroup, tuple[str, ...]] = {
+    ActionGroup.ITEMS: ("item.",),
+    ActionGroup.LISTS: ("project.", "list."),
+    ActionGroup.SHARING: ("project_grant.", "list_grant."),
+}
+
+
+def action_group(action: str) -> ActionGroup | None:
+    """The group an action belongs to; None for an action no group knows."""
+    for group, prefixes in _GROUP_PREFIXES.items():
+        if action.startswith(prefixes):
+            return group
+    return None
+
+
 @dataclass(frozen=True)
 class EventFilter:
     """Optional filters for reading the log. `action_prefix` matches the start of the action:
-    "item." gives every item event, "item.completed" only that one."""
+    "item." gives every item event, "item.completed" only that one. `group` gives the actions
+    of one `ActionGroup`. The filters combine with AND."""
 
     actor_kind: PrincipalKind | None = None
     actor_id: uuid.UUID | None = None
     action_prefix: str | None = None
+    group: ActionGroup | None = None
 
 
 @dataclass(frozen=True)
@@ -130,6 +157,15 @@ async def _page(
         query = query.where(AuditEvent.actor_id == filters.actor_id)
     if filters.action_prefix:
         query = query.where(AuditEvent.action.startswith(filters.action_prefix, autoescape=True))
+    if filters.group is not None:
+        query = query.where(
+            or_(
+                *(
+                    AuditEvent.action.startswith(prefix, autoescape=True)
+                    for prefix in _GROUP_PREFIXES[filters.group]
+                )
+            )
+        )
     if cursor is not None:
         query = query.where(order < _decode_cursor(cursor))
     query = query.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc())

@@ -731,6 +731,13 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * ActionGroup
+         * @description The actions as a reader sorts them: what happened to items, to the lists (and the
+         *     project they are in), or to who has access.
+         * @enum {string}
+         */
+        ActionGroup: "items" | "lists" | "sharing";
+        /**
          * ActorOut
          * @description Who did something: a user or an agent.
          */
@@ -1754,6 +1761,7 @@ export interface operations {
                 actor_kind?: components["schemas"]["PrincipalKind"] | null;
                 actor_id?: string | null;
                 action?: string | null;
+                group?: components["schemas"]["ActionGroup"] | null;
             };
             header?: never;
             path: {
@@ -2706,6 +2714,7 @@ export interface operations {
                 actor_kind?: components["schemas"]["PrincipalKind"] | null;
                 actor_id?: string | null;
                 action?: string | null;
+                group?: components["schemas"]["ActionGroup"] | null;
             };
             header?: never;
             path: {

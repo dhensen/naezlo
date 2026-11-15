@@ -15,15 +15,10 @@ import {
   useSetProjectGrant,
 } from '../sharing/hooks'
 import type { GrantRef, ListRole, PrincipalKind, PrincipalRef, ProjectGrant } from '../sharing/hooks'
+import { ROLE_LABELS } from '../sharing/roles'
 import { Dialog, DIALOG_CANCEL, DIALOG_SUBMIT } from './Dialog'
 import { ErrorMessage } from './ErrorMessage'
 
-const ROLE_LABELS: Record<ListRole, string> = {
-  viewer: 'Viewer',
-  editor: 'Editor',
-  admin: 'Admin',
-  none: 'No access',
-}
 const PROJECT_ROLES: readonly ProjectRole[] = ['viewer', 'editor', 'admin']
 const LIST_ROLES: readonly ListRole[] = ['viewer', 'editor', 'admin', 'none']
 

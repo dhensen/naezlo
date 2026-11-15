@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 
 import { ApiError } from '../api/client'
+import { ActivityLog } from '../components/ActivityLog'
 import { Dialog, DIALOG_CANCEL, DIALOG_DANGER, DIALOG_INPUT, DIALOG_LABEL, DIALOG_SUBMIT } from '../components/Dialog'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { DeleteListDialog, EditListDialog, NewListDialog } from '../components/ListDialogs'
 import { ModeBadge } from '../components/ModeBadge'
 import { ShareProjectDialog } from '../components/ShareDialogs'
+import { TabPanel, Tabs } from '../components/Tabs'
 import { listAllows } from '../lists/hooks'
 import { useCurrentOrganization } from '../orgs/hooks'
 import type { Organization, Project } from '../orgs/hooks'
@@ -20,7 +22,15 @@ const HEADER_BUTTON =
 const HEADER_DANGER_BUTTON =
   'rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50'
 
-/** A project (`/o/:orgSlug/p/:projectId`): its name, description and lists. */
+const PROJECT_TABS = [
+  { id: 'lists', label: 'Lists' },
+  { id: 'activity', label: 'Activity' },
+] as const
+
+/**
+ * A project (`/o/:orgSlug/p/:projectId`): its name, description and lists. Its admins also
+ * get the "Activity" tab with the audit log (`?tab=activity`).
+ */
 export function ProjectPage() {
   const { organization } = useCurrentOrganization()
   const { projectId } = useParams()
@@ -34,6 +44,7 @@ export function ProjectPage() {
 function ProjectView({ organization, projectId }: { organization: Organization; projectId: string }) {
   const project = useProject(projectId)
   const [dialog, setDialog] = useState<'edit' | 'share' | 'delete' | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const notFound =
     (project.error instanceof ApiError && (project.error.status === 404 || project.error.status === 422)) ||
@@ -67,6 +78,9 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
   const canEdit = roleAtLeast(current.role, 'editor')
   // Sharing and deleting are for the project's admins.
   const canDelete = roleAtLeast(current.role, 'admin')
+  // So is the audit log; everyone else has no tabs at all.
+  const tab = canDelete && searchParams.get('tab') === 'activity' ? 'activity' : 'lists'
+  const lists = <ListsSection project={current} organization={organization} />
 
   return (
     <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-6">
@@ -97,7 +111,19 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
           </div>
         )}
       </header>
-      <ListsSection project={current} organization={organization} />
+      {canDelete ? (
+        <>
+          <Tabs
+            label="Views of this project"
+            tabs={PROJECT_TABS}
+            selected={tab}
+            onSelect={(id) => setSearchParams(id === 'lists' ? {} : { tab: id }, { replace: true })}
+          />
+          <TabPanel tab={tab}>{tab === 'activity' ? <ProjectActivity project={current} /> : lists}</TabPanel>
+        </>
+      ) : (
+        lists
+      )}
       {dialog === 'edit' && <EditProjectDialog project={current} onClose={() => setDialog(null)} />}
       {dialog === 'share' && <ShareProjectDialog project={current} onClose={() => setDialog(null)} />}
       {dialog === 'delete' && (
@@ -105,6 +131,13 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
       )}
     </main>
   )
+}
+
+/** The project's audit log; an event of a list that still exists names that list. */
+function ProjectActivity({ project }: { project: Project }) {
+  const lists = useProjectLists(project.id)
+  const listNames = useMemo(() => new Map((lists.data ?? []).map((list) => [list.id, list.name])), [lists.data])
+  return <ActivityLog scope={{ kind: 'project', id: project.id }} listNames={listNames} />
 }
 
 function openItems(count: number): string {

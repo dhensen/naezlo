@@ -62,6 +62,10 @@
   src/oauth/hooks.ts), guarded but outside `AppLayout`. Tests: src/pages/ConsentPage.test.tsx and
   e2e/consent.spec.ts (`startFlow(page, clientName)` registers a client and makes the PKCE pair; the
   callback URL is answered with `page.route`).
+- Audit log in the UI (since US-038): the "Activity" tab (`?tab=activity`, admins only) on the
+  project and the list page: components/ActivityLog.tsx + Tabs.tsx, src/audit/ (hooks.ts,
+  describe.ts). The audit routes take `group=items|lists|sharing`. Tests: pages/Activity.test.tsx,
+  audit/describe.test.ts, e2e/activity.spec.ts.
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -1289,4 +1293,43 @@
     `beforeEach` when several tests assert on it.
   - A throw-away Playwright script must lie inside frontend/ to resolve `@playwright/test` (copy it
     in, run it, delete it).
+---
+
+## 2026-11-15 - US-038
+- Implemented the audit log views: an "Activity" tab on the project page (next to "Lists") and on
+  the list page (next to "Items"), for admins only, in the address as `?tab=activity`. Rows are
+  newest first with a person/robot marker, the actor's name, a sentence per action (Claude
+  completed "Write tests"), the changed fields of updates as "Field: old → new", and the time.
+  Filters "By" (Everyone, Humans, Agents) and "Changes to" (All changes, Items, Lists, Sharing) go
+  to the API; "Load more" uses the API cursor. In a project's log, item and list-grant events name
+  their list when it still exists.
+- Backend: the audit routes got a `group` query parameter (`items | lists | sharing`, `ActionGroup`
+  in services/audit.py), because "sharing" is two action prefixes and the existing `action` prefix
+  filter cannot express it. Project events are in `lists`.
+- README.md: sections for local setup, running the app, running all checks, Google login and
+  connecting an agent over MCP, below the unchanged feature list.
+- Files: src/todolist/services/audit.py, api/audit.py, tests/test_audit_api.py, frontend/openapi.json
+  + src/api/schema.d.ts (generated), frontend/src/audit/ (new: hooks.ts, describe.ts,
+  describe.test.ts), components/ActivityLog.tsx + Tabs.tsx (new), sharing/roles.ts (new, `ROLE_LABELS`
+  moved out of ShareDialogs.tsx), pages/ListPage.tsx, ProjectPage.tsx, pages/Activity.test.tsx (new),
+  test/api.ts, e2e/activity.spec.ts (new), README.md, DECISIONS.md, CLAUDE.md
+- Checks: ruff, pyright, pytest (696), eslint, tsc, vitest (153), Playwright (19) all pass.
+- Browser check: the chrome-devtools browser was in use by another session, so screenshots were
+  made with a throw-away Playwright script on the e2e backend (port 8766), at desktop and phone
+  width: the list's Activity tab with events by a person and by an agent (made through the item
+  service; no MCP client was connected), update rows with changed fields, the empty state after
+  filtering, and the project's Activity tab. They looked right. Not looked at: the "Load more"
+  button and the error state (Playwright and vitest cover them).
+- Not verified: the Google console steps in the README were written from .env.example and general
+  knowledge; the console itself was not opened, and nobody signed in with Google for this story.
+  The README's MCP commands are the connect panel's (checked in US-036), not run again.
+- Pushed: yes
+- **Learnings for future iterations:**
+  - `useInfiniteQuery` ends when `getNextPageParam` returns null, so the API's `next_cursor` can
+    be returned as it is.
+  - Rows that tests count by `listitem` must not contain a nested list; use a `<dl>` for details.
+  - Playwright's `toContainText([...])` on a list locator checks the rows in order by substring.
+  - An agent event without an MCP client: a short script with `create_item(session,
+    Principal.for_agent(agent), ...)` on `E2E_DATABASE_URL` while the e2e backend runs.
+  - Every story of ralph/prd.json now passes.
 ---
