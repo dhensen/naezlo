@@ -130,8 +130,10 @@ export function item(
   }
 }
 
+export const MCP_URL = 'https://todos.example.com/mcp'
+
 export function config(overrides: Partial<AppConfig> = {}): Response {
-  return json({ dev_login_enabled: false, google_login_enabled: false, ...overrides })
+  return json({ dev_login_enabled: false, google_login_enabled: false, mcp_url: MCP_URL, ...overrides })
 }
 
 export const GRACE: Schemas['MemberOut'] = {
@@ -154,6 +156,8 @@ export const CLAUDE_AGENT: Schemas['AgentOut'] = {
   name: 'Claude',
   description: null,
   created_by: ADA.user.id,
+  project_count: 0,
+  list_count: 0,
   created_at: '2026-11-01T10:00:00Z',
   updated_at: '2026-11-01T10:00:00Z',
 }

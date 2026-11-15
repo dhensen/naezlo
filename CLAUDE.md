@@ -431,3 +431,16 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
   that opens a share dialog mocks `GET /api/orgs/<id>/members` and `.../agents` for the picker.
 - E2E: a second person joins the first one's organization with `page.request.post('/api/orgs/<id>/invitations',
   { data: { email } })` after they signed in once in their own context (`frontend/e2e/sharing.spec.ts`).
+- Agents in the UI: the page is `/o/:orgSlug/agents` (`src/pages/AgentsPage.tsx`), dialogs in
+  `components/AgentDialogs.tsx` and `components/ConnectAgentDialog.tsx`, hooks in `src/agents/hooks.ts`
+  (`useCreateAgent`, `useUpdateAgent`, `useDeleteAgent`; `useAgents` stays in `src/sharing/hooks.ts`).
+  `AgentOut.project_count` / `list_count` come from `agent_reach` (`services/agents.py`). The MCP
+  setup texts per tool are data in `src/agents/connect.ts` (`clientGuides(mcpUrl)`, `serverName()`);
+  when a tool's syntax changes, change it there and the sources in DECISIONS.md (US-036).
+- `GET /api/config` also gives `mcp_url`; the vitest `config()` fixture answers `MCP_URL`.
+- `renderApp` puts the location in an `<output>`, which has the role `status`: a test cannot ask
+  for "the" status. An informative notice on a page is `role="note"`.
+- A copyable text is `<CopyButton text label />` (`src/components/CopyButton.tsx`, named "Copy <label>").
+  In Playwright a labelled code block needs `getByLabel('Command', { exact: true })`, or the copy
+  button matches too.
+

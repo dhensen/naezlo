@@ -82,9 +82,17 @@
             "title": "Id",
             "type": "string"
           },
+          "list_count": {
+            "title": "List Count",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "project_count": {
+            "title": "Project Count",
+            "type": "integer"
           },
           "updated_at": {
             "format": "date-time",
@@ -97,6 +105,8 @@
           "name",
           "description",
           "created_by",
+          "project_count",
+          "list_count",
           "created_at",
           "updated_at"
         ],
@@ -344,11 +354,16 @@
           "google_login_enabled": {
             "title": "Google Login Enabled",
             "type": "boolean"
+          },
+          "mcp_url": {
+            "title": "Mcp Url",
+            "type": "string"
           }
         },
         "required": [
           "dev_login_enabled",
-          "google_login_enabled"
+          "google_login_enabled",
+          "mcp_url"
         ],
         "title": "ConfigOut",
         "type": "object"

@@ -184,17 +184,21 @@ async def test_dev_login_rejects_invalid_input(client: AsyncClient, body: dict[s
     assert response.status_code == 422
 
 
-async def test_config_is_public(client: AsyncClient) -> None:
+async def test_config_is_public(client: AsyncClient, settings: Settings) -> None:
     response = await client.get("/api/config")
 
     assert response.status_code == 200
-    assert response.json() == {"dev_login_enabled": True, "google_login_enabled": False}
+    assert response.json() == {
+        "dev_login_enabled": True,
+        "google_login_enabled": False,
+        "mcp_url": f"{settings.public_base_url.rstrip('/')}/mcp",
+    }
 
 
 async def test_config_reports_dev_login_disabled(client_without_dev_login: AsyncClient) -> None:
     response = await client_without_dev_login.get("/api/config")
 
-    assert response.json() == {"dev_login_enabled": False, "google_login_enabled": False}
+    assert response.json()["dev_login_enabled"] is False
 
 
 def test_dev_login_is_off_by_default() -> None:

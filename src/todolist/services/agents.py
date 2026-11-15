@@ -4,13 +4,16 @@ The callers check that the acting user may manage the organization (owner or adm
 """
 
 import uuid
+from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from todolist.errors import ConflictError, NotFoundError
 from todolist.models import Agent
+from todolist.permissions import accessible_lists
+from todolist.principals import Principal
 
 
 def _clean_description(description: str | None) -> str | None:
@@ -30,6 +33,33 @@ async def list_agents(session: AsyncSession, organization_id: uuid.UUID) -> list
         select(Agent).where(Agent.organization_id == organization_id).order_by(Agent.id)
     )
     return list(agents)
+
+
+@dataclass(frozen=True)
+class AgentReach:
+    """How much an agent can access: the lists it sees and the projects those are in."""
+
+    project_count: int = 0
+    list_count: int = 0
+
+
+async def agent_reach(session: AsyncSession, agents: list[Agent]) -> dict[uuid.UUID, AgentReach]:
+    """The reach of each of these agents, by agent id.
+
+    Counted with `accessible_lists`, so it is what the agent gets from the MCP tools
+    `list_lists` and `list_projects`: a human-only list does not count, and a project counts
+    when the agent sees at least one list in it.
+    """
+    reach: dict[uuid.UUID, AgentReach] = {}
+    for agent in agents:
+        lists = accessible_lists(Principal.for_agent(agent)).subquery()
+        row = (
+            await session.execute(
+                select(func.count(lists.c.project_id.distinct()), func.count()).select_from(lists)
+            )
+        ).one()
+        reach[agent.id] = AgentReach(project_count=row[0], list_count=row[1])
+    return reach
 
 
 async def get_agent(

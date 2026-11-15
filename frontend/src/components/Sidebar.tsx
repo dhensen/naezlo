@@ -14,7 +14,7 @@ interface SidebarProps {
   onNavigate: () => void
 }
 
-/** The projects of the current organization that the user can see, "New project", and the link to its settings. */
+/** The projects of the current organization that the user can see, "New project", and the links to its agents and its settings. */
 export function Sidebar({ organization, open, onNavigate }: SidebarProps) {
   const projects = useProjects(organization.id)
   const [creating, setCreating] = useState(false)
@@ -67,17 +67,23 @@ export function Sidebar({ organization, open, onNavigate }: SidebarProps) {
           </button>
         </nav>
         <nav aria-label="Organization" className="mt-auto flex flex-col border-t border-slate-200 p-3">
-          <NavLink
-            to={orgPath(organization.slug, '/settings')}
-            className={({ isActive }) =>
-              `block rounded-md px-2 py-1.5 text-sm hover:bg-slate-100 ${
-                isActive ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-700'
-              }`
-            }
-            onClick={onNavigate}
-          >
-            Settings
-          </NavLink>
+          {[
+            { to: '/agents', label: 'Agents' },
+            { to: '/settings', label: 'Settings' },
+          ].map((link) => (
+            <NavLink
+              key={link.to}
+              to={orgPath(organization.slug, link.to)}
+              className={({ isActive }) =>
+                `block rounded-md px-2 py-1.5 text-sm hover:bg-slate-100 ${
+                  isActive ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-700'
+                }`
+              }
+              onClick={onNavigate}
+            >
+              {link.label}
+            </NavLink>
+          ))}
         </nav>
       </aside>
       {/* Next to the sidebar, not in it: the drawer has its own stacking order. */}

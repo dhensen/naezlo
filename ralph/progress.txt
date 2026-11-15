@@ -54,6 +54,10 @@
   components/ShareDialogs.tsx (hooks in src/sharing/hooks.ts, incl. `useAgents`). Inherited project
   grants for a list admin: `GET /api/lists/{id}/grants/inherited`. Tests: components/ShareDialogs.test.tsx,
   e2e/sharing.spec.ts (two people in one organization).
+- Agents in the UI (since US-036): `/o/:orgSlug/agents` (src/pages/AgentsPage.tsx; dialogs in
+  components/AgentDialogs.tsx and ConnectAgentDialog.tsx; hooks in src/agents/hooks.ts). The MCP setup
+  texts per tool are data in src/agents/connect.ts; their sources are in DECISIONS.md (US-036).
+  `/api/config` has `mcp_url`; `AgentOut` has `project_count` and `list_count`.
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
@@ -1209,4 +1213,44 @@
   - `getByRole('combobox', { name: 'Role', exact: true })` is needed next to the "Role of <name>" selects.
   - There is still no UI for agents (create, rename, delete) or for the audit log; the picker shows
     agents made through the API.
+---
+
+## 2026-11-15 01:25 - US-036
+- Agents page `/o/:orgSlug/agents` (sidebar link "Agents" in the Organization nav): name, description
+  and "n projects, n lists" per agent; "New agent", "Connect", "Edit" and "Delete" (asks in the row)
+  for owners and admins; a member sees the list without controls.
+- Connect panel (dialog "Connect <agent>") after creating an agent and from "Connect": the MCP URL
+  with a copy button, tabs Claude Code / Claude desktop / claude.ai / Codex with the command or
+  settings and the steps after it (sign in, pick the agent on the consent screen, share a project
+  or list). After the first agent, the panel and the page note that new lists default to Mixed.
+- Backend: `GET /api/config` has `mcp_url`; `AgentOut` has `project_count` and `list_count`
+  (`agent_reach` in services/agents.py, on `accessible_lists`). No schema change.
+- Syntax check: the Claude Code, claude.ai connector and Codex documentation pages plus
+  `claude mcp add --help` (2.1.325) and `codex mcp add --help` (0.166.0) on this machine; sources and
+  the limits of that check are in DECISIONS.md. The doc pages came through a fetch tool that
+  summarizes long pages, so the commands were confirmed against the CLIs' help, the surrounding
+  wording was not compared letter by letter. None of the three tools was actually connected.
+- Files changed: src/todolist/api/agents.py, api/config.py, services/agents.py, tests/test_agents.py,
+  tests/test_auth.py, frontend/openapi.json + src/api/schema.d.ts (generated), frontend/src/agents/
+  (new: hooks.ts, connect.ts), components/AgentDialogs.tsx, ConnectAgentDialog.tsx, CopyButton.tsx
+  (new), pages/AgentsPage.tsx + AgentsPage.test.tsx (new), components/Sidebar.tsx, App.tsx,
+  test/api.ts, e2e/agents.spec.ts (new), DECISIONS.md, CLAUDE.md
+- Checks: ruff, pyright, pytest (694), eslint, tsc, vitest (111), Playwright (14) all pass.
+- Browser check: screenshots made with a throw-away Playwright script on the e2e backend (port
+  8766), at desktop and phone width: the new-agent dialog, the connect panel on each tab, the page
+  with two agents and the delete question. They looked right. After that the page header got
+  `sm:flex-nowrap` (the "New agent" button had wrapped under the intro text); that last change was
+  not looked at again. The copy button was not pressed in a real browser (vitest covers it).
+- Pushed: yes
+- **Learnings for future iterations:**
+  - `renderApp`'s location element is an `<output>` (role `status`), so `getByRole('status')` finds
+    two elements when a page has a status of its own; a notice is `role="note"`.
+  - A code block with `aria-label="X"` next to a button "Copy X": Playwright's `getByLabel('X')`
+    matches both; use `{ exact: true }`.
+  - Escape only closes a `<Dialog>` while the focus is inside it; after a `selectOption` + click in
+    Playwright press the dialog's own "Done" button instead.
+  - Don't put `pkill -f "todolist.e2e --port 8766"` in the same command as other work: it also
+    kills the shell that runs it (exit 144) and the rest never runs.
+  - `claude` and `codex` are installed here; their `mcp add --help` is the quickest check of the syntax.
+  - There is still no UI for the audit log.
 ---

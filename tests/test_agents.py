@@ -57,7 +57,18 @@ async def test_create_returns_the_agent(client: AsyncClient, db_session: AsyncSe
     assert body["created_by"] == ada_id
     assert body["created_at"] is not None
     assert body["updated_at"] is not None
-    assert set(body) == {"id", "name", "description", "created_by", "created_at", "updated_at"}
+    assert body["project_count"] == 0
+    assert body["list_count"] == 0
+    assert set(body) == {
+        "id",
+        "name",
+        "description",
+        "created_by",
+        "project_count",
+        "list_count",
+        "created_at",
+        "updated_at",
+    }
 
     agent = await db_session.get(Agent, uuid.UUID(body["id"]))
     assert agent is not None
@@ -367,3 +378,48 @@ async def test_principal_for_a_user_and_an_agent(
     with pytest.raises(dataclasses.FrozenInstanceError):
         as_user.name = "Someone else"  # pyright: ignore[reportAttributeAccessIssue]
     assert as_agent in {Principal.for_agent(agent)}
+
+
+async def test_list_counts_the_projects_and_lists_an_agent_can_access(
+    client: AsyncClient,
+) -> None:
+    org_id, url = await ada_org(client)
+    claude = await create(client, url, "Claude")
+    codex = await create(client, url, "Codex")
+
+    async def post(path: str, **body: Any) -> str:
+        response = await client.post(path, json=body)
+        assert response.status_code == 201, response.text
+        return response.json()["id"]
+
+    async def grant(path: str, role: str) -> None:
+        response = await client.put(
+            path, json={"principal_kind": "agent", "principal_id": claude["id"], "role": role}
+        )
+        assert response.status_code in (200, 201), response.text
+
+    # Claude has a role on the first project: its mixed and AI-only lists count, the
+    # human-only one and the one closed with a `none` grant do not.
+    first = await post(f"/api/orgs/{org_id}/projects", name="First")
+    await post(f"/api/projects/{first}/lists", name="Mixed", mode="mixed")
+    await post(f"/api/projects/{first}/lists", name="AI", mode="ai_only")
+    await post(f"/api/projects/{first}/lists", name="Human", mode="human_only")
+    closed = await post(f"/api/projects/{first}/lists", name="Closed", mode="mixed")
+    await grant(f"/api/projects/{first}/grants", "editor")
+    await grant(f"/api/lists/{closed}/grants", "none")
+    # A list grant alone makes the second project count; the third has nothing for Claude.
+    second = await post(f"/api/orgs/{org_id}/projects", name="Second")
+    shared = await post(f"/api/projects/{second}/lists", name="Shared", mode="mixed")
+    await post(f"/api/projects/{second}/lists", name="Not shared", mode="mixed")
+    await grant(f"/api/lists/{shared}/grants", "viewer")
+    third = await post(f"/api/orgs/{org_id}/projects", name="Third")
+    await post(f"/api/projects/{third}/lists", name="Other", mode="mixed")
+
+    agents = {agent["name"]: agent for agent in (await client.get(url)).json()}
+
+    assert (agents["Claude"]["project_count"], agents["Claude"]["list_count"]) == (2, 3)
+    assert (agents["Codex"]["project_count"], agents["Codex"]["list_count"]) == (0, 0)
+
+    renamed = await client.patch(f"{url}/{claude['id']}", json={"name": "Claude 2"})
+    assert (renamed.json()["project_count"], renamed.json()["list_count"]) == (2, 3)
+    assert codex["list_count"] == 0

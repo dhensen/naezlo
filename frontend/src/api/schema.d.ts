@@ -765,8 +765,12 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** List Count */
+            list_count: number;
             /** Name */
             name: string;
+            /** Project Count */
+            project_count: number;
             /**
              * Updated At
              * Format: date-time
@@ -872,6 +876,8 @@ export interface components {
             dev_login_enabled: boolean;
             /** Google Login Enabled */
             google_login_enabled: boolean;
+            /** Mcp Url */
+            mcp_url: string;
         };
         /** ConsentAgentOut */
         ConsentAgentOut: {
