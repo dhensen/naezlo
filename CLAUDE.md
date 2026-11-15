@@ -492,3 +492,7 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
 - The organization start page (`OrganizationPage.tsx`) lists the projects in `<main>` as well as the
   sidebar: in a test of a page under `/o/:orgSlug`, find a project link `within` the navigation
   "Projects". Its button is "Create a project", so "New project" stays the sidebar's.
+- The logo is `<Logo className="h-7" />` (`frontend/src/components/Logo.tsx`; `markOnPhone` for the top
+  bar, `decorative` next to a text that says the name). Its images in `frontend/src/assets/` (`logo.png`,
+  `logo-mark.png`, `favicon.png`) are cut from `assets/naezlo-logo.png`, the original; its name is its
+  `alt`, from `APP_NAME`.

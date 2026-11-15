@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet } from 'react-router'
 
-import { APP_NAME } from '../config'
 import { useCurrentOrganization } from '../orgs/hooks'
 import { rememberOrganization } from '../orgs/paths'
+import { Logo } from './Logo'
 import { OrganizationSwitcher } from './OrganizationSwitcher'
 import { Sidebar } from './Sidebar'
 import { UserMenu } from './UserMenu'
@@ -48,8 +48,8 @@ export function AppLayout() {
             </svg>
           </button>
         )}
-        <Link to="/" className="hidden text-lg font-semibold tracking-tight sm:block">
-          {APP_NAME}
+        <Link to="/" className="flex shrink-0 items-center rounded-md px-1 py-2">
+          <Logo className="h-6 sm:h-7" markOnPhone />
         </Link>
         <OrganizationSwitcher current={organization} />
         <div className="ml-auto shrink-0">

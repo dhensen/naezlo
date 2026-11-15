@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Navigate } from 'react-router'
 
 import { useMe } from '../auth/hooks'
+import { Logo } from '../components/Logo'
 import { NewOrganizationDialog } from '../components/NewOrganizationDialog'
-import { APP_NAME } from '../config'
 import { lastOrganizationSlug, orgPath } from '../orgs/paths'
 
 /** `/`: on to the organization used last, or the first one. Someone without any gets a start. */
@@ -21,7 +21,9 @@ export function HomePage() {
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-      <h1 className="text-4xl font-semibold tracking-tight">{APP_NAME}</h1>
+      <h1>
+        <Logo className="h-12" />
+      </h1>
       <p className="text-slate-600">You are not a member of an organization yet.</p>
       <button
         type="button"

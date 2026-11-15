@@ -6,6 +6,7 @@ import { useAppConfig, useDevLogin, useMe } from '../auth/hooks'
 import { leaveTo, safeNextPath } from '../auth/next'
 import { isBackendPath } from '../backendPaths'
 import { ErrorMessage } from '../components/ErrorMessage'
+import { Logo } from '../components/Logo'
 import { APP_NAME } from '../config'
 
 // What the backend's Google routes report as /login?error=<code>.
@@ -98,7 +99,9 @@ export function LoginPage() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 text-slate-900 sm:px-6">
       <div className="flex w-full max-w-sm flex-col gap-5 rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col items-center gap-1">
+          {/* The heading below already says the name. */}
+          <Logo className="mb-3 h-9" decorative />
           <h1 className="text-2xl font-semibold tracking-tight">Sign in to {APP_NAME}</h1>
           <p className="text-sm text-slate-600">Todo lists that people and AI agents share.</p>
         </div>
