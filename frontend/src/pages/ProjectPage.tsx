@@ -217,7 +217,7 @@ function ListRow({ list, to, onEdit, onDelete }: ListRowProps) {
   const canDelete = listAllows(list, 'administer')
 
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 sm:gap-x-3">
       {/* At phone width the name has the whole line; the rest follows below it. */}
       <div className="flex min-w-0 basis-full flex-col sm:flex-1 sm:basis-0">
         <Link to={to} className="py-1 font-medium wrap-anywhere text-slate-900 hover:underline sm:py-0">
@@ -230,7 +230,7 @@ function ListRow({ list, to, onEdit, onDelete }: ListRowProps) {
       <ModeBadge mode={list.mode} />
       <span className="text-sm text-slate-600 tabular-nums sm:w-28 sm:text-right">{openItems(list.open_item_count)}</span>
       {(canEdit || canDelete) && (
-        <div className="ml-auto flex shrink-0 gap-1 sm:ml-0">
+        <div className="ml-auto flex shrink-0 sm:ml-0 sm:gap-1">
           {canEdit && (
             <button type="button" aria-label={`Edit ${list.name}`} className={ROW_BUTTON} onClick={onEdit}>
               Edit

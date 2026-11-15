@@ -177,7 +177,8 @@ test('editing renames the project on the page and in the sidebar', async () => {
 })
 
 test('deleting asks first, then leaves the page and the sidebar', async () => {
-  const fetchMock = mockApi({ ...routes(), [`DELETE /api/projects/${WEBSITE.id}`]: new Response(null, { status: 204 }) })
+  const all = { ...routes(), [`DELETE /api/projects/${WEBSITE.id}`]: new Response(null, { status: 204 }) }
+  const fetchMock = mockApi(all)
   const deletes = () => fetchMock.mock.calls.filter(([request]) => request.method === 'DELETE').length
   renderApp(PAGE)
 
@@ -188,6 +189,8 @@ test('deleting asks first, then leaves the page and the sidebar', async () => {
   expect(deletes()).toBe(0)
 
   await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+  // The organization's start page, where this ends, loads the projects again.
+  all[`GET /api/orgs/${ACME.id}/projects`] = json([LAUNCH])
   await userEvent.click(screen.getByRole('button', { name: 'Delete project' }))
 
   await waitFor(() => expect(location()).toBe('/o/acme'))

@@ -477,4 +477,18 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
 - Assignment in the UI: an `assign` `ItemChange` (`src/items/hooks.ts`, with `useAssignees`,
   `sameAssignee`), `AssigneeControl` in `ListPage.tsx`, the toggle in `ListFields`
   (`components/ListDialogs.tsx`). Tests: `tests/test_assignment.py`, `frontend/e2e/assignment.spec.ts`.
-
+- Phone width (below `sm`, 640px) is a first-class layout; `frontend/e2e/mobile.spec.ts` checks it at
+  375px with touch. Rules: a page never scrolls sideways (free text gets `wrap-anywhere`, not
+  `break-words`); anything pressed is at least 36px in both directions below `sm` (`min-h-9 min-w-9`,
+  see `ROW_BUTTON_SIZE` in `ListPage.tsx`); fields are 16px there (the rule in `src/index.css`, so
+  Safari does not zoom); page padding is `p-4 sm:p-6`; full height is `min-h-dvh`, not `min-h-screen`.
+- One DOM for both widths: no second, phone-only copy of a control (jsdom has no CSS, so vitest would
+  find both). Rearrange with `sm:` classes (`sm:contents`, grid placement) or hide a secondary group
+  behind a toggle that is `sm:hidden` while the group itself is `hidden sm:flex` (the "More actions"
+  button of an item row). A table that gets too wide becomes stacked rows below `sm` (`MEMBER_ROW`).
+- The top bar is `h-14`; the sidebar drawer and its backdrop are `fixed top-14` below `md` and lock
+  the page scroll while open, as `<Dialog>` does. A dialog sits at the top of a phone screen so the
+  on-screen keyboard does not cover its fields.
+- The organization start page (`OrganizationPage.tsx`) lists the projects in `<main>` as well as the
+  sidebar: in a test of a page under `/o/:orgSlug`, find a project link `within` the navigation
+  "Projects". Its button is "Create a project", so "New project" stays the sidebar's.

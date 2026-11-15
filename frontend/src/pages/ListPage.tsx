@@ -545,8 +545,9 @@ function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlPr
   const choices =
     current === null || assignees.some((assignee) => sameAssignee(assignee, current)) ? assignees : [current, ...assignees]
 
+  // The select takes what its longest name needs; "Pick up" goes below it when the line is short.
   return (
-    <span className="flex items-center gap-2 px-1">
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
       <select
         aria-label={`Assignee of ${item.title}`}
         value={current === null ? '' : assigneeValue(current)}
@@ -557,7 +558,7 @@ function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlPr
             assignee: choices.find((assignee) => assigneeValue(assignee) === event.target.value) ?? null,
           })
         }
-        className={`h-9 min-w-0 shrink truncate rounded-md border px-1.5 text-xs focus:border-slate-500 focus:outline-none sm:h-auto sm:py-0.5 ${
+        className={`h-9 max-w-fit min-w-0 flex-[1_1_7.5rem] truncate rounded-md border px-1.5 text-xs focus:border-slate-500 focus:outline-none sm:h-auto sm:py-0.5 ${
           mine ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-300 bg-white text-slate-700'
         }`}
       >

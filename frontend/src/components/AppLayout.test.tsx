@@ -44,11 +44,29 @@ test('the sidebar has an empty state when there are no projects', async () => {
   expect(within(sidebar).queryByRole('link')).not.toBeInTheDocument()
 })
 
+test('the start page of an organization lists its projects and can create one', async () => {
+  mockApi(routes())
+  renderApp('/o/acme')
+
+  const projects = await screen.findByRole('list', { name: 'Projects of this organization' })
+  const links = within(projects).getAllByRole('link')
+  expect(links.length).toBeGreaterThan(0)
+  expect(links.map((link) => link.getAttribute('href'))).toEqual(
+    within(screen.getByRole('navigation', { name: 'Projects' }))
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href')),
+  )
+
+  await userEvent.click(screen.getByRole('button', { name: 'Create a project' }))
+  expect(screen.getByRole('dialog', { name: 'New project' })).toBeInTheDocument()
+})
+
 test('the sidebar shows an error when the projects cannot be loaded', async () => {
   mockApi({ ...routes(), [`GET /api/orgs/${ACME.id}/projects`]: apiError(500, 'internal', 'No projects today') })
   renderApp('/o/acme')
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('No projects today')
+  const sidebar = await screen.findByRole('navigation', { name: 'Projects' })
+  expect(await within(sidebar).findByRole('alert')).toHaveTextContent('No projects today')
 })
 
 test('the switcher lists the organizations and switches to the chosen one', async () => {
@@ -152,6 +170,7 @@ test('the menu button opens and closes the sidebar drawer', async () => {
   expect(open).toHaveAttribute('aria-expanded', 'true')
 
   // Choosing a project closes the drawer again.
-  await userEvent.click(await screen.findByRole('link', { name: 'Website' }))
+  const sidebar = screen.getByRole('navigation', { name: 'Projects' })
+  await userEvent.click(await within(sidebar).findByRole('link', { name: 'Website' }))
   expect(screen.getByRole('button', { name: 'Open navigation' })).toHaveAttribute('aria-expanded', 'false')
 })

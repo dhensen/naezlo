@@ -81,7 +81,7 @@ export function ConnectAgentDialog({ agent, first = false, onClose }: ConnectAge
           <>
             <Code label="MCP server URL" text={mcpUrl} />
             <div>
-              <div role="tablist" aria-label="AI tool" className="flex gap-1 overflow-x-auto border-b border-slate-200">
+              <div role="tablist" aria-label="AI tool" className="flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-slate-200)] [scrollbar-width:none]">
                 {guides.map((candidate) => (
                   <button
                     key={candidate.id}
@@ -98,7 +98,7 @@ export function ConnectAgentDialog({ agent, first = false, onClose }: ConnectAge
                         tabs.current.delete(candidate.id)
                       }
                     }}
-                    className={`-mb-px shrink-0 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap sm:py-1.5 ${
+                    className={`shrink-0 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap sm:py-1.5 ${
                       candidate.id === selected
                         ? 'border-slate-900 text-slate-900'
                         : 'border-transparent text-slate-500 hover:text-slate-800'
