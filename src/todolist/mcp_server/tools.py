@@ -9,13 +9,14 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from todolist.errors import AppError, NotFoundError
+from todolist.errors import AppError, ConflictError, NotFoundError
 from todolist.mcp_server.context import AgentContext, AgentContextFactory
 from todolist.models import (
     Item,
     ItemStatus,
     ListMode,
     Organization,
+    PrincipalKind,
     Project,
     ProjectRole,
     TodoList,
@@ -27,15 +28,21 @@ from todolist.permissions import (
     effective_project_role,
     list_access,
 )
+from todolist.principals import Principal
 from todolist.services.items import (
+    ITEM_ASSIGNED_TO_OTHER,
+    ITEM_NOT_ASSIGNED,
     ItemCounts,
     ItemNotes,
     ItemTitle,
+    assign_item,
     count_items,
     create_item,
     delete_item,
+    item_assignees,
     list_items,
     move_item,
+    unassign_item,
     update_item,
 )
 from todolist.services.lists import list_accessible_lists
@@ -79,6 +86,11 @@ class ListInfo(BaseModel):
     mode: ListMode = Field(
         description="mixed: people and agents work on the list; ai_only: only agents change it"
     )
+    assignment_required: bool = Field(
+        description="When true, only the assignee of an item can complete it: call "
+        "claim_item before you start working on an item, and leave items alone that are "
+        "assigned to someone else"
+    )
     project: ProjectRef
     role: ProjectRole = Field(
         description="Your role on the list: a viewer reads, an editor also changes items, "
@@ -94,11 +106,21 @@ class ListList(BaseModel):
     )
 
 
+class AssigneeInfo(BaseModel):
+    kind: PrincipalKind = Field(description="user: a person; agent: an AI agent")
+    id: uuid.UUID
+    name: str
+
+
 class ItemInfo(BaseModel):
     id: uuid.UUID
     title: str
     notes: str | None
     status: ItemStatus
+    assignee: AssigneeInfo | None = Field(
+        description="Who works on the item; null when nobody picked it up yet"
+    )
+    assigned_to_you: bool = Field(description="Whether you are the assignee")
     position: int = Field(description="Place in the list, starting at 1")
     created_at: datetime
     updated_at: datetime
@@ -133,6 +155,7 @@ def _list_info(
         name=todo_list.name,
         description=todo_list.description,
         mode=todo_list.mode,
+        assignment_required=todo_list.assignment_required,
         project=ProjectRef(id=project.id, name=project.name),
         role=access.role,
         open_item_count=counts.open,
@@ -140,12 +163,16 @@ def _list_info(
     )
 
 
-def _item_info(item: Item) -> ItemInfo:
+def _item_info(item: Item, assignee: Principal | None, you: Principal) -> ItemInfo:
     return ItemInfo(
         id=item.id,
         title=item.title,
         notes=item.notes,
         status=item.status,
+        assignee=None
+        if assignee is None
+        else AssigneeInfo(kind=assignee.kind, id=assignee.id, name=assignee.name),
+        assigned_to_you=assignee is not None and (assignee.kind, assignee.id) == (you.kind, you.id),
         position=item.position,
         created_at=item.created_at,
         updated_at=item.updated_at,
@@ -153,8 +180,13 @@ def _item_info(item: Item) -> ItemInfo:
     )
 
 
-def _changed_item(item: Item) -> ChangedItem:
-    return ChangedItem(**_item_info(item).model_dump(), list_id=item.list_id)
+async def _changed_item(ctx: AgentContext, item: Item) -> ChangedItem:
+    """The item as a tool returns it after a change, with its assignee looked up."""
+    todo_list = await ctx.session.get_one(TodoList, item.list_id)
+    project = await ctx.session.get_one(Project, todo_list.project_id)
+    assignees = await item_assignees(ctx.session, todo_list, project, [item])
+    info = _item_info(item, assignees.get(item.id), ctx.principal)
+    return ChangedItem(**info.model_dump(), list_id=item.list_id)
 
 
 async def _project_with_lists(ctx: AgentContext, project_id: uuid.UUID) -> Project:
@@ -281,7 +313,11 @@ def register_tools(server: MCPServer, agent_context: AgentContextFactory) -> Non
             counts = await count_items(ctx.session, [todo_list.id])
             items = await list_items(ctx.session, todo_list, include_done=include_done)
             info = _list_info(todo_list, project, access, counts[todo_list.id])
-            return ListWithItems(**info.model_dump(), items=[_item_info(item) for item in items])
+            assignees = await item_assignees(ctx.session, todo_list, project, items)
+            return ListWithItems(
+                **info.model_dump(),
+                items=[_item_info(item, assignees.get(item.id), ctx.principal) for item in items],
+            )
 
     @server.tool()
     async def add_item(  # pyright: ignore[reportUnusedFunction]
@@ -296,7 +332,7 @@ def register_tools(server: MCPServer, agent_context: AgentContextFactory) -> Non
         async with agent_context() as ctx:
             todo_list, _, _ = await _accessible_list(ctx, list_id, ListAction.CHANGE_ITEMS)
             item = await create_item(ctx.session, ctx.principal, todo_list, title, notes)
-            return _changed_item(item)
+            return await _changed_item(ctx, item)
 
     @server.tool(name="update_item")
     async def update_item_tool(  # pyright: ignore[reportUnusedFunction]
@@ -328,16 +364,31 @@ def register_tools(server: MCPServer, agent_context: AgentContextFactory) -> Non
                 notes=notes,
                 set_notes=notes is not None,
             )
-            return _changed_item(item)
+            return await _changed_item(ctx, item)
 
     @server.tool()
     async def complete_item(item_id: ItemId) -> ChangedItem:  # pyright: ignore[reportUnusedFunction]
         """Mark an item as done. Needs the editor role on the item's list. An item that is
-        already done stays as it is."""
+        already done stays as it is. In a list with assignment_required you must be the
+        item's assignee: call claim_item first."""
         async with agent_context() as ctx:
             item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
-            item = await update_item(ctx.session, ctx.principal, item, status=ItemStatus.DONE)
-            return _changed_item(item)
+            try:
+                item = await update_item(ctx.session, ctx.principal, item, status=ItemStatus.DONE)
+            except ConflictError as error:
+                if error.code == ITEM_NOT_ASSIGNED:
+                    raise ConflictError(
+                        error.code,
+                        f"{error.detail} Call claim_item with this item_id, do the work, "
+                        "then call complete_item again.",
+                    ) from error
+                if error.code == ITEM_ASSIGNED_TO_OTHER:
+                    raise ConflictError(
+                        error.code,
+                        f"{error.detail} Leave this item to them and pick another one.",
+                    ) from error
+                raise
+            return await _changed_item(ctx, item)
 
     @server.tool()
     async def reopen_item(item_id: ItemId) -> ChangedItem:  # pyright: ignore[reportUnusedFunction]
@@ -346,7 +397,53 @@ def register_tools(server: MCPServer, agent_context: AgentContextFactory) -> Non
         async with agent_context() as ctx:
             item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
             item = await update_item(ctx.session, ctx.principal, item, status=ItemStatus.OPEN)
-            return _changed_item(item)
+            return await _changed_item(ctx, item)
+
+    @server.tool()
+    async def claim_item(item_id: ItemId) -> ChangedItem:  # pyright: ignore[reportUnusedFunction]
+        """Pick an item up: make yourself its assignee, so people and other agents see that
+        you work on it and leave it alone. Call this before you start working on an item.
+        Needs the editor role on the item's list. Fails when someone else is the assignee;
+        an item that is already yours stays as it is."""
+        async with agent_context() as ctx:
+            item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
+            todo_list = await ctx.session.get_one(TodoList, item.list_id)
+            project = await ctx.session.get_one(Project, todo_list.project_id)
+            try:
+                item = await assign_item(
+                    ctx.session,
+                    ctx.principal,
+                    item,
+                    todo_list,
+                    project,
+                    ctx.principal.kind,
+                    ctx.principal.id,
+                    only_if_free=True,
+                )
+            except ConflictError as error:
+                raise ConflictError(
+                    error.code,
+                    f"{error.detail}. Leave it to them and pick an item without an assignee "
+                    "(see assignee in get_list).",
+                ) from error
+            return await _changed_item(ctx, item)
+
+    @server.tool()
+    async def release_item(item_id: ItemId) -> ChangedItem:  # pyright: ignore[reportUnusedFunction]
+        """Give an item back that you picked up with claim_item but will not finish, so
+        someone else can take it. Needs the editor role on the item's list. Fails when the
+        item is assigned to someone else; an item without an assignee stays as it is."""
+        async with agent_context() as ctx:
+            item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
+            changed = await _changed_item(ctx, item)
+            if changed.assignee is not None and not changed.assigned_to_you:
+                raise ConflictError(
+                    ITEM_ASSIGNED_TO_OTHER,
+                    f"This item is assigned to {changed.assignee.name}, not to you: "
+                    "you can only release your own items.",
+                )
+            item = await unassign_item(ctx.session, ctx.principal, item)
+            return await _changed_item(ctx, item)
 
     @server.tool(name="move_item")
     async def move_item_tool(  # pyright: ignore[reportUnusedFunction]
@@ -365,7 +462,7 @@ def register_tools(server: MCPServer, agent_context: AgentContextFactory) -> Non
         async with agent_context() as ctx:
             item = await _accessible_item(ctx, item_id, ListAction.CHANGE_ITEMS)
             item = await move_item(ctx.session, ctx.principal, item, before_item_id)
-            return _changed_item(item)
+            return await _changed_item(ctx, item)
 
     @server.tool(name="delete_item")
     async def delete_item_tool(item_id: ItemId) -> DeletedItem:  # pyright: ignore[reportUnusedFunction]

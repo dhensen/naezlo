@@ -12,6 +12,8 @@ Rules (DECISIONS.md, "ACL"):
   it can raise it, lower it, take it away (`none`) or give access without any project role.
 - A user may let an MCP client act as an agent (the OAuth consent screen) when they are owner
   or admin of the agent's organization (`can_authorize_agent`, `authorizable_agents`).
+- An item can be assigned to everyone who may change the items of its list
+  (`assignable_principals`).
 - The list mode comes on top of the role (`list_access`, the one check for everything that
   happens to a list or its items): a human-only list does not exist for agents, and in an
   AI-only list people read but leave the items alone; only its admins still manage the list.
@@ -40,6 +42,7 @@ from todolist.models import (
     ProjectGrant,
     ProjectRole,
     TodoList,
+    User,
 )
 from todolist.principals import Principal
 from todolist.services.organizations import can_manage_organization
@@ -275,6 +278,70 @@ async def list_access(
     if role is None:
         return None
     return ListAccess(role=role, mode=todo_list.mode, kind=principal.kind)
+
+
+def _may_change_items(role: ProjectRole | None, todo_list: TodoList, kind: PrincipalKind) -> bool:
+    return role is not None and ListAccess(role=role, mode=todo_list.mode, kind=kind).allows(
+        ListAction.CHANGE_ITEMS
+    )
+
+
+async def assignable_principals(
+    session: AsyncSession, todo_list: TodoList, project: Project
+) -> list[Principal]:
+    """Everyone an item of the list can be assigned to: the people and the agents of the
+    organization that may change the list's items (`ListAction.CHANGE_ITEMS`, so the role and
+    the list mode together). People first, each kind by name.
+
+    The same rules as `list_access`, for every principal of the organization in two queries.
+    """
+    if todo_list.project_id != project.id:
+        raise ValueError("project is not the list's project")
+    found: list[Principal] = []
+    user_rows = await session.execute(
+        select(User, Membership.role, ListGrant.role, ProjectGrant.role)
+        .join(Membership, Membership.user_id == User.id)
+        .outerjoin(ListGrant, and_(ListGrant.list_id == todo_list.id, ListGrant.user_id == User.id))
+        .outerjoin(
+            ProjectGrant,
+            and_(ProjectGrant.project_id == project.id, ProjectGrant.user_id == User.id),
+        )
+        .where(Membership.organization_id == project.organization_id)
+        .order_by(User.name, User.id)
+    )
+    for row in user_rows:
+        user, membership_role = row[0], row[1]
+        # The outer joins make the grant roles optional, which the row type does not say.
+        list_role = cast("ListRole | None", row[2])
+        role = cast("ProjectRole | None", row[3])
+        if can_manage_organization(membership_role):
+            role = ProjectRole.ADMIN
+        elif list_role is not None:
+            role = list_role.project_role
+        if _may_change_items(role, todo_list, PrincipalKind.USER):
+            found.append(Principal.for_user(user, project.organization_id))
+    if todo_list.mode is ListMode.HUMAN_ONLY:
+        return found
+    agent_rows = await session.execute(
+        select(Agent, ListGrant.role, ProjectGrant.role)
+        .outerjoin(
+            ListGrant, and_(ListGrant.list_id == todo_list.id, ListGrant.agent_id == Agent.id)
+        )
+        .outerjoin(
+            ProjectGrant,
+            and_(ProjectGrant.project_id == project.id, ProjectGrant.agent_id == Agent.id),
+        )
+        .where(Agent.organization_id == project.organization_id)
+        .order_by(Agent.name, Agent.id)
+    )
+    for row in agent_rows:
+        list_role = cast("ListRole | None", row[1])
+        role = cast("ProjectRole | None", row[2])
+        if list_role is not None:
+            role = list_role.project_role
+        if _may_change_items(role, todo_list, PrincipalKind.AGENT):
+            found.append(Principal.for_agent(row[0]))
+    return found
 
 
 async def list_accesses(

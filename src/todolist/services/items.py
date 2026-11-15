@@ -2,6 +2,9 @@
 
 Shared by the HTTP API and the MCP tools. The callers check the acting principal's role on
 the list and the list mode (`list_access` in `todolist.permissions`).
+
+An item can have an assignee: the person or agent who works on it. In a list with
+`assignment_required` only the assignee can complete an item, which `update_item` checks.
 """
 
 import uuid
@@ -13,8 +16,18 @@ from pydantic import StringConstraints
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from todolist.errors import AppError
-from todolist.models import AuditAction, Item, ItemStatus, TodoList
+from todolist.errors import AppError, ConflictError
+from todolist.models import (
+    Agent,
+    AuditAction,
+    Item,
+    ItemStatus,
+    PrincipalKind,
+    Project,
+    TodoList,
+    User,
+)
+from todolist.permissions import assignable_principals
 from todolist.principals import Principal
 from todolist.services.audit import changes, record_event
 
@@ -81,6 +94,146 @@ async def _record(
         # The title makes the event readable after the item is gone.
         details={"title": item.title, **details},
     )
+
+
+ITEM_NOT_ASSIGNED = "item_not_assigned"
+ITEM_ASSIGNED_TO_OTHER = "item_assigned_to_other"
+
+
+async def _principal_name(
+    session: AsyncSession, kind: PrincipalKind, principal_id: uuid.UUID
+) -> str | None:
+    """The name of the user or agent as it is now; None when they no longer exist."""
+    model = User if kind is PrincipalKind.USER else Agent
+    return await session.scalar(select(model.name).where(model.id == principal_id))
+
+
+async def _assignee_details(session: AsyncSession, item: Item) -> dict[str, object] | None:
+    """The item's assignee as an audit event keeps it (kind, id and name), None without one."""
+    if item.assignee_kind is None or item.assignee_id is None:
+        return None
+    return {
+        "kind": item.assignee_kind.value,
+        "id": str(item.assignee_id),
+        "name": await _principal_name(session, item.assignee_kind, item.assignee_id),
+    }
+
+
+async def _require_assignee(session: AsyncSession, principal: Principal, item: Item) -> None:
+    """In a list with `assignment_required`, refuse unless `principal` is the item's assignee."""
+    required = await session.scalar(
+        select(TodoList.assignment_required).where(TodoList.id == item.list_id)
+    )
+    if not required:
+        return
+    if item.assignee_kind is None or item.assignee_id is None:
+        raise ConflictError(
+            ITEM_NOT_ASSIGNED,
+            "Nobody is assigned to this item. In this list only the assignee can complete "
+            "an item: pick it up first.",
+        )
+    if (item.assignee_kind, item.assignee_id) != (principal.kind, principal.id):
+        name = await _principal_name(session, item.assignee_kind, item.assignee_id)
+        raise ConflictError(
+            ITEM_ASSIGNED_TO_OTHER,
+            f"This item is assigned to {name or 'someone else'}. In this list only the "
+            "assignee can complete an item.",
+        )
+
+
+async def _lock_item(session: AsyncSession, item: Item) -> None:
+    """Make other transactions that assign this item wait, and see it as it is now."""
+    await session.execute(select(Item.id).where(Item.id == item.id).with_for_update())
+    await session.refresh(item)
+
+
+async def item_assignees(
+    session: AsyncSession, todo_list: TodoList, project: Project, items: Collection[Item]
+) -> dict[uuid.UUID, Principal]:
+    """The assignee of each of these items of the list, by item id. An item without one is
+    left out, and so is an item whose assignee can no longer change the list's items (they
+    left, lost their role or the list mode shut them out): that item is free again."""
+    if all(item.assignee_id is None for item in items):
+        return {}
+    assignable = {
+        (principal.kind, principal.id): principal
+        for principal in await assignable_principals(session, todo_list, project)
+    }
+    assignees: dict[uuid.UUID, Principal] = {}
+    for item in items:
+        if item.assignee_kind is not None and item.assignee_id is not None:
+            assignee = assignable.get((item.assignee_kind, item.assignee_id))
+            if assignee is not None:
+                assignees[item.id] = assignee
+    return assignees
+
+
+async def assign_item(
+    session: AsyncSession,
+    principal: Principal,
+    item: Item,
+    todo_list: TodoList,
+    project: Project,
+    assignee_kind: PrincipalKind,
+    assignee_id: uuid.UUID,
+    *,
+    only_if_free: bool = False,
+) -> Item:
+    """Make the user or agent the item's assignee, in place of whoever it was.
+
+    422 `invalid_assignee` when they cannot change the items of the list
+    (`assignable_principals`). With `only_if_free` (someone picking the item up for
+    themselves) 409 `item_assigned_to_other` when another assignee still has it. Assigning
+    the item to the assignee it already has changes nothing and records nothing.
+    """
+    assignable = {
+        (candidate.kind, candidate.id): candidate
+        for candidate in await assignable_principals(session, todo_list, project)
+    }
+    assignee = assignable.get((assignee_kind, assignee_id))
+    if assignee is None:
+        raise AppError(
+            422,
+            "invalid_assignee",
+            "An item can only be assigned to someone who can change the items of its list",
+        )
+    # Two principals picking the item up at the same moment: the second one sees the first.
+    await _lock_item(session, item)
+    if (item.assignee_kind, item.assignee_id) == (assignee_kind, assignee_id):
+        return item
+    previous = await _assignee_details(session, item)
+    if only_if_free and item.assignee_kind is not None and item.assignee_id is not None:
+        holder = assignable.get((item.assignee_kind, item.assignee_id))
+        if holder is not None:
+            raise ConflictError(ITEM_ASSIGNED_TO_OTHER, f"This item is assigned to {holder.name}")
+    item.assignee_kind = assignee_kind
+    item.assignee_id = assignee_id
+    await session.flush()
+    await session.refresh(item)
+    await _record(
+        session,
+        principal,
+        AuditAction.ITEM_ASSIGNED,
+        item,
+        todo_list.project_id,
+        assignee={"kind": assignee.kind.value, "id": str(assignee.id), "name": assignee.name},
+        previous_assignee=previous,
+    )
+    return item
+
+
+async def unassign_item(session: AsyncSession, principal: Principal, item: Item) -> Item:
+    """Take the assignee off the item. An item without one stays as it is, without an event."""
+    await _lock_item(session, item)
+    previous = await _assignee_details(session, item)
+    if previous is None:
+        return item
+    item.assignee_kind = None
+    item.assignee_id = None
+    await session.flush()
+    await session.refresh(item)
+    await _record(session, principal, AuditAction.ITEM_UNASSIGNED, item, previous_assignee=previous)
+    return item
 
 
 async def list_items(
@@ -167,7 +320,9 @@ async def update_item(
     clears them).
 
     Going from open to done records `principal` and the time as the completion; going back to
-    open clears both. Setting the status an item already has changes nothing: an item that is
+    open clears both. In a list with `assignment_required` only the item's assignee can
+    complete it: 409 `item_not_assigned` when it has none, 409 `item_assigned_to_other` when
+    it is someone else's. Setting the status an item already has changes nothing: an item that is
     done keeps its first completion.
 
     The audit log gets `item.updated` for a changed title or notes and `item.completed` or
@@ -180,6 +335,8 @@ async def update_item(
     if set_notes:
         item.notes = _clean_notes(notes)
     if status is not None and status is not item.status:
+        if status is ItemStatus.DONE:
+            await _require_assignee(session, principal, item)
         item.status = status
         status_action = (
             AuditAction.ITEM_COMPLETED if status is ItemStatus.DONE else AuditAction.ITEM_REOPENED

@@ -3,7 +3,7 @@
 import enum
 import uuid
 
-from sqlalchemy import ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from todolist.db import Base, TimestampMixin, UUIDPrimaryKeyMixin, value_enum
@@ -25,6 +25,11 @@ class TodoList(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
     mode: Mapped[ListMode] = mapped_column(value_enum(ListMode, "list_mode"))
+    # When set, an item can only be completed by its assignee: someone picks an item up (or
+    # is given it) before working on it, so a person and an agent never do the same item.
+    assignment_required: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     # Order of the lists within their project, lowest first. Not necessarily gap-free.
     position: Mapped[int] = mapped_column(Integer)
     # The user who created the list; empty when that user no longer exists.

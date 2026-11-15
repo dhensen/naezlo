@@ -29,6 +29,8 @@ class AuditAction(enum.StrEnum):
     ITEM_REOPENED = "item.reopened"
     ITEM_MOVED = "item.moved"
     ITEM_DELETED = "item.deleted"
+    ITEM_ASSIGNED = "item.assigned"
+    ITEM_UNASSIGNED = "item.unassigned"
     PROJECT_GRANT_SET = "project_grant.set"
     PROJECT_GRANT_REVOKED = "project_grant.revoked"
     LIST_GRANT_SET = "list_grant.set"

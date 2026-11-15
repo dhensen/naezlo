@@ -95,6 +95,7 @@ async def test_create_returns_the_list(client: AsyncClient, db_session: AsyncSes
         "name",
         "description",
         "mode",
+        "assignment_required",
         "position",
         "open_item_count",
         "role",

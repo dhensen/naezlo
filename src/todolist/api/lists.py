@@ -43,6 +43,8 @@ class ListIn(BaseModel):
     description: ListDescription | None = None
     # Left out or null: mixed when the organization has an agent, otherwise human_only.
     mode: ListMode | None = None
+    # Only the assignee of an item can complete it.
+    assignment_required: bool = False
 
 
 class ListPatch(BaseModel):
@@ -51,8 +53,9 @@ class ListPatch(BaseModel):
     name: ListName | None = None
     description: ListDescription | None = None
     mode: ListMode | None = None
+    assignment_required: bool | None = None
 
-    @field_validator("name", "mode")
+    @field_validator("name", "mode", "assignment_required")
     @classmethod
     def _is_not_null(cls, value: object) -> object:
         # Runs only when the field is sent: leaving it out is fine, null is not a value.
@@ -71,6 +74,8 @@ class ListOut(BaseModel):
     name: str
     description: str | None
     mode: ListMode
+    # Only the assignee of an item can complete it.
+    assignment_required: bool
     position: int
     # Items that are not done yet.
     open_item_count: int
@@ -94,6 +99,7 @@ def _list_out(
         name=todo_list.name,
         description=todo_list.description,
         mode=todo_list.mode,
+        assignment_required=todo_list.assignment_required,
         position=todo_list.position,
         open_item_count=open_item_count,
         role=access.role,
@@ -125,7 +131,13 @@ async def create_list_route(
     body: ListIn, ctx: ProjectEditorContextDep, session: SessionDep
 ) -> ListOut:
     todo_list = await create_list(
-        session, ctx.principal, ctx.project, body.name, body.description, body.mode
+        session,
+        ctx.principal,
+        ctx.project,
+        body.name,
+        body.description,
+        body.mode,
+        body.assignment_required,
     )
     access = await list_access(session, ctx.principal, todo_list, ctx.project)
     if access is None:
@@ -153,6 +165,7 @@ async def update_list_route(
         description=body.description,
         set_description="description" in body.model_fields_set,
         mode=body.mode,
+        assignment_required=body.assignment_required,
     )
     # A new mode changes what the caller may do from here on.
     access = replace(ctx.access, mode=todo_list.mode)

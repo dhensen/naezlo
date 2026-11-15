@@ -38,6 +38,10 @@ class Item(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         # One item per position in a list. Deferred to the end of the transaction, so a move
         # can shift the items in between before the moved one takes its place.
         UniqueConstraint("list_id", "position", deferrable=True, initially="DEFERRED"),
+        # An assignee is a kind and an id, or neither.
+        CheckConstraint(
+            "(assignee_kind IS NULL) = (assignee_id IS NULL)", name="assignee_kind_with_id"
+        ),
     )
 
     list_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("todo_lists.id", ondelete="CASCADE"))
@@ -60,3 +64,10 @@ class Item(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     completed_by_id: Mapped[uuid.UUID | None]
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Who works on the item: the user or agent who picked it up or was given it. No foreign
+    # key, like the actors above; an assignee who can no longer change the list's items
+    # counts as nobody (`item_assignees` in the item service).
+    assignee_kind: Mapped[PrincipalKind | None] = mapped_column(
+        value_enum(PrincipalKind, "principal_kind")
+    )
+    assignee_id: Mapped[uuid.UUID | None]

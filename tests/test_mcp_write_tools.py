@@ -1,5 +1,5 @@
-"""The MCP write tools: add_item, update_item, complete_item, reopen_item, move_item and
-delete_item."""
+"""The MCP write tools: add_item, update_item, complete_item, reopen_item, move_item,
+delete_item, claim_item and release_item."""
 
 import uuid
 from typing import Any
@@ -382,3 +382,121 @@ async def test_a_failed_tool_call_changes_nothing(
     assert missing.is_error
     assert await titles(client, list_id) == ["A"]
     assert len(await all_events(db_session)) == events
+
+
+ASSIGNMENT_TOOLS = ("claim_item", "release_item")
+
+
+async def assign_to_ada(client: AsyncClient, item_id: str) -> None:
+    ada = (await client.get("/api/me")).json()["user"]["id"]
+    response = await client.put(f"/api/items/{item_id}/assignee", json={"kind": "user", "id": ada})
+    assert response.status_code == 200, response.text
+
+
+async def require_assignment(client: AsyncClient, list_id: str) -> None:
+    response = await client.patch(f"/api/lists/{list_id}", json={"assignment_required": True})
+    assert response.status_code == 200, response.text
+
+
+async def test_the_assignment_tools_explain_themselves(app: FastAPI, client: AsyncClient) -> None:
+    _, token = await agent_token(client)
+
+    async with mcp_client(app, token) as mcp:
+        tools = {tool.name: tool for tool in (await mcp.list_tools()).tools}
+
+    for name in ASSIGNMENT_TOOLS:
+        assert "editor" in (tools[name].description or ""), name
+        assert set(tools[name].input_schema["properties"]) == {"item_id"}
+        assert tools[name].input_schema["properties"]["item_id"].get("description")
+    assert "claim_item" in (tools["complete_item"].description or "")
+
+
+async def test_an_agent_claims_and_releases_an_item(
+    app: FastAPI, client: AsyncClient, db_session: AsyncSession
+) -> None:
+    authorized, token, list_id = await shared_list(client, db_session)
+    me = {"kind": "agent", "id": authorized.agent["id"], "name": authorized.agent["name"]}
+    item_id = await add_item(client, list_id, "Dishes")
+    before = len(await all_events(db_session))
+
+    async with mcp_client(app, token) as mcp:
+        free = (await call(mcp, "get_list", list_id=list_id))["items"][0]
+        claimed = await call(mcp, "claim_item", item_id=item_id)
+        again = await call(mcp, "claim_item", item_id=item_id)
+        listed = (await call(mcp, "get_list", list_id=list_id))["items"][0]
+        seen_by_ada = (await api_items(client, list_id))[0]
+        released = await call(mcp, "release_item", item_id=item_id)
+        released_again = await call(mcp, "release_item", item_id=item_id)
+
+    assert (free["assignee"], free["assigned_to_you"]) == (None, False)
+    for result in (claimed, again, listed):
+        assert (result["assignee"], result["assigned_to_you"]) == (me, True)
+    assert seen_by_ada["assignee"] == me
+    for result in (released, released_again):
+        assert (result["assignee"], result["assigned_to_you"]) == (None, False)
+    assigned, unassigned = await events_since(db_session, before)
+    assert (assigned.action, unassigned.action) == ("item.assigned", "item.unassigned")
+    assert_by_agent(assigned, authorized)
+    assert_by_agent(unassigned, authorized)
+    assert assigned.details["assignee"] == me
+
+
+async def test_an_agent_leaves_an_item_of_someone_else_alone(
+    app: FastAPI, client: AsyncClient, db_session: AsyncSession
+) -> None:
+    _, token, list_id = await shared_list(client, db_session)
+    item_id = await add_item(client, list_id, "Dishes")
+    await assign_to_ada(client, item_id)
+    before = len(await all_events(db_session))
+
+    async with mcp_client(app, token) as mcp:
+        seen = (await call(mcp, "get_list", list_id=list_id))["items"][0]
+        claim = await error_of(mcp, "claim_item", item_id=item_id)
+        release = await error_of(mcp, "release_item", item_id=item_id)
+
+    assert seen["assignee"]["name"] == "Ada"
+    assert seen["assigned_to_you"] is False
+    assert "This item is assigned to Ada" in claim
+    assert "pick an item without an assignee" in claim
+    assert "assigned to Ada, not to you" in release
+    assert (await api_items(client, list_id))[0]["assignee"]["name"] == "Ada"
+    assert await events_since(db_session, before) == []
+
+
+async def test_claiming_needs_the_editor_role(
+    app: FastAPI, client: AsyncClient, db_session: AsyncSession
+) -> None:
+    _, token, list_id = await shared_list(client, db_session, ListRole.VIEWER)
+    item_id = await add_item(client, list_id, "Dishes")
+
+    async with mcp_client(app, token) as mcp:
+        for tool in ASSIGNMENT_TOOLS:
+            assert NEEDS_EDITOR in await error_of(mcp, tool, item_id=item_id)
+        unknown = await error_of(mcp, "claim_item", item_id=str(uuid.uuid7()))
+
+    assert "not found" in unknown
+
+
+async def test_in_a_list_with_assignment_required_an_agent_claims_before_it_completes(
+    app: FastAPI, client: AsyncClient, db_session: AsyncSession
+) -> None:
+    _, token, list_id = await shared_list(client, db_session)
+    await require_assignment(client, list_id)
+    dishes = await add_item(client, list_id, "Dishes")
+    laundry = await add_item(client, list_id, "Laundry")
+    await assign_to_ada(client, laundry)
+
+    async with mcp_client(app, token) as mcp:
+        listed = await call(mcp, "get_list", list_id=list_id)
+        unclaimed = await error_of(mcp, "complete_item", item_id=dishes)
+        hers = await error_of(mcp, "complete_item", item_id=laundry)
+        await call(mcp, "claim_item", item_id=dishes)
+        done = await call(mcp, "complete_item", item_id=dishes)
+
+    assert listed["assignment_required"] is True
+    assert "Nobody is assigned to this item" in unclaimed
+    assert "Call claim_item" in unclaimed
+    assert "This item is assigned to Ada" in hers
+    assert "Leave this item to them" in hers
+    assert (done["status"], done["assigned_to_you"]) == ("done", True)
+    assert [item["status"] for item in await api_items(client, list_id)] == ["done", "open"]

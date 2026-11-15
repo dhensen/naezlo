@@ -177,6 +177,31 @@ export interface paths {
         patch: operations["update_item_route_api_items__item_id__patch"];
         trace?: never;
     };
+    "/api/items/{item_id}/assignee": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Assign Item Route
+         * @description Assign the item to a user or agent, in place of its assignee. 422 `invalid_assignee`
+         *     when they cannot change the items of the list.
+         */
+        put: operations["assign_item_route_api_items__item_id__assignee_put"];
+        post?: never;
+        /**
+         * Unassign Item Route
+         * @description Take the assignee off the item.
+         */
+        delete: operations["unassign_item_route_api_items__item_id__assignee_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/items/{item_id}/move": {
         parameters: {
             query?: never;
@@ -211,6 +236,26 @@ export interface paths {
         head?: never;
         /** Update List Route */
         patch: operations["update_list_route_api_lists__list_id__patch"];
+        trace?: never;
+    };
+    "/api/lists/{list_id}/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Assignees Route
+         * @description Everyone an item of the list can be assigned to: people first, each kind by name.
+         */
+        get: operations["list_assignees_route_api_lists__list_id__assignees_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/lists/{list_id}/audit": {
@@ -802,6 +847,32 @@ export interface components {
              */
             agent_id: string;
         };
+        /**
+         * AssigneeIn
+         * @description The user or agent to assign the item to.
+         */
+        AssigneeIn: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["PrincipalKind"];
+        };
+        /**
+         * AssigneeOut
+         * @description Someone an item is or can be assigned to.
+         */
+        AssigneeOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["PrincipalKind"];
+            /** Name */
+            name: string;
+        };
         /** AuditActorOut */
         AuditActorOut: {
             /**
@@ -1040,6 +1111,7 @@ export interface components {
         };
         /** ItemOut */
         ItemOut: {
+            assignee: components["schemas"]["AssigneeOut"] | null;
             /** Completed At */
             completed_at: string | null;
             completed_by: components["schemas"]["ActorOut"] | null;
@@ -1135,6 +1207,11 @@ export interface components {
         };
         /** ListIn */
         ListIn: {
+            /**
+             * Assignment Required
+             * @default false
+             */
+            assignment_required: boolean;
             /** Description */
             description?: string | null;
             mode?: components["schemas"]["ListMode"] | null;
@@ -1151,6 +1228,8 @@ export interface components {
         ListOut: {
             /** Actions */
             actions: components["schemas"]["ListAction"][];
+            /** Assignment Required */
+            assignment_required: boolean;
             /**
              * Created At
              * Format: date-time
@@ -1196,6 +1275,8 @@ export interface components {
          * @description Only the fields that are sent change. `description: null` removes the description.
          */
         ListPatch: {
+            /** Assignment Required */
+            assignment_required?: boolean | null;
             /** Description */
             description?: string | null;
             mode?: components["schemas"]["ListMode"] | null;
@@ -1623,6 +1704,72 @@ export interface operations {
             };
         };
     };
+    assign_item_route_api_items__item_id__assignee_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssigneeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unassign_item_route_api_items__item_id__assignee_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     move_item_route_api_items__item_id__move_post: {
         parameters: {
             query?: never;
@@ -1740,6 +1887,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_assignees_route_api_lists__list_id__assignees_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                list_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssigneeOut"][];
                 };
             };
             /** @description Validation Error */

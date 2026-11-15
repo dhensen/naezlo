@@ -169,6 +169,49 @@
         "title": "ApproveIn",
         "type": "object"
       },
+      "AssigneeIn": {
+        "description": "The user or agent to assign the item to.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PrincipalKind"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "AssigneeIn",
+        "type": "object"
+      },
+      "AssigneeOut": {
+        "description": "Someone an item is or can be assigned to.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PrincipalKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "name"
+        ],
+        "title": "AssigneeOut",
+        "type": "object"
+      },
       "AuditActorOut": {
         "properties": {
           "id": {
@@ -725,6 +768,16 @@
       },
       "ItemOut": {
         "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "completed_at": {
             "anyOf": [
               {
@@ -803,6 +856,7 @@
           "created_by",
           "completed_by",
           "completed_at",
+          "assignee",
           "created_at",
           "updated_at"
         ],
@@ -951,6 +1005,11 @@
       },
       "ListIn": {
         "properties": {
+          "assignment_required": {
+            "default": false,
+            "title": "Assignment Required",
+            "type": "boolean"
+          },
           "description": {
             "anyOf": [
               {
@@ -1004,6 +1063,10 @@
             },
             "title": "Actions",
             "type": "array"
+          },
+          "assignment_required": {
+            "title": "Assignment Required",
+            "type": "boolean"
           },
           "created_at": {
             "format": "date-time",
@@ -1084,6 +1147,7 @@
           "name",
           "description",
           "mode",
+          "assignment_required",
           "position",
           "open_item_count",
           "role",
@@ -1098,6 +1162,17 @@
       "ListPatch": {
         "description": "Only the fields that are sent change. `description: null` removes the description.",
         "properties": {
+          "assignment_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Required"
+          },
           "description": {
             "anyOf": [
               {
@@ -1815,6 +1890,102 @@
         ]
       }
     },
+    "/api/items/{item_id}/assignee": {
+      "delete": {
+        "description": "Take the assignee off the item.",
+        "operationId": "unassign_item_route_api_items__item_id__assignee_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unassign Item Route",
+        "tags": [
+          "items"
+        ]
+      },
+      "put": {
+        "description": "Assign the item to a user or agent, in place of its assignee. 422 `invalid_assignee`\nwhen they cannot change the items of the list.",
+        "operationId": "assign_item_route_api_items__item_id__assignee_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssigneeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Assign Item Route",
+        "tags": [
+          "items"
+        ]
+      }
+    },
     "/api/items/{item_id}/move": {
       "post": {
         "operationId": "move_item_route_api_items__item_id__move_post",
@@ -1993,6 +2164,54 @@
         "summary": "Update List Route",
         "tags": [
           "lists"
+        ]
+      }
+    },
+    "/api/lists/{list_id}/assignees": {
+      "get": {
+        "description": "Everyone an item of the list can be assigned to: people first, each kind by name.",
+        "operationId": "list_assignees_route_api_lists__list_id__assignees_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "list_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "List Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssigneeOut"
+                  },
+                  "title": "Response List Assignees Route Api Lists  List Id  Assignees Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Assignees Route",
+        "tags": [
+          "items"
         ]
       }
     },

@@ -66,6 +66,7 @@ async def create_list(
     name: str,
     description: str | None,
     mode: ListMode | None = None,
+    assignment_required: bool = False,
 ) -> TodoList:
     """Add a list at the end of the project. Without a `mode` it gets `default_list_mode`."""
     # Two lists created at the same moment must not get the same position.
@@ -78,6 +79,7 @@ async def create_list(
         name=name.strip(),
         description=_clean_description(description),
         mode=mode or await default_list_mode(session, project.organization_id),
+        assignment_required=assignment_required,
         position=1 if last is None else last + 1,
         # created_by refers to a user; a list made by an agent has none.
         created_by=principal.id if principal.kind is PrincipalKind.USER else None,
@@ -102,6 +104,7 @@ def _audited_fields(todo_list: TodoList) -> dict[str, object]:
         "name": todo_list.name,
         "description": todo_list.description,
         "mode": todo_list.mode,
+        "assignment_required": todo_list.assignment_required,
     }
 
 
@@ -114,9 +117,10 @@ async def update_list(
     description: str | None = None,
     set_description: bool = False,
     mode: ListMode | None = None,
+    assignment_required: bool | None = None,
 ) -> TodoList:
-    """Change the name and the mode (when given) and the description (when `set_description`;
-    None clears it)."""
+    """Change the name, the mode and whether assignment is required (when given) and the
+    description (when `set_description`; None clears it)."""
     old = _audited_fields(todo_list)
     if name is not None:
         todo_list.name = name.strip()
@@ -124,6 +128,8 @@ async def update_list(
         todo_list.description = _clean_description(description)
     if mode is not None:
         todo_list.mode = mode
+    if assignment_required is not None:
+        todo_list.assignment_required = assignment_required
     await session.flush()
     # updated_at is set by the database.
     await session.refresh(todo_list)

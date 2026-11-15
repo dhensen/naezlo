@@ -229,6 +229,17 @@ async def test_item_events(client: AsyncClient, db_session: AsyncSession) -> Non
     assert (await client.patch(item_url, json={"status": "open"})).status_code == 200
     await check("item.reopened", {"title": "Write texts"})
 
+    assignee = {"kind": "user", "id": str(user.id), "name": user.name}
+    response = await client.put(f"{item_url}/assignee", json={"kind": "user", "id": str(user.id)})
+    assert response.status_code == 200, response.text
+    await check(
+        "item.assigned",
+        {"title": "Write texts", "assignee": assignee, "previous_assignee": None},
+    )
+
+    assert (await client.delete(f"{item_url}/assignee")).status_code == 200
+    await check("item.unassigned", {"title": "Write texts", "previous_assignee": assignee})
+
     response = await client.post(f"{item_url}/move", json={"before_item_id": first["id"]})
     assert response.status_code == 200, response.text
     await check(
@@ -239,12 +250,14 @@ async def test_item_events(client: AsyncClient, db_session: AsyncSession) -> Non
     assert (await client.delete(item_url)).status_code == 204
     await check("item.deleted", {"title": "Write texts"})
 
-    assert (await actions(db_session))[-7:] == [
+    assert (await actions(db_session))[-9:] == [
         "item.created",  # Buy domain
         "item.created",
         "item.updated",
         "item.completed",
         "item.reopened",
+        "item.assigned",
+        "item.unassigned",
         "item.moved",
         "item.deleted",
     ]
