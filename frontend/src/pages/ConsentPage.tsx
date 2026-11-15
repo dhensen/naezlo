@@ -6,6 +6,7 @@ import { ApiError } from '../api/client'
 import { useMe } from '../auth/hooks'
 import { leaveTo } from '../auth/next'
 import { ErrorMessage } from '../components/ErrorMessage'
+import { Logo } from '../components/Logo'
 import { APP_NAME } from '../config'
 import { useAnswerAuthorizationRequest, useAuthorizationRequest } from '../oauth/hooks'
 import type { AuthorizationRequest, ConsentAgent, ConsentAnswer } from '../oauth/hooks'
@@ -62,6 +63,8 @@ export function ConsentPage() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 py-10 text-slate-900 sm:px-6">
       <div className="flex w-full max-w-md flex-col gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        {/* Every heading here says the name, or is about the application. */}
+        <Logo className="h-8 self-start" decorative />
         {requestId === null || requestId === '' ? (
           <>
             <h1 className="text-2xl font-semibold tracking-tight">Connect an application</h1>
