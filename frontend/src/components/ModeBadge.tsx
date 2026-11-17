@@ -4,9 +4,9 @@ import { modeInfo } from '../lists/modes'
 import type { ListMode } from '../lists/modes'
 
 const STYLES: Record<ListMode, string> = {
-  human_only: 'bg-slate-100 text-slate-700',
-  ai_only: 'bg-violet-100 text-violet-800',
-  mixed: 'bg-teal-100 text-teal-800',
+  human_only: 'bg-ink-100 text-ink-700 ring-ink-200',
+  ai_only: 'bg-brand-50 text-brand-700 ring-brand-200',
+  mixed: 'bg-mint-50 text-mint-800 ring-mint-200',
 }
 
 const PERSON = (
@@ -70,7 +70,7 @@ export function ModeBadge({ mode }: { mode: ListMode }) {
       <span
         tabIndex={0}
         aria-describedby={tooltipId}
-        className={`inline-flex cursor-default items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium focus:outline-2 focus:outline-offset-1 focus:outline-slate-500 ${STYLES[mode]}`}
+        className={`inline-flex cursor-default items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${STYLES[mode]}`}
       >
         <ModeIcon mode={mode} />
         {info.label}
@@ -78,7 +78,7 @@ export function ModeBadge({ mode }: { mode: ListMode }) {
       <span
         role="tooltip"
         id={tooltipId}
-        className="pointer-events-none invisible absolute top-full right-0 z-10 mt-1 w-56 rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+        className="pointer-events-none invisible absolute top-full right-0 z-10 mt-1 w-56 rounded-lg bg-ink-900 px-2.5 py-1.5 text-xs font-normal text-white opacity-0 shadow-float transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
       >
         {info.explanation}
       </span>

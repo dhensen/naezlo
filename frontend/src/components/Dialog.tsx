@@ -23,7 +23,7 @@ export function Dialog({ title, onClose, wide = false, children }: DialogProps) 
   // At phone width it sits at the top, so the on-screen keyboard does not cover its fields.
   return (
     <div
-      className="fixed inset-0 z-30 flex items-start justify-center bg-slate-900/40 p-3 sm:items-center sm:p-4"
+      className="fixed inset-0 z-30 flex items-start justify-center bg-ink-900/45 p-3 backdrop-blur-[2px] sm:items-center sm:p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose()
@@ -34,14 +34,14 @@ export function Dialog({ title, onClose, wide = false, children }: DialogProps) 
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`max-h-full w-full overflow-y-auto overscroll-contain rounded-lg bg-white p-4 shadow-xl sm:p-5 ${wide ? 'max-w-xl' : 'max-w-sm'}`}
+        className={`max-h-full w-full overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-float sm:p-6 ${wide ? 'max-w-xl' : 'max-w-sm'}`}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             onClose()
           }
         }}
       >
-        <h2 id={titleId} className="text-lg font-semibold tracking-tight break-words">
+        <h2 id={titleId} className="text-lg font-semibold break-words">
           {title}
         </h2>
         {children}
@@ -51,11 +51,11 @@ export function Dialog({ title, onClose, wide = false, children }: DialogProps) 
 }
 
 export const DIALOG_INPUT =
-  'rounded-md border border-slate-300 px-3 py-2 font-normal text-slate-900 focus:border-slate-500 focus:outline-none'
-export const DIALOG_LABEL = 'flex flex-col gap-1 text-sm font-medium text-slate-700'
+  'rounded-lg border border-ink-300 px-3 py-2 font-normal text-ink-900 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none'
+export const DIALOG_LABEL = 'flex flex-col gap-1 text-sm font-medium text-ink-700'
 export const DIALOG_CANCEL =
-  'rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:py-1.5'
+  'rounded-lg border border-ink-300 px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 sm:py-1.5'
 export const DIALOG_SUBMIT =
-  'rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60 sm:py-1.5'
+  'rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 sm:py-1.5'
 export const DIALOG_DANGER =
-  'rounded-md bg-red-700 px-3 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-60 sm:py-1.5'
+  'rounded-lg bg-red-700 px-3 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-60 sm:py-1.5'

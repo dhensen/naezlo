@@ -19,9 +19,9 @@ const LOGIN_ERRORS: Record<string, string> = {
 }
 
 const INPUT =
-  'rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-slate-500 focus:outline-none'
+  'rounded-lg border border-ink-300 px-3 py-2 text-ink-900 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none'
 const BUTTON =
-  'rounded-md bg-slate-900 px-4 py-2 text-center font-medium text-white hover:bg-slate-700 disabled:opacity-60'
+  'rounded-lg bg-brand-600 px-4 py-2.5 text-center font-semibold text-white shadow-card hover:bg-brand-700 disabled:opacity-60'
 
 function DevLoginForm() {
   const devLogin = useDevLogin()
@@ -35,10 +35,10 @@ function DevLoginForm() {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3 text-left" aria-label="Development sign-in">
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-ink-500">
         Development sign-in: no password, any email address.
       </p>
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-ink-700">
         Email
         <input
           type="email"
@@ -50,7 +50,7 @@ function DevLoginForm() {
           className={INPUT}
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-ink-700">
         Name
         <input
           type="text"
@@ -97,20 +97,20 @@ export function LoginPage() {
     '/api/auth/google/login' + (next === null ? '' : `?next=${encodeURIComponent(next)}`)
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 text-slate-900 sm:px-6">
-      <div className="flex w-full max-w-sm flex-col gap-5 rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-ink-50 px-4 text-ink-900 sm:px-6">
+      <div className="flex w-full max-w-sm flex-col gap-5 rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-float sm:p-8">
         <div className="flex flex-col items-center gap-1">
           {/* The heading below already says the name. */}
-          <Logo className="mb-3 h-9" decorative />
+          <Logo className="mb-4 h-10" decorative />
           <h1 className="text-2xl font-semibold tracking-tight">Sign in to {APP_NAME}</h1>
-          <p className="text-sm text-slate-600">Todo lists that people and AI agents share.</p>
+          <p className="text-sm text-ink-600">Todo lists that people and AI agents share.</p>
         </div>
         {errorCode !== null && (
           <ErrorMessage error={LOGIN_ERRORS[errorCode] ?? 'Signing in did not work. Try again.'} />
         )}
         <ErrorMessage error={me.error ?? config.error} />
         {config.isPending && (
-          <p role="status" className="text-slate-500">
+          <p role="status" className="text-ink-500">
             Loading…
           </p>
         )}
@@ -122,7 +122,7 @@ export function LoginPage() {
         )}
         {config.data?.dev_login_enabled && <DevLoginForm />}
         {config.data && !config.data.google_login_enabled && !config.data.dev_login_enabled && (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-ink-600">
             Signing in is not set up on this server yet. Ask its administrator.
           </p>
         )}

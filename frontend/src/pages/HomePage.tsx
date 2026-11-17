@@ -24,10 +24,10 @@ export function HomePage() {
       <h1>
         <Logo className="h-12" />
       </h1>
-      <p className="text-slate-600">You are not a member of an organization yet.</p>
+      <p className="text-ink-600">You are not a member of an organization yet.</p>
       <button
         type="button"
-        className="rounded-md bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700"
+        className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
         onClick={() => setCreating(true)}
       >
         New organization

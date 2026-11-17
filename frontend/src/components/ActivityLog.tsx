@@ -8,7 +8,7 @@ import { ErrorMessage } from './ErrorMessage'
 import { ModeIcon } from './ModeBadge'
 
 const SELECT =
-  'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none'
+  'select rounded-lg border border-ink-300 bg-white px-2 py-1.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none'
 
 const ACTORS = [
   { value: '', label: 'Everyone' },
@@ -48,7 +48,7 @@ export function ActivityLog({ scope, listNames }: ActivityLogProps) {
 
   return (
     <section aria-label="Activity" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-700">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-700">
         <span className="flex items-center gap-2">
           <label htmlFor="activity-actor">By</label>
           <select
@@ -81,18 +81,18 @@ export function ActivityLog({ scope, listNames }: ActivityLogProps) {
         </span>
       </div>
       {activity.isPending && (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-ink-500">
           Loading…
         </p>
       )}
       <ErrorMessage error={activity.error} />
       {events?.length === 0 && (
-        <p className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-slate-600">
+        <p className="rounded-xl border border-dashed border-ink-300 px-4 py-8 text-center text-ink-600">
           {filtered ? 'No activity matches these filters.' : 'Nothing has happened here yet.'}
         </p>
       )}
       {events && events.length > 0 && (
-        <ol aria-label="Activity, newest first" className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+        <ol aria-label="Activity, newest first" className="divide-y divide-ink-200 rounded-xl border border-ink-200 bg-white shadow-card">
           {events.map((event) => (
             <EventRow key={event.id} event={event} context={context} />
           ))}
@@ -102,7 +102,7 @@ export function ActivityLog({ scope, listNames }: ActivityLogProps) {
         <button
           type="button"
           disabled={activity.isFetchingNextPage}
-          className="self-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:text-slate-400"
+          className="self-center rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:text-ink-400"
           onClick={() => void activity.fetchNextPage()}
         >
           {activity.isFetchingNextPage ? 'Loading…' : 'Load more'}
@@ -122,34 +122,34 @@ function EventRow({ event, context }: { event: AuditEvent; context: DescribeCont
       <span
         title={agent ? 'AI agent' : 'Person'}
         data-actor-kind={event.actor.kind}
-        className={`mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full ${
-          agent ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-700'
+        className={`mt-0.5 inline-flex size-6 shrink-0 items-center justify-center text-white ${
+          agent ? 'rounded-md bg-brand-600' : 'rounded-full bg-ink-800'
         }`}
       >
         <ModeIcon mode={agent ? 'ai_only' : 'human_only'} />
         <span className="sr-only">{agent ? 'AI agent:' : 'Person:'}</span>
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="break-words text-slate-900">
-          <span className="font-medium">{event.actor.name}</span> {describeEvent(event, context)}
+        <p className="break-words text-ink-900">
+          <span className="font-semibold">{event.actor.name}</span> {describeEvent(event, context)}
         </p>
         {changes.length > 0 && (
-          <dl className="flex flex-col gap-0.5 text-sm text-slate-600">
+          <dl className="flex flex-col gap-0.5 text-sm text-ink-600">
             {changes.map((change) => (
               <div key={change.field} className="flex flex-wrap gap-x-1.5">
                 <dt className="font-medium">{change.label}:</dt>
                 <dd className="min-w-0 break-words whitespace-pre-line">
                   <span className="sr-only">from </span>
-                  <span className="text-slate-500 line-through decoration-slate-400">{change.old}</span>
+                  <span className="text-ink-500 line-through decoration-ink-400">{change.old}</span>
                   <span aria-hidden="true"> → </span>
                   <span className="sr-only"> to </span>
-                  <span className="text-slate-900">{change.new}</span>
+                  <span className="text-ink-900">{change.new}</span>
                 </dd>
               </div>
             ))}
           </dl>
         )}
-        <time dateTime={event.created_at} title={time.toLocaleString()} className="text-xs text-slate-500">
+        <time dateTime={event.created_at} title={time.toLocaleString()} className="text-xs text-ink-500">
           {TIME.format(time)}
         </time>
       </div>

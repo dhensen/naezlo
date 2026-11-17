@@ -71,7 +71,7 @@ export function NewAgentDialog({ organization, onClose, onCreated }: NewAgentDia
   return (
     <Dialog title="New agent" onClose={onClose}>
       <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-600">
           An agent is the identity an AI tool works under. Give each tool or task its own, for example "Claude" or
           "Release bot".
         </p>

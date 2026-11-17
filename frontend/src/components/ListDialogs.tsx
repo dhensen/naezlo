@@ -24,9 +24,14 @@ function ModeChoice({ value, onChange }: ModeChoiceProps) {
 
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-sm font-medium text-slate-700">Mode</legend>
+      <legend className="mb-1 text-sm font-medium text-ink-700">Mode</legend>
       {MODES.map((info) => (
-        <div key={info.mode} className="flex items-start gap-2">
+        // The whole row chooses the mode; the radio in it is what the keyboard uses.
+        <div
+          key={info.mode}
+          className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-ink-200 px-3 py-2.5 hover:bg-ink-50 has-checked:border-brand-500 has-checked:bg-brand-50"
+          onClick={() => onChange(info.mode)}
+        >
           <input
             type="radio"
             name="mode"
@@ -40,12 +45,12 @@ function ModeChoice({ value, onChange }: ModeChoiceProps) {
           <div className="flex min-w-0 flex-col">
             <label
               htmlFor={`${id}-${info.mode}`}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-900"
+              className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-ink-900"
             >
               <ModeIcon mode={info.mode} className="size-4" />
               {info.label}
             </label>
-            <p id={`${id}-${info.mode}-explanation`} className="text-xs text-slate-600">
+            <p id={`${id}-${info.mode}-explanation`} className="text-xs text-ink-600">
               {info.explanation}
             </p>
           </div>
@@ -116,10 +121,10 @@ function ListFields({
           className="mt-1"
         />
         <div className="flex min-w-0 flex-col">
-          <label htmlFor={`${id}-assignment`} className="text-sm font-medium text-slate-900">
+          <label htmlFor={`${id}-assignment`} className="text-sm font-medium text-ink-900">
             Assignment required
           </label>
-          <p id={`${id}-assignment-explanation`} className="text-xs text-slate-600">
+          <p id={`${id}-assignment-explanation`} className="text-xs text-ink-600">
             Only the assignee can complete an item. People and agents pick an item up before they work on it, so
             nobody does the same work twice.
           </p>
@@ -252,7 +257,7 @@ export function DeleteListDialog({ list, onClose }: { list: TodoList; onClose: (
 
   return (
     <Dialog title={`Delete ${list.name}?`} onClose={onClose}>
-      <p className="mt-2 text-sm text-slate-600">The list is deleted with all its items. This cannot be undone.</p>
+      <p className="mt-2 text-sm text-ink-600">The list is deleted with all its items. This cannot be undone.</p>
       <div className="mt-4 flex flex-col gap-4">
         <ErrorMessage error={remove.error} />
         <div className="flex justify-end gap-2">

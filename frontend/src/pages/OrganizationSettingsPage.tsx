@@ -22,16 +22,16 @@ type Role = Member['role']
 
 const ROLE_LABELS: Record<Role, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
 
-const INPUT = 'rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none'
+const INPUT = 'rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none'
 const PRIMARY_BUTTON =
-  'rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60'
+  'rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60'
 const SMALL_BUTTON =
-  'rounded-md border border-slate-300 px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 sm:py-1'
+  'rounded-lg border border-ink-300 px-2.5 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-60 sm:py-1'
 const DANGER_BUTTON =
-  'rounded-md border border-red-300 px-2.5 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60 sm:py-1'
+  'rounded-lg border border-ink-300 bg-white px-2.5 py-1.5 text-sm font-medium text-red-700 hover:border-red-300 hover:bg-red-50 disabled:opacity-60 sm:py-1'
 // Below `sm` a member is a block of lines (name, email, then role and action) instead of a table row.
 const MEMBER_ROW = 'flex flex-wrap items-center gap-x-3 py-2 sm:table-row'
-const SECTION = 'flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4'
+const SECTION = 'flex flex-col gap-3 rounded-xl border border-ink-200 bg-white shadow-card p-4'
 
 /** Settings of an organization (`/o/:orgSlug/settings`): name, members and invitations. */
 export function OrganizationSettingsPage() {
@@ -42,11 +42,11 @@ export function OrganizationSettingsPage() {
   const canManage = organization.role === 'owner' || organization.role === 'admin'
 
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
+    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 mx-auto p-4 sm:px-8 sm:py-8">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Organization settings</h1>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Organization settings</h1>
         {!canManage && (
-          <p className="text-sm text-slate-600">Only owners and admins can change these settings.</p>
+          <p className="text-sm text-ink-600">Only owners and admins can change these settings.</p>
         )}
       </div>
       {/* Keyed, so the forms start empty again in another organization. */}
@@ -79,7 +79,7 @@ function NameSection({ organization, canManage }: SectionProps) {
       {canManage ? (
         <form onSubmit={submit} className="flex flex-col gap-3">
           <div className="flex flex-wrap items-end gap-2">
-            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium text-slate-700">
+            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium text-ink-700">
               Organization name
               <input
                 type="text"
@@ -103,14 +103,14 @@ function NameSection({ organization, canManage }: SectionProps) {
             </button>
           </div>
           {rename.isSuccess && (
-            <p role="status" className="text-sm text-green-700">
+            <p role="status" className="text-sm text-mint-700">
               Renamed. Links to this organization stay the same.
             </p>
           )}
           <ErrorMessage error={rename.error} />
         </form>
       ) : (
-        <p className="text-slate-900">{organization.name}</p>
+        <p className="text-ink-900">{organization.name}</p>
       )}
     </section>
   )
@@ -158,7 +158,7 @@ function MembersSection({ organization, canManage }: SectionProps) {
         Members
       </h2>
       {members.isPending && (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-ink-500">
           Loading…
         </p>
       )}
@@ -167,7 +167,7 @@ function MembersSection({ organization, canManage }: SectionProps) {
       {members.data && (
         <div className="overflow-x-auto">
           <table aria-labelledby="settings-members" className="w-full text-left text-sm">
-            <thead className="hidden text-xs tracking-wide text-slate-500 uppercase sm:table-header-group">
+            <thead className="hidden text-xs font-semibold text-ink-500 sm:table-header-group">
               <tr>
                 <th scope="col" className="py-2 pr-3 font-medium">
                   Name
@@ -183,7 +183,7 @@ function MembersSection({ organization, canManage }: SectionProps) {
                 </th>
               </tr>
             </thead>
-            <tbody className="block divide-y divide-slate-100 border-t border-slate-200 sm:table-row-group">
+            <tbody className="block divide-y divide-ink-100 border-t border-ink-200 sm:table-row-group">
               {members.data.map((member) => {
                 const isSelf = member.user_id === myId
                 const choices = roleChoices(organization.role, member)
@@ -191,12 +191,12 @@ function MembersSection({ organization, canManage }: SectionProps) {
                 const action = isSelf ? 'Leave' : 'Remove'
                 return (
                   <tr key={member.user_id} className={MEMBER_ROW}>
-                    <th scope="row" className="basis-full font-medium text-slate-900 sm:py-2 sm:pr-3">
+                    <th scope="row" className="basis-full font-medium text-ink-900 sm:py-2 sm:pr-3">
                       {member.name}
-                      {isSelf && <span className="font-normal text-slate-500"> (you)</span>}
+                      {isSelf && <span className="font-normal text-ink-500"> (you)</span>}
                     </th>
-                    <td className="basis-full break-all text-slate-700 sm:py-2 sm:pr-3">{member.email}</td>
-                    <td className="pt-1 text-slate-700 sm:py-2 sm:pr-3">
+                    <td className="basis-full break-all text-ink-700 sm:py-2 sm:pr-3">{member.email}</td>
+                    <td className="pt-1 text-ink-700 sm:py-2 sm:pr-3">
                       {choices ? (
                         <select
                           aria-label={`Role of ${member.name}`}
@@ -206,7 +206,7 @@ function MembersSection({ organization, canManage }: SectionProps) {
                             remove.reset()
                             changeRole.mutate({ userId: member.user_id, role: event.target.value as Role })
                           }}
-                          className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm sm:py-1"
+                          className="select rounded-lg border border-ink-300 bg-white px-2 py-1.5 text-sm sm:py-1"
                         >
                           {choices.map((role) => (
                             <option key={role} value={role}>
@@ -275,7 +275,7 @@ function InvitationsSection({ organization }: { organization: Organization }) {
         Invitations
       </h2>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
-        <label className="flex w-full min-w-0 flex-col gap-1 text-sm font-medium text-slate-700 sm:w-auto sm:flex-1">
+        <label className="flex w-full min-w-0 flex-col gap-1 text-sm font-medium text-ink-700 sm:w-auto sm:flex-1">
           Email address
           <input
             type="email"
@@ -289,13 +289,13 @@ function InvitationsSection({ organization }: { organization: Organization }) {
           />
         </label>
         {/* Not wrapped in the label: the options would become part of its name. */}
-        <div className="flex flex-1 flex-col gap-1 text-sm font-medium text-slate-700 sm:flex-none">
+        <div className="flex flex-1 flex-col gap-1 text-sm font-medium text-ink-700 sm:flex-none">
           <label htmlFor={roleId}>Role</label>
           <select
             id={roleId}
             value={role}
             onChange={(event) => setRole(event.target.value as Schemas['InvitationRole'])}
-            className={INPUT}
+            className={`select ${INPUT}`}
           >
             <option value="member">Member</option>
             <option value="admin">Admin</option>
@@ -306,28 +306,28 @@ function InvitationsSection({ organization }: { organization: Organization }) {
         </button>
       </form>
       {invite.data && (
-        <p role="status" className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <p role="status" className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700">
           {invite.data.message}
         </p>
       )}
       <ErrorMessage error={invite.error} />
 
-      <h3 className="mt-2 text-sm font-medium text-slate-700">Pending invitations</h3>
+      <h3 className="mt-2 text-sm font-medium text-ink-700">Pending invitations</h3>
       {invitations.isPending && (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-ink-500">
           Loading…
         </p>
       )}
       <ErrorMessage error={invitations.error} />
       <ErrorMessage error={revoke.error} />
-      {invitations.data?.length === 0 && <p className="text-sm text-slate-500">No pending invitations.</p>}
+      {invitations.data?.length === 0 && <p className="text-sm text-ink-500">No pending invitations.</p>}
       {invitations.data && invitations.data.length > 0 && (
-        <ul aria-label="Pending invitations" className="divide-y divide-slate-100 border-t border-slate-200 text-sm">
+        <ul aria-label="Pending invitations" className="divide-y divide-ink-100 border-t border-ink-200 text-sm">
           {invitations.data.map((invitation) => (
             <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <span className="min-w-0 break-all text-slate-900">
+              <span className="min-w-0 break-all text-ink-900">
                 {invitation.email}
-                <span className="text-slate-500"> · {ROLE_LABELS[invitation.role]}</span>
+                <span className="text-ink-500"> · {ROLE_LABELS[invitation.role]}</span>
               </span>
               <button
                 type="button"

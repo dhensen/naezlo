@@ -35,7 +35,7 @@ export function CopyButton({ text, label }: CopyButtonProps) {
     <button
       type="button"
       aria-label={`Copy ${label}`}
-      className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm sm:py-1 font-medium text-slate-700 hover:bg-slate-50"
+      className="shrink-0 rounded-lg border border-ink-300 bg-white px-2.5 py-2 text-sm sm:py-1 font-medium text-ink-700 hover:bg-ink-50"
       onClick={copy}
     >
       <span aria-live="polite">{state === 'copied' ? 'Copied' : state === 'failed' ? 'Select it to copy' : 'Copy'}</span>

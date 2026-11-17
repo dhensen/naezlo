@@ -13,9 +13,9 @@ import type { AuthorizationRequest, ConsentAgent, ConsentAnswer } from '../oauth
 import { orgPath } from '../orgs/paths'
 
 const PRIMARY_BUTTON =
-  'rounded-md bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700 disabled:opacity-60'
+  'rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60'
 const SECONDARY_BUTTON =
-  'rounded-md border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60'
+  'rounded-lg border border-ink-300 px-4 py-2 font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-60'
 
 const GONE =
   'This authorization request was not found. It may have expired or been answered already. ' +
@@ -61,8 +61,8 @@ export function ConsentPage() {
   const requestId = params.get('request')
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 py-10 text-slate-900 sm:px-6">
-      <div className="flex w-full max-w-md flex-col gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-ink-50 px-4 py-10 text-ink-900 sm:px-6">
+      <div className="flex w-full max-w-md flex-col gap-5 rounded-xl border border-ink-200 bg-white p-5 shadow-card sm:p-6">
         {/* Every heading here says the name, or is about the application. */}
         <Logo className="h-8 self-start" decorative />
         {requestId === null || requestId === '' ? (
@@ -85,14 +85,14 @@ function Consent({ requestId }: { requestId: string }) {
   if (answer.isSuccess) {
     // The browser is on its way out; the request no longer exists.
     return (
-      <p role="status" className="text-center text-slate-600">
+      <p role="status" className="text-center text-ink-600">
         Returning to the application…
       </p>
     )
   }
   if (request.isPending) {
     return (
-      <p role="status" className="text-center text-slate-500">
+      <p role="status" className="text-center text-ink-500">
         Loading…
       </p>
     )
@@ -148,29 +148,29 @@ function ConsentForm({ request, error, busy, onAnswer }: ConsentFormProps) {
         <h1 className="text-2xl font-semibold tracking-tight">
           <span className="break-words">{clientName}</span> wants to access {APP_NAME}
         </h1>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-600">
           It will work as the agent you choose and reach only the projects and lists that are shared with that
           agent.
         </p>
       </div>
 
-      <dl className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+      <dl className="flex flex-col gap-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-sm">
         <div className="flex flex-wrap justify-between gap-x-3">
-          <dt className="text-slate-600">Application</dt>
+          <dt className="text-ink-600">Application</dt>
           <dd className="break-all font-medium">{request.client_name ?? 'Unnamed application'}</dd>
         </div>
         <div className="flex flex-wrap justify-between gap-x-3">
-          <dt className="text-slate-600">After your answer you go to</dt>
+          <dt className="text-ink-600">After your answer you go to</dt>
           <dd className="break-all font-mono font-medium">{request.redirect_host}</dd>
         </div>
         {me.data && (
           <div className="flex flex-wrap justify-between gap-x-3">
-            <dt className="text-slate-600">Signed in as</dt>
+            <dt className="text-ink-600">Signed in as</dt>
             <dd className="break-all font-medium">{me.data.user.email}</dd>
           </div>
         )}
       </dl>
-      <p role="note" className="text-sm text-slate-600">
+      <p role="note" className="text-sm text-ink-600">
         {isLoopback(request.redirect_host)
           ? 'That address is an application on this computer. '
           : 'Check that this address belongs to the application you are connecting. '}
@@ -178,7 +178,7 @@ function ConsentForm({ request, error, busy, onAnswer }: ConsentFormProps) {
       </p>
 
       {groups.length === 0 ? (
-        <div className="flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           <p>
             <strong className="font-semibold">Create an agent first.</strong> An application connects as an agent,
             and there is no agent yet that you may connect.
@@ -208,18 +208,18 @@ function ConsentForm({ request, error, busy, onAnswer }: ConsentFormProps) {
         </div>
       ) : (
         <div role="group" aria-labelledby="consent-agents" className="flex flex-col gap-3">
-          <h2 id="consent-agents" className="text-sm font-semibold text-slate-900">
+          <h2 id="consent-agents" className="text-sm font-semibold text-ink-900">
             Connect as
           </h2>
           {groups.map(({ organization, agents }) => (
             <fieldset key={organization.id} className="flex flex-col gap-1">
-              <legend className="mb-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              <legend className="mb-1 text-xs font-semibold text-ink-500">
                 {organization.name}
               </legend>
               {agents.map((agent) => (
                 <label
                   key={agent.id}
-                  className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50 has-checked:border-slate-900 has-checked:bg-slate-50"
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-ink-200 px-3 py-2 hover:bg-ink-50 has-checked:border-brand-500 has-checked:bg-brand-50"
                 >
                   <input
                     type="radio"
@@ -237,7 +237,7 @@ function ConsentForm({ request, error, busy, onAnswer }: ConsentFormProps) {
                       {agent.name}
                     </span>
                     {agent.description !== null && (
-                      <span id={`consent-agent-description-${agent.id}`} className="text-sm break-words text-slate-600">
+                      <span id={`consent-agent-description-${agent.id}`} className="text-sm break-words text-ink-600">
                         {agent.description}
                       </span>
                     )}

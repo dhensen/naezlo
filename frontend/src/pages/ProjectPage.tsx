@@ -18,9 +18,11 @@ import { roleAtLeast, useDeleteProject, useProject, useProjectLists, useUpdatePr
 import type { TodoList } from '../projects/hooks'
 
 const HEADER_BUTTON =
-  'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50'
+  'rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50'
+const PRIMARY_BUTTON =
+  'rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white shadow-card hover:bg-brand-700'
 const HEADER_DANGER_BUTTON =
-  'rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50'
+  'rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:border-red-300 hover:bg-red-50'
 
 const PROJECT_TABS = [
   { id: 'lists', label: 'Lists' },
@@ -54,8 +56,8 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Project not found</h1>
-        <p className="text-slate-600">It does not exist, or you have no access to it.</p>
-        <Link to={orgPath(organization.slug)} className="text-slate-600 underline">
+        <p className="text-ink-600">It does not exist, or you have no access to it.</p>
+        <Link to={orgPath(organization.slug)} className="text-ink-600 underline">
           Back to {organization.name}
         </Link>
       </main>
@@ -65,7 +67,7 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
         {project.isPending && (
-          <p role="status" className="text-slate-500">
+          <p role="status" className="text-ink-500">
             Loading…
           </p>
         )}
@@ -83,12 +85,12 @@ function ProjectView({ organization, projectId }: { organization: Organization; 
   const lists = <ListsSection project={current} organization={organization} />
 
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
+    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 mx-auto p-4 sm:px-8 sm:py-8">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight break-words">{current.name}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl break-words">{current.name}</h1>
           {current.description !== null && (
-            <p className="break-words whitespace-pre-line text-slate-600">{current.description}</p>
+            <p className="break-words whitespace-pre-line text-ink-600">{current.description}</p>
           )}
         </div>
         {(canEdit || canDelete) && (
@@ -147,8 +149,8 @@ function openItems(count: number): string {
   return count === 1 ? '1 open item' : `${count} open items`
 }
 
-const ROW_BUTTON = 'min-h-9 rounded-md px-2 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-const ROW_DANGER_BUTTON = 'min-h-9 rounded-md px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50'
+const ROW_BUTTON = 'min-h-9 rounded-lg px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900'
+const ROW_DANGER_BUTTON = 'min-h-9 rounded-lg px-2 py-1 text-sm font-medium text-ink-600 hover:bg-red-50 hover:text-red-700'
 
 type ListDialog = { kind: 'new' } | { kind: 'edit' | 'delete'; list: TodoList }
 
@@ -164,26 +166,26 @@ function ListsSection({ project, organization }: { project: Project; organizatio
           Lists
         </h2>
         {roleAtLeast(project.role, 'editor') && (
-          <button type="button" className={HEADER_BUTTON} onClick={() => setDialog({ kind: 'new' })}>
+          <button type="button" className={PRIMARY_BUTTON} onClick={() => setDialog({ kind: 'new' })}>
             New list
           </button>
         )}
       </div>
       {lists.isPending && (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-ink-500">
           Loading…
         </p>
       )}
       <ErrorMessage error={lists.error} />
       {lists.data?.length === 0 && (
-        <p className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-slate-600">
+        <p className="rounded-xl border border-dashed border-ink-300 px-4 py-8 text-center text-ink-600">
           This project has no lists yet.
         </p>
       )}
       {lists.data && lists.data.length > 0 && (
         <ul
           aria-labelledby="project-lists"
-          className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white"
+          className="divide-y divide-ink-200 rounded-xl border border-ink-200 bg-white shadow-card"
         >
           {lists.data.map((list) => (
             <ListRow
@@ -217,18 +219,18 @@ function ListRow({ list, to, onEdit, onDelete }: ListRowProps) {
   const canDelete = listAllows(list, 'administer')
 
   return (
-    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 sm:gap-x-3">
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3.5 sm:gap-x-3">
       {/* At phone width the name has the whole line; the rest follows below it. */}
       <div className="flex min-w-0 basis-full flex-col sm:flex-1 sm:basis-0">
-        <Link to={to} className="py-1 font-medium wrap-anywhere text-slate-900 hover:underline sm:py-0">
+        <Link to={to} className="py-1 font-semibold wrap-anywhere text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline sm:py-0">
           {list.name}
         </Link>
         {list.description !== null && (
-          <span className="text-sm break-words whitespace-pre-line text-slate-600">{list.description}</span>
+          <span className="text-sm break-words whitespace-pre-line text-ink-600">{list.description}</span>
         )}
       </div>
       <ModeBadge mode={list.mode} />
-      <span className="text-sm text-slate-600 tabular-nums sm:w-28 sm:text-right">{openItems(list.open_item_count)}</span>
+      <span className="text-sm text-ink-600 tabular-nums sm:w-28 sm:text-right">{openItems(list.open_item_count)}</span>
       {(canEdit || canDelete) && (
         <div className="ml-auto flex shrink-0 sm:ml-0 sm:gap-1">
           {canEdit && (
@@ -314,7 +316,7 @@ function DeleteProjectDialog({ project, organization, onClose }: DeleteProjectDi
 
   return (
     <Dialog title={`Delete ${project.name}?`} onClose={onClose}>
-      <p className="mt-2 text-sm text-slate-600">
+      <p className="mt-2 text-sm text-ink-600">
         The project is deleted with all its lists and items. This cannot be undone.
       </p>
       <div className="mt-4 flex flex-col gap-4">

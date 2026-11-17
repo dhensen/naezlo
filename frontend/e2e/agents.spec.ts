@@ -43,7 +43,7 @@ test('create an agent, see how to connect it, and delete it', async ({ page }) =
   await expect(page.getByRole('note')).toContainText('new lists default to Mixed')
 
   // A new list is now Mixed by default, and sharing it with the agent shows in its row.
-  await page.getByRole('button', { name: '+ New project' }).click()
+  await page.getByRole('button', { name: 'New project' }).click()
   const projectForm = page.getByRole('dialog', { name: 'New project' })
   await projectForm.getByLabel('Name').fill('Website')
   await projectForm.getByRole('button', { name: 'Create' }).click()

@@ -1,4 +1,53 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/instrument-sans/wght.css';
+
+/*
+ * The look of Naezlo, taken from its logo: the blue of the N (`brand`, what is pressed and
+ * what belongs to an agent), the green of its tick (`mint`, what is done and what is yours)
+ * and the black of the word (`ink`, text and lines). The marketing site carries the same
+ * values in its own stylesheet; change them in both places.
+ */
+@theme {
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink-50: #f6f7fb;
+  --color-ink-100: #eef0f6;
+  --color-ink-200: #e1e4ee;
+  --color-ink-300: #cbd0de;
+  --color-ink-400: #9aa1b5;
+  --color-ink-500: #6c7389;
+  --color-ink-600: #4f566b;
+  --color-ink-700: #383e52;
+  --color-ink-800: #232838;
+  --color-ink-900: #15171f;
+
+  --color-brand-50: #f1f1fe;
+  --color-brand-100: #e4e4fd;
+  --color-brand-200: #cdcdfb;
+  --color-brand-300: #a9a8f6;
+  --color-brand-400: #7d7aee;
+  --color-brand-500: #4a46e0;
+  --color-brand-600: #1f1bb5;
+  --color-brand-700: #18158f;
+  --color-brand-800: #131170;
+  --color-brand-900: #0e0d52;
+
+  --color-mint-50: #e9f9f3;
+  --color-mint-100: #cff2e4;
+  --color-mint-200: #a2e5cb;
+  --color-mint-300: #62d2aa;
+  --color-mint-400: #2bbf90;
+  --color-mint-500: #10b085;
+  --color-mint-600: #0a9070;
+  --color-mint-700: #08735a;
+  --color-mint-800: #095b48;
+  --color-mint-900: #0a4a3c;
+
+  /* A sheet of paper on the page: every list and card. */
+  --shadow-card: 0 1px 2px rgb(21 23 31 / 0.04), 0 1px 1px rgb(21 23 31 / 0.03);
+  /* Something that floats above the page: a menu, a dialog. */
+  --shadow-float: 0 12px 32px -8px rgb(21 23 31 / 0.18), 0 2px 6px rgb(21 23 31 / 0.06);
+}
 
 /*
  * On a phone, Safari zooms the page in when a field with text smaller than 16px gets the
@@ -13,6 +62,17 @@
 }
 
 @layer base {
+  body {
+    background: var(--color-ink-50);
+    color: var(--color-ink-900);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  input[type='radio'],
+  input[type='checkbox'] {
+    accent-color: var(--color-brand-600);
+  }
+
   /* No 300ms wait and no double-tap zoom on anything that is pressed. */
   a,
   button,
@@ -21,5 +81,74 @@
   textarea,
   label {
     touch-action: manipulation;
+  }
+
+  button:not(:disabled),
+  select:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
+  /* One focus ring for everything reached with the keyboard. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /*
+   * The tick box of an item: the green tick of the logo once it is done. Still a native
+   * checkbox, so the keyboard, a screen reader and the tests use it as one.
+   */
+  .tick {
+    appearance: none;
+    display: grid;
+    place-content: center;
+    flex-shrink: 0;
+    border: 1.5px solid var(--color-ink-300);
+    border-radius: 0.375rem;
+    background: white;
+    transition:
+      background-color 0.12s,
+      border-color 0.12s;
+  }
+  .tick:hover:not(:disabled) {
+    border-color: var(--color-mint-500);
+  }
+  .tick::after {
+    content: '';
+    width: 62%;
+    aspect-ratio: 1;
+    background: white;
+    clip-path: polygon(8% 52%, 22% 38%, 40% 56%, 78% 16%, 93% 30%, 40% 86%);
+    transform: scale(0);
+    transition: transform 0.12s;
+  }
+  .tick:checked {
+    border-color: var(--color-mint-500);
+    background: var(--color-mint-500);
+  }
+  .tick:checked::after {
+    transform: scale(1);
+  }
+  .tick:disabled {
+    opacity: 0.5;
+  }
+
+  /* A select without the browser's own arrow: ours is drawn in the background. */
+  .select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236c7389' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.4rem center;
+    background-size: 0.9rem;
+    padding-right: 1.6rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
   }
 }

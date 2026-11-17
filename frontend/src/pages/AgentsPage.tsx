@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useDeleteAgent } from '../agents/hooks'
 import { EditAgentDialog, NewAgentDialog } from '../components/AgentDialogs'
 import { ConnectAgentDialog, FIRST_AGENT_NOTE } from '../components/ConnectAgentDialog'
+import { Avatar } from '../components/Avatar'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { useCurrentOrganization } from '../orgs/hooks'
 import type { Organization } from '../orgs/hooks'
@@ -10,11 +11,11 @@ import { useAgents } from '../sharing/hooks'
 import type { Agent } from '../sharing/hooks'
 
 const PRIMARY_BUTTON =
-  'rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60'
+  'rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60'
 const SMALL_BUTTON =
-  'rounded-md border border-slate-300 px-2.5 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60'
+  'rounded-lg border border-ink-300 px-2.5 py-1 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-60'
 const DANGER_BUTTON =
-  'rounded-md border border-red-300 px-2.5 py-1 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60'
+  'rounded-lg border border-ink-300 bg-white px-2.5 py-1 text-sm font-medium text-red-700 hover:border-red-300 hover:bg-red-50 disabled:opacity-60'
 
 function counted(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`
@@ -59,11 +60,11 @@ function Agents({ organization }: { organization: Organization }) {
   }
 
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
+    <main className="flex w-full max-w-3xl flex-1 flex-col gap-6 mx-auto p-4 sm:px-8 sm:py-8">
       <div className="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap">
         <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Agents</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Agents</h1>
+          <p className="text-sm text-ink-600">
             An agent is the identity an AI tool such as Claude or Codex works under. It sees only the projects and
             lists that are shared with it.
             {!canManage && ' Only owners and admins can add, change and connect agents.'}
@@ -76,32 +77,33 @@ function Agents({ organization }: { organization: Organization }) {
         )}
       </div>
       {gotFirstAgent && (
-        <p role="note" className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+        <p role="note" className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
           {FIRST_AGENT_NOTE}
         </p>
       )}
       {agents.isPending && (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-ink-500">
           Loading…
         </p>
       )}
       <ErrorMessage error={agents.error} />
       <ErrorMessage error={remove.error} />
       {agents.data?.length === 0 && (
-        <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">
+        <p className="rounded-xl border border-dashed border-ink-300 p-6 text-center text-sm text-ink-600">
           No agents yet.{canManage && ' Create one to connect Claude, Codex or another AI tool.'}
         </p>
       )}
       {agents.data && agents.data.length > 0 && (
-        <ul aria-label="Agents" className="flex flex-col divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+        <ul aria-label="Agents" className="flex flex-col divide-y divide-ink-100 rounded-xl border border-ink-200 bg-white shadow-card">
           {agents.data.map((agent) => (
-            <li key={agent.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4">
+            <li key={agent.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 p-4">
+              <Avatar name={agent.name} kind="agent" className="size-9 self-start rounded-lg" />
               <div className="flex min-w-40 flex-1 flex-col gap-0.5">
-                <h2 className="font-medium break-words text-slate-900">{agent.name}</h2>
+                <h2 className="font-semibold break-words text-ink-900">{agent.name}</h2>
                 {agent.description !== null && (
-                  <p className="text-sm break-words whitespace-pre-line text-slate-600">{agent.description}</p>
+                  <p className="text-sm break-words whitespace-pre-line text-ink-600">{agent.description}</p>
                 )}
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-ink-500">
                   <span className="sr-only">Can access: </span>
                   {reach(agent)}
                 </p>
@@ -110,7 +112,7 @@ function Agents({ organization }: { organization: Organization }) {
                 <div className="flex flex-wrap items-center gap-2">
                   {confirming === agent.id ? (
                     <>
-                      <span className="text-sm text-slate-600">Delete it and disconnect its tools?</span>
+                      <span className="text-sm text-ink-600">Delete it and disconnect its tools?</span>
                       <button
                         type="button"
                         disabled={remove.isPending}

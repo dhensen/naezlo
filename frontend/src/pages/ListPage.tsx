@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import { ApiError } from '../api/client'
 import { useMe } from '../auth/hooks'
 import { ActivityLog } from '../components/ActivityLog'
+import { Avatar } from '../components/Avatar'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { ModeBadge, ModeIcon } from '../components/ModeBadge'
 import { ShareListDialog } from '../components/ShareDialogs'
@@ -51,8 +52,8 @@ function ListView({ organization, listId }: { organization: Organization; listId
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">List not found</h1>
-        <p className="text-slate-600">It does not exist, or you have no access to it.</p>
-        <Link to={orgPath(organization.slug)} className="text-slate-600 underline">
+        <p className="text-ink-600">It does not exist, or you have no access to it.</p>
+        <Link to={orgPath(organization.slug)} className="text-ink-600 underline">
           Back to {organization.name}
         </Link>
       </main>
@@ -62,7 +63,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
         {list.isPending && (
-          <p role="status" className="text-slate-500">
+          <p role="status" className="text-ink-500">
             Loading…
           </p>
         )}
@@ -79,20 +80,20 @@ function ListView({ organization, listId }: { organization: Organization; listId
   const itemsView = (
     <>
       {!canChange && (
-        <p role="note" className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <p role="note" className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700">
           {current.mode === 'ai_only'
             ? 'AI agents manage this list. You can read it, but not change its items.'
             : 'You can read this list, but not change its items.'}
         </p>
       )}
       {canChange && current.assignment_required && (
-        <p role="note" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p role="note" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Only the assignee can complete an item in this list. Pick an item up before you start on it, so nobody else
           does the same work.
         </p>
       )}
       {items.isPending && (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-ink-500">
           Loading…
         </p>
       )}
@@ -104,12 +105,15 @@ function ListView({ organization, listId }: { organization: Organization; listId
   const projectIsVisible = projects.data?.some((project) => project.id === current.project_id) ?? false
 
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-5 p-4 sm:p-6">
+    <main className="flex w-full max-w-3xl flex-1 flex-col gap-5 mx-auto p-4 sm:px-8 sm:py-8">
       <header className="flex flex-col gap-1">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm font-medium text-ink-500">
           <span className="sr-only">Project: </span>
           {projectIsVisible ? (
-            <Link to={projectPath(organization.slug, current.project_id)} className="underline hover:text-slate-900">
+            <Link
+              to={projectPath(organization.slug, current.project_id)}
+              className="underline decoration-ink-300 underline-offset-4 hover:text-ink-900 hover:decoration-ink-500"
+            >
               {current.project_name}
             </Link>
           ) : (
@@ -117,7 +121,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
           )}
         </p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="min-w-0 text-2xl font-semibold tracking-tight wrap-anywhere">{current.name}</h1>
+          <h1 className="min-w-0 text-2xl font-semibold tracking-tight wrap-anywhere sm:text-3xl">{current.name}</h1>
           <ModeBadge mode={current.mode} />
           {current.assignment_required && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
@@ -127,7 +131,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
           {listAllows(current, 'administer') && (
             <button
               type="button"
-              className="ml-auto rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="ml-auto rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm font-semibold text-ink-800 shadow-card hover:bg-ink-50"
               onClick={() => setSharing(true)}
             >
               Share
@@ -135,7 +139,7 @@ function ListView({ organization, listId }: { organization: Organization; listId
           )}
         </div>
         {current.description !== null && (
-          <p className="break-words whitespace-pre-line text-slate-600">{current.description}</p>
+          <p className="break-words whitespace-pre-line text-ink-600">{current.description}</p>
         )}
       </header>
       {canAdminister ? (
@@ -159,12 +163,16 @@ function ListView({ organization, listId }: { organization: Organization; listId
 }
 
 const TEXT_INPUT =
-  'rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-slate-500 focus:outline-none'
+  'rounded-lg border border-ink-300 bg-white px-3 py-2 text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none'
 // At phone width a row button is at least 36px in both directions: big enough for a thumb.
 const ROW_BUTTON_SIZE = 'inline-flex min-h-9 min-w-9 items-center justify-center gap-1 sm:min-h-0 sm:min-w-0'
-const SMALL_BUTTON = `${ROW_BUTTON_SIZE} rounded-md px-2 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:text-slate-300 disabled:hover:bg-transparent`
-const SMALL_DANGER_BUTTON = `${ROW_BUTTON_SIZE} rounded-md px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50 disabled:text-red-300`
-const ITEM_LIST = 'divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white'
+const SMALL_BUTTON = `${ROW_BUTTON_SIZE} rounded-lg px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900 disabled:text-ink-300 disabled:hover:bg-transparent sm:size-8 sm:p-0 sm:text-ink-500`
+// The same with words in it, which need their room.
+const SMALL_TEXT_BUTTON = `${ROW_BUTTON_SIZE} rounded-lg px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900`
+const SMALL_DANGER_BUTTON = `${ROW_BUTTON_SIZE} rounded-lg px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50 disabled:text-red-300`
+// The bin of a row: quiet until the pointer is on it. At phone width it has the word, in red.
+const ROW_DELETE_BUTTON = `${ROW_BUTTON_SIZE} rounded-lg px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50 disabled:text-ink-300 sm:size-8 sm:p-0 sm:text-ink-500 sm:hover:text-red-700`
+const ITEM_LIST = 'divide-y divide-ink-200 rounded-xl border border-ink-200 bg-white shadow-card'
 
 type Direction = 'up' | 'down'
 
@@ -252,7 +260,7 @@ function ItemsSection({ list, items, canChange }: { list: TodoList; items: Item[
           />
           <button
             type="submit"
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 sm:px-3"
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-card hover:bg-brand-700"
           >
             Add
           </button>
@@ -264,11 +272,24 @@ function ItemsSection({ list, items, canChange }: { list: TodoList; items: Item[
         </button>
       </ErrorMessage>
       {items.length === 0 && (
-        <p className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-slate-600">
+        <p className="rounded-xl border border-dashed border-ink-300 px-4 py-8 text-center text-ink-600">
           This list has no items yet.
         </p>
       )}
-      {items.length > 0 && open.length === 0 && <p className="text-slate-600">Everything is done.</p>}
+      {items.length > 0 && (
+        <p className="flex items-center gap-3 text-sm text-ink-600">
+          <span className="tabular-nums">
+            {done.length} of {items.length} done
+          </span>
+          <span aria-hidden="true" className="h-1.5 w-24 overflow-hidden rounded-full bg-ink-200">
+            <span
+              className="block h-full rounded-full bg-mint-500 transition-[width] duration-300"
+              style={{ width: `${(done.length / items.length) * 100}%` }}
+            />
+          </span>
+        </p>
+      )}
+      {items.length > 0 && open.length === 0 && <p className="text-ink-600">Everything is done.</p>}
       {open.length > 0 && (
         <ul ref={openList} aria-label="Open items" className={ITEM_LIST}>
           {open.map((item, index) => (
@@ -291,7 +312,7 @@ function ItemsSection({ list, items, canChange }: { list: TodoList; items: Item[
             type="button"
             aria-expanded={doneShown}
             aria-controls={doneListId}
-            className="flex min-h-9 items-center gap-1.5 self-start rounded-md px-2 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0"
+            className="flex min-h-9 items-center gap-1.5 self-start rounded-lg px-2 py-1 text-sm font-semibold text-ink-700 hover:bg-ink-100 sm:min-h-0"
             onClick={() => setDoneShown(!doneShown)}
           >
             <svg
@@ -361,13 +382,13 @@ function ItemRow({
   const done = item.status === 'done'
   // Not stored yet, so there is no id to send a change for: its controls wait.
   const waiting = isUnsaved(item)
-  const titleStyle = done ? 'text-slate-500 line-through' : 'text-slate-900'
+  const titleStyle = done ? 'text-ink-500 line-through decoration-ink-300' : 'font-medium text-ink-900'
   const mine = item.assignee !== null && sameAssignee(item.assignee, { kind: 'user', id: assignment.userId })
   // Where assignment is required only the assignee ticks an item off; anyone reopens it.
   const canTick = canChange && (done || !assignment.required || mine)
 
   return (
-    <li aria-busy={waiting || undefined} className="flex flex-col gap-2 px-3 py-2.5 sm:px-4">
+    <li aria-busy={waiting || undefined} className="flex flex-col gap-2 px-3 py-3 sm:px-4">
       <div className="flex items-start gap-x-1">
         {canTick ? (
           // The label is the part that is pressed: 40px, around a much smaller box.
@@ -378,11 +399,11 @@ function ItemRow({
               checked={done}
               disabled={waiting}
               onChange={() => onChange({ kind: 'update', item, patch: { status: done ? 'open' : 'done' } })}
-              className="size-5 accent-slate-900 sm:size-4"
+              className="tick size-5"
             />
           </label>
         ) : (
-          <span className="-ml-2 flex h-7 w-10 shrink-0 items-center justify-center text-slate-500">
+          <span className={`-ml-2 flex h-7 w-10 shrink-0 items-center justify-center ${done ? 'text-mint-600' : 'text-ink-400'}`}>
             <span aria-hidden="true">{done ? '✓' : '○'}</span>
             <span className="sr-only">{done ? 'Done:' : 'Open:'}</span>
           </span>
@@ -418,7 +439,8 @@ function ItemRow({
                 <AssigneeControl item={item} assignment={assignment} mine={mine} onChange={onChange} />
               ) : (
                 item.assignee !== null && (
-                  <span className="flex min-h-9 items-center px-1 text-sm text-slate-600 sm:min-h-0 sm:text-xs">
+                  <span className="flex min-h-9 items-center gap-1.5 px-1 text-sm text-ink-600 sm:min-h-0 sm:text-xs">
+                    <Avatar name={item.assignee.name} kind={item.assignee.kind} className="size-5" />
                     Assigned to {item.assignee.name}
                     {item.assignee.kind === 'agent' && ' (agent)'}
                   </span>
@@ -432,17 +454,17 @@ function ItemRow({
                   aria-label={`Notes of ${item.title}`}
                   aria-expanded={notesShown}
                   aria-controls={notesId}
-                  className={`relative ${SMALL_BUTTON}`}
+                  title="Notes"
+                  className={`relative ${SMALL_BUTTON} ${notesShown ? 'bg-ink-100 text-ink-900 sm:text-ink-900' : ''}`}
                   onClick={() => setNotesShown(!notesShown)}
                 >
-                  <RowIcon className="sm:hidden">
+                  <RowIcon>
                     <path d="M4 2.5h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1ZM5.5 6h5M5.5 8.5h5M5.5 11h3" />
                   </RowIcon>
-                  <span className="hidden sm:inline">Notes</span>
                   {item.notes !== null && (
                     <span
                       aria-hidden="true"
-                      className="absolute top-1 right-1 size-2 rounded-full bg-sky-600 sm:static sm:size-1.5 sm:bg-current"
+                      className="absolute top-1 right-1 size-2 rounded-full bg-brand-500 ring-2 ring-white"
                     />
                   )}
                 </button>
@@ -453,7 +475,7 @@ function ItemRow({
                   aria-label={`More actions for ${item.title}`}
                   aria-expanded={moreShown}
                   aria-controls={moreId}
-                  className={`sm:hidden ${SMALL_BUTTON} ${moreShown ? 'bg-slate-100 text-slate-900' : ''}`}
+                  className={`sm:hidden ${SMALL_BUTTON} ${moreShown ? 'bg-ink-100 text-ink-900' : ''}`}
                   onClick={() => setMoreShown(!moreShown)}
                 >
                   <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="size-5">
@@ -482,7 +504,7 @@ function ItemRow({
                   >
                     Yes, delete
                   </button>
-                  <button type="button" className={SMALL_BUTTON} onClick={() => setConfirming(false)}>
+                  <button type="button" className={SMALL_TEXT_BUTTON} onClick={() => setConfirming(false)}>
                     Cancel
                   </button>
                 </>
@@ -498,10 +520,14 @@ function ItemRow({
                     type="button"
                     aria-label={`Delete ${item.title}`}
                     disabled={waiting}
-                    className={SMALL_DANGER_BUTTON}
+                    title="Delete"
+                    className={ROW_DELETE_BUTTON}
                     onClick={() => setConfirming(true)}
                   >
-                    Delete
+                    <RowIcon className="hidden sm:block">
+                      <path d="M3 4.5h10M6.5 4.5v-1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1M4.5 4.5l.5 8a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-8M6.75 7v4M9.25 7v4" />
+                    </RowIcon>
+                    <span className="sm:hidden">Delete</span>
                   </button>
                 </>
               )}
@@ -518,7 +544,7 @@ function ItemRow({
               onClose={() => setNotesShown(false)}
             />
           ) : (
-            <p className="text-sm break-words whitespace-pre-line text-slate-600">{item.notes}</p>
+            <p className="text-sm break-words whitespace-pre-line text-ink-600">{item.notes}</p>
           )}
         </div>
       )}
@@ -547,7 +573,8 @@ function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlPr
 
   // The select takes what its longest name needs; "Pick up" goes below it when the line is short.
   return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
+    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1">
+      {current !== null && <Avatar name={current.name} kind={current.kind} className="size-5" />}
       <select
         aria-label={`Assignee of ${item.title}`}
         value={current === null ? '' : assigneeValue(current)}
@@ -558,8 +585,14 @@ function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlPr
             assignee: choices.find((assignee) => assigneeValue(assignee) === event.target.value) ?? null,
           })
         }
-        className={`h-9 max-w-fit min-w-0 flex-[1_1_7.5rem] truncate rounded-md border px-1.5 text-xs focus:border-slate-500 focus:outline-none sm:h-auto sm:py-0.5 ${
-          mine ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-300 bg-white text-slate-700'
+        className={`select h-9 max-w-fit min-w-0 flex-[1_1_7.5rem] truncate rounded-full border pl-2.5 text-xs font-medium focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none sm:h-6 ${
+          mine
+            ? 'border-mint-200 bg-mint-50 text-mint-900'
+            : current === null
+              ? 'border-dashed border-ink-300 bg-transparent text-ink-500 hover:border-ink-400 hover:text-ink-700'
+              : current.kind === 'agent'
+                ? 'border-brand-200 bg-brand-50 text-brand-800'
+                : 'border-ink-200 bg-ink-50 text-ink-700'
         }`}
       >
         <option value="">Unassigned</option>
@@ -574,7 +607,7 @@ function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlPr
         <button
           type="button"
           aria-label={`Pick up ${item.title}`}
-          className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:h-auto sm:px-2 sm:py-0.5 sm:text-xs"
+          className="h-9 shrink-0 rounded-full px-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50 sm:h-6 sm:px-2 sm:text-xs"
           onClick={() => onChange({ kind: 'assign', item, assignee: me })}
         >
           Pick up
@@ -587,7 +620,7 @@ function AssigneeControl({ item, assignment, mine, onChange }: AssigneeControlPr
 /** Says that an AI agent, not a person, added or completed the item. */
 function AgentMarker({ children }: { children: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-800">
+    <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200 ring-inset">
       <ModeIcon mode="ai_only" className="size-3" />
       {children}
     </span>
@@ -605,7 +638,7 @@ function RowIcon({ className = '', children }: { className?: string; children: R
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className={`size-5 shrink-0 ${className}`}
+      className={`size-5 shrink-0 sm:size-4 ${className}`}
     >
       {children}
     </svg>
@@ -625,6 +658,7 @@ function MoveButton({ item, direction, disabled, onMove }: MoveButtonProps) {
       type="button"
       aria-label={`Move ${item.title} ${direction}`}
       data-move={`${item.id}:${direction}`}
+      title={direction === 'up' ? 'Move up' : 'Move down'}
       disabled={disabled}
       className={SMALL_BUTTON}
       onClick={() => onMove(direction)}
@@ -678,7 +712,7 @@ function EditableTitle({ item, className, onSave }: EditableTitleProps) {
         aria-label={`Edit title of ${item.title}`}
         title="Edit title"
         data-title
-        className={`rounded-md px-1 py-0.5 text-left wrap-anywhere hover:bg-slate-100 ${className}`}
+        className={`rounded-lg px-1 py-0.5 text-left wrap-anywhere hover:bg-ink-100 ${className}`}
         onClick={() => setDraft(item.title)}
       >
         {item.title}
@@ -714,7 +748,7 @@ function EditableTitle({ item, className, onSave }: EditableTitleProps) {
           event.currentTarget.blur()
         }
       }}
-      className="w-full rounded-md border border-slate-300 bg-white px-1 py-0.5 text-slate-900 focus:border-slate-500 focus:outline-none"
+      className="w-full rounded-lg border border-ink-300 bg-white px-1 py-0.5 text-ink-900 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none"
     />
   )
 }
@@ -755,11 +789,11 @@ function NotesEditor({ item, onSave, onClose }: NotesEditorProps) {
         <button
           type="submit"
           disabled={!changed}
-          className="min-h-9 rounded-md bg-slate-900 px-2.5 py-1 text-sm font-medium text-white hover:bg-slate-700 disabled:bg-slate-300 sm:min-h-0"
+          className="min-h-9 rounded-lg bg-brand-600 px-2.5 py-1 text-sm font-medium text-white hover:bg-brand-700 disabled:bg-ink-300 sm:min-h-0"
         >
           Save notes
         </button>
-        <button type="button" className={SMALL_BUTTON} onClick={onClose}>
+        <button type="button" className={SMALL_TEXT_BUTTON} onClick={onClose}>
           Close
         </button>
       </div>

@@ -35,7 +35,7 @@ export function Tabs<Id extends string>({ label, tabs, selected, onSelect }: Tab
   }
 
   return (
-    <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-slate-200)] [scrollbar-width:none]" onKeyDown={onKeyDown}>
+    <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-ink-200)] [scrollbar-width:none]" onKeyDown={onKeyDown}>
       {tabs.map((tab) => {
         const current = tab.id === selected
         return (
@@ -48,8 +48,8 @@ export function Tabs<Id extends string>({ label, tabs, selected, onSelect }: Tab
             tabIndex={current ? 0 : -1}
             className={`shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap sm:py-2 ${
               current
-                ? 'border-slate-900 text-slate-900'
-                : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                ? 'border-brand-600 text-brand-700'
+                : 'border-transparent text-ink-600 hover:border-ink-300 hover:text-ink-900'
             }`}
             onClick={() => onSelect(tab.id)}
           >

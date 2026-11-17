@@ -14,7 +14,7 @@ export function RequireAuth() {
 
   if (me.isPending) {
     return (
-      <p role="status" className="p-6 text-center text-slate-500">
+      <p role="status" className="p-6 text-center text-ink-500">
         Loading…
       </p>
     )

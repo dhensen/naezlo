@@ -14,6 +14,7 @@
     "gen:api": "uv run --project .. python -m naezlo.openapi > openapi.json && openapi-typescript openapi.json -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@fontsource-variable/instrument-sans": "^5.3.0",
     "@tanstack/react-query": "^5.107.1",
     "openapi-fetch": "^0.17.0",
     "react": "^19.3.1",

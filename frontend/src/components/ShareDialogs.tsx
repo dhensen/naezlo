@@ -16,6 +16,7 @@ import {
 } from '../sharing/hooks'
 import type { GrantRef, ListRole, PrincipalKind, PrincipalRef, ProjectGrant } from '../sharing/hooks'
 import { ROLE_LABELS } from '../sharing/roles'
+import { Avatar } from './Avatar'
 import { Dialog, DIALOG_CANCEL, DIALOG_SUBMIT } from './Dialog'
 import { ErrorMessage } from './ErrorMessage'
 
@@ -23,19 +24,19 @@ const PROJECT_ROLES: readonly ProjectRole[] = ['viewer', 'editor', 'admin']
 const LIST_ROLES: readonly ListRole[] = ['viewer', 'editor', 'admin', 'none']
 
 const SELECT =
-  'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none'
-const ROW_BUTTON = 'rounded-md px-2 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-const ROW_DANGER_BUTTON = 'rounded-md px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50'
-const NOTE = 'rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700'
-const ROWS = 'divide-y divide-slate-200 rounded-lg border border-slate-200'
-const SECTION_HEADING = 'text-sm font-semibold text-slate-900'
+  'select rounded-lg border border-ink-300 bg-white px-2 py-1.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none'
+const ROW_BUTTON = 'rounded-lg px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900'
+const ROW_DANGER_BUTTON = 'rounded-lg px-2 py-1 text-sm font-medium text-ink-600 hover:bg-red-50 hover:text-red-700'
+const NOTE = 'rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700'
+const ROWS = 'divide-y divide-ink-200 rounded-xl border border-ink-200'
+const SECTION_HEADING = 'text-sm font-semibold text-ink-900'
 
 /** Says whether a principal is a person or an AI agent. */
 function KindMarker({ kind }: { kind: PrincipalKind }) {
   return (
     <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-        kind === 'agent' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-700'
+      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
+        kind === 'agent' ? 'bg-brand-50 text-brand-700 ring-brand-200' : 'bg-ink-100 text-ink-700 ring-ink-200'
       }`}
     >
       {kind === 'agent' ? 'Agent' : 'Person'}
@@ -53,12 +54,15 @@ interface Grant<Role extends ListRole> extends GrantRef {
 function Principal({ grant }: { grant: Grant<ListRole> }) {
   return (
     // Wide enough to push the controls to a line of their own in a narrow dialog.
-    <div className="flex min-w-0 flex-1 basis-48 flex-col">
-      <span className="flex min-w-0 items-center gap-2">
-        <span className="font-medium break-words text-slate-900">{grant.name}</span>
-        <KindMarker kind={grant.principal_kind} />
-      </span>
-      {grant.email !== null && <span className="text-xs break-all text-slate-600">{grant.email}</span>}
+    <div className="flex min-w-0 flex-1 basis-48 items-center gap-2.5">
+      <Avatar name={grant.name} kind={grant.principal_kind} className="size-8 text-xs" />
+      <div className="flex min-w-0 flex-col">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="font-semibold break-words text-ink-900">{grant.name}</span>
+          <KindMarker kind={grant.principal_kind} />
+        </span>
+        {grant.email !== null && <span className="text-xs break-all text-ink-600">{grant.email}</span>}
+      </div>
     </div>
   )
 }
@@ -109,13 +113,13 @@ function Grants<Role extends ListRole>({
     <section className="flex flex-col gap-2">
       <h3 className={SECTION_HEADING}>{heading}</h3>
       {grants.isPending && (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-ink-500">
           Loading…
         </p>
       )}
       <ErrorMessage error={grants.error} />
       <ErrorMessage error={setGrant.error ?? revoke.error} />
-      {grants.data?.length === 0 && <p className="text-sm text-slate-600">{empty}</p>}
+      {grants.data?.length === 0 && <p className="text-sm text-ink-600">{empty}</p>}
       {grants.data && grants.data.length > 0 && (
         <ul aria-label={heading} className={ROWS}>
           {grants.data.map((grant) => (
@@ -207,7 +211,7 @@ function AddGrant<Role extends ListRole>({ organizationId, roles, taken, busy, s
     <form onSubmit={submit} className="flex flex-col gap-2">
       <ErrorMessage error={members.error ?? agents.error} />
       {loaded && people.length === 0 && freeAgents.length === 0 ? (
-        <p className="text-sm text-slate-600">Every member and agent of the organization is listed here.</p>
+        <p className="text-sm text-ink-600">Every member and agent of the organization is listed here.</p>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           <select
@@ -279,7 +283,7 @@ export function ShareProjectDialog({ project, onClose }: { project: Project; onC
   return (
     <Dialog title={`Share ${project.name}`} wide onClose={onClose}>
       <div className="mt-4 flex flex-col gap-4">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-600">
           A role on the project counts for all its lists, unless a list gives someone a role of their own.{' '}
           {OWNERS_NOTE}
         </p>
@@ -331,20 +335,20 @@ export function ShareListDialog({ list, onClose }: { list: TodoList; onClose: ()
           setGrant={setGrant}
           revoke={revoke}
         />
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-600">
           A role given here replaces the role from the project on this list. “No access” hides the list from
           someone.
         </p>
         <section className="flex flex-col gap-2">
           <h3 className={SECTION_HEADING}>Access from the project {list.project_name}</h3>
           {inherited.isPending && (
-            <p role="status" className="text-sm text-slate-500">
+            <p role="status" className="text-sm text-ink-500">
               Loading…
             </p>
           )}
           <ErrorMessage error={inherited.error} />
           {inherited.data?.length === 0 && (
-            <p className="text-sm text-slate-600">Nobody has a role on the project.</p>
+            <p className="text-sm text-ink-600">Nobody has a role on the project.</p>
           )}
           {inherited.data && inherited.data.length > 0 && (
             <ul aria-label="Access from the project" className={ROWS}>
@@ -352,17 +356,17 @@ export function ShareListDialog({ list, onClose }: { list: TodoList; onClose: ()
                 <li key={grant.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                   <Principal grant={grant} />
                   {replaced(grant) ? (
-                    <span className="text-sm text-slate-500">
+                    <span className="text-sm text-ink-500">
                       <s>{ROLE_LABELS[grant.role]}</s> (replaced on this list)
                     </span>
                   ) : (
-                    <span className="text-sm text-slate-700">{ROLE_LABELS[grant.role]}</span>
+                    <span className="text-sm text-ink-700">{ROLE_LABELS[grant.role]}</span>
                   )}
                 </li>
               ))}
             </ul>
           )}
-          <p className="text-sm text-slate-600">{OWNERS_NOTE}</p>
+          <p className="text-sm text-ink-600">{OWNERS_NOTE}</p>
         </section>
         <Done onClose={onClose} />
       </div>

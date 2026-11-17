@@ -32,15 +32,15 @@ export function AppLayout() {
   }, [navOpen])
 
   return (
-    <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-2 sm:px-3">
+    <div className="flex min-h-dvh flex-col bg-ink-50 text-ink-900">
+      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-ink-200 bg-white px-2 sm:px-3">
         {organization && (
           <button
             type="button"
             aria-label={navOpen ? 'Close navigation' : 'Open navigation'}
             aria-expanded={navOpen}
             aria-controls="sidebar"
-            className="flex size-10 shrink-0 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 md:hidden"
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg text-ink-700 hover:bg-ink-100 md:hidden"
             onClick={() => setNavOpen((value) => !value)}
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" className="size-5 fill-current">
@@ -48,7 +48,7 @@ export function AppLayout() {
             </svg>
           </button>
         )}
-        <Link to="/" className="flex shrink-0 items-center rounded-md px-1 py-2">
+        <Link to="/" className="flex shrink-0 items-center rounded-lg px-1 py-2">
           <Logo className="h-6 sm:h-7" markOnPhone />
         </Link>
         <OrganizationSwitcher current={organization} />
@@ -65,7 +65,7 @@ export function AppLayout() {
                 type="button"
                 aria-label="Close navigation"
                 tabIndex={-1}
-                className="fixed inset-0 top-14 z-10 bg-slate-900/30 md:hidden"
+                className="fixed inset-0 top-14 z-10 bg-ink-900/30 md:hidden"
                 onClick={() => setNavOpen(false)}
               />
             )}
@@ -75,8 +75,8 @@ export function AppLayout() {
           {slug !== undefined && organization === null ? (
             <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
               <h1 className="text-2xl font-semibold tracking-tight">Organization not found</h1>
-              <p className="text-slate-600">It does not exist, or you are not a member of it.</p>
-              <Link to="/" className="text-slate-600 underline">
+              <p className="text-ink-600">It does not exist, or you are not a member of it.</p>
+              <Link to="/" className="text-ink-600 underline">
                 Back to the start
               </Link>
             </main>

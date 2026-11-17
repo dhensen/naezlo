@@ -492,6 +492,18 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
 - The organization start page (`OrganizationPage.tsx`) lists the projects in `<main>` as well as the
   sidebar: in a test of a page under `/o/:orgSlug`, find a project link `within` the navigation
   "Projects". Its button is "Create a project", so "New project" stays the sidebar's.
+- Look and feel: the tokens are in `frontend/src/index.css` (`@theme`): `ink-*` (text, lines, surfaces; there is
+  no `slate`), `brand-*` (the blue of the logo: primary buttons, the selected tab or link, anything of an agent),
+  `mint-*` (the green tick: done, and what is the user's own), `shadow-card` (a list or card on the page) and
+  `shadow-float` (a menu, a dialog). The typeface is Instrument Sans (`@fontsource-variable/instrument-sans`).
+  Controls are `rounded-lg`, cards `rounded-xl`, dialogs `rounded-2xl`. No upper-case labels.
+- A person is shown as a round `<Avatar kind="user">`, an agent as a blue square `<Avatar kind="agent">`
+  (`src/components/Avatar.tsx`, decoration: the initial is drawn by CSS and is not in the text). An item's tick box
+  is a native checkbox with the class `tick`; a `<select>` gets the class `select` (our arrow instead of the
+  browser's). A row's secondary actions are quiet (`text-ink-500`) and only turn red on hover when they delete.
+- The marketing site (the private deploy repository, `marketing/public/`) copies these tokens and shows copies
+  of the list page, the project page, the "Connect" dialog and the activity log. After a visible change to one
+  of those, or to a token, change `styles.css` / `index.html` there too.
 - The logo is `<Logo className="h-7" />` (`frontend/src/components/Logo.tsx`; `markOnPhone` for the top
   bar, `decorative` next to a text that says the name). Its images in `frontend/src/assets/` (`logo.png`,
   `logo-mark.png`, `favicon.png`) are cut from `assets/naezlo-logo.png`, the original; its name is its

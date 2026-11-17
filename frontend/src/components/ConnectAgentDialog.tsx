@@ -23,12 +23,12 @@ interface ConnectAgentDialogProps {
 function Code({ label, text }: { label: string; text: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</span>
+      <span className="text-xs font-medium text-ink-500">{label}</span>
       <div className="flex items-start gap-2">
         <pre
           aria-label={label}
           tabIndex={0}
-          className="min-w-0 flex-1 overflow-x-auto rounded-md bg-slate-900 px-3 py-2 text-xs leading-5 break-all whitespace-pre-wrap text-slate-100 sm:break-normal sm:whitespace-pre"
+          className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-ink-900 px-3 py-2 text-xs leading-5 break-all whitespace-pre-wrap text-ink-100 sm:break-normal sm:whitespace-pre"
         >
           <code>{text}</code>
         </pre>
@@ -65,9 +65,9 @@ export function ConnectAgentDialog({ agent, first = false, onClose }: ConnectAge
 
   return (
     <Dialog title={`Connect ${agent.name}`} wide onClose={onClose}>
-      <div className="mt-3 flex flex-col gap-4 text-sm text-slate-700">
+      <div className="mt-3 flex flex-col gap-4 text-sm text-ink-700">
         {first && (
-          <p role="note" className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sky-900">
+          <p role="note" className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-brand-900">
             {FIRST_AGENT_NOTE}
           </p>
         )}
@@ -81,7 +81,7 @@ export function ConnectAgentDialog({ agent, first = false, onClose }: ConnectAge
           <>
             <Code label="MCP server URL" text={mcpUrl} />
             <div>
-              <div role="tablist" aria-label="AI tool" className="flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-slate-200)] [scrollbar-width:none]">
+              <div role="tablist" aria-label="AI tool" className="flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-ink-200)] [scrollbar-width:none]">
                 {guides.map((candidate) => (
                   <button
                     key={candidate.id}
@@ -100,8 +100,8 @@ export function ConnectAgentDialog({ agent, first = false, onClose }: ConnectAge
                     }}
                     className={`shrink-0 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap sm:py-1.5 ${
                       candidate.id === selected
-                        ? 'border-slate-900 text-slate-900'
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                        ? 'border-brand-600 text-brand-700'
+                        : 'border-transparent text-ink-500 hover:text-ink-800'
                     }`}
                     onClick={() => setSelected(candidate.id)}
                     onKeyDown={onTabKey}
@@ -111,14 +111,14 @@ export function ConnectAgentDialog({ agent, first = false, onClose }: ConnectAge
                 ))}
               </div>
               <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-tab-${guide.id}`} className="pt-3">
-                <ol className="flex list-decimal flex-col gap-3 pl-5 marker:font-medium marker:text-slate-500">
+                <ol className="flex list-decimal flex-col gap-3 pl-5 marker:font-medium marker:text-ink-500">
                   <li>
                     <div className="flex flex-col gap-2">
                       <p>{guide.intro}</p>
                       {guide.snippets.map((snippet) => (
                         <Code key={snippet.label} label={snippet.label} text={snippet.text} />
                       ))}
-                      {guide.note && <p className="text-slate-500">{guide.note}</p>}
+                      {guide.note && <p className="text-ink-500">{guide.note}</p>}
                     </div>
                   </li>
                   <li>{guide.signIn}</li>
