@@ -9,14 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import (
-    add_in_savepoint,
-    add_member,
-    grant_list_role,
-    grant_project_role,
-    sign_in,
-)
-from todolist.models import (
+from naezlo.models import (
     Agent,
     Item,
     ItemStatus,
@@ -26,8 +19,15 @@ from todolist.models import (
     ProjectRole,
     TodoList,
 )
-from todolist.principals import Principal
-from todolist.services.items import create_item, list_items, update_item
+from naezlo.principals import Principal
+from naezlo.services.items import create_item, list_items, update_item
+from tests.helpers import (
+    add_in_savepoint,
+    add_member,
+    grant_list_role,
+    grant_project_role,
+    sign_in,
+)
 
 ITEM_NOT_FOUND = {"detail": "Item not found", "code": "not_found"}
 LIST_NOT_FOUND = {"detail": "List not found", "code": "not_found"}

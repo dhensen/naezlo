@@ -12,9 +12,9 @@ from alembic import context
 from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
-import todolist.models  # noqa: F401  (registers every model on Base.metadata)
-from todolist.config import get_settings
-from todolist.db import Base
+import naezlo.models  # noqa: F401  (registers every model on Base.metadata)
+from naezlo.config import get_settings
+from naezlo.db import Base
 
 config = context.config
 

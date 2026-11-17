@@ -7,9 +7,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import add_member, grant_list_role, grant_project_role, sign_in
-from todolist.errors import AppError
-from todolist.models import (
+from naezlo.errors import AppError
+from naezlo.models import (
     Agent,
     ItemStatus,
     ListGrant,
@@ -23,16 +22,17 @@ from todolist.models import (
     TodoList,
     User,
 )
-from todolist.permissions import (
+from naezlo.permissions import (
     ListAction,
     effective_list_role,
     list_access,
     list_accesses,
     visible_lists,
 )
-from todolist.principals import Principal
-from todolist.services.items import create_item, delete_item, list_items, move_item, update_item
-from todolist.services.lists import list_lists
+from naezlo.principals import Principal
+from naezlo.services.items import create_item, delete_item, list_items, move_item, update_item
+from naezlo.services.lists import list_lists
+from tests.helpers import add_member, grant_list_role, grant_project_role, sign_in
 
 AI_ONLY_ITEMS = {
     "detail": "This list is AI-only: people can read its items only",

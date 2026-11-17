@@ -13,15 +13,15 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import add_in_savepoint, sign_in
-from todolist.models import (
+from naezlo.models import (
     Agent,
     OAuthAccessToken,
     OAuthAuthorizationCode,
     OAuthClient,
     OAuthRefreshToken,
 )
-from todolist.services.oauth import hash_token, new_token
+from naezlo.services.oauth import hash_token, new_token
+from tests.helpers import add_in_savepoint, sign_in
 
 CALLBACK = "http://localhost:33418/callback"
 

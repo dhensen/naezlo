@@ -10,8 +10,8 @@ from mcp.client.auth.utils import (
 )
 from mcp.shared.auth import OAuthMetadata, ProtectedResourceMetadata
 
-from todolist.app import create_app
-from todolist.config import Settings
+from naezlo.app import create_app
+from naezlo.config import Settings
 
 AS_METADATA_URL = "/.well-known/oauth-authorization-server"
 PRM_URLS = ["/.well-known/oauth-protected-resource/mcp", "/.well-known/oauth-protected-resource"]
@@ -56,7 +56,7 @@ async def test_protected_resource_metadata(client: AsyncClient, url: str) -> Non
         "authorization_servers": ["http://localhost:8000"],
         "scopes_supported": ["mcp"],
         "bearer_methods_supported": ["header"],
-        "resource_name": "todolist",
+        "resource_name": "Naezlo",
     }
 
 

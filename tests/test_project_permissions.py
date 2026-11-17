@@ -9,8 +9,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import add_in_savepoint, add_member, grant_project_role, sign_in
-from todolist.models import (
+from naezlo.models import (
     Agent,
     MembershipRole,
     PrincipalKind,
@@ -19,8 +18,9 @@ from todolist.models import (
     ProjectRole,
     User,
 )
-from todolist.permissions import effective_project_role, role_at_least, visible_projects
-from todolist.principals import Principal
+from naezlo.permissions import effective_project_role, role_at_least, visible_projects
+from naezlo.principals import Principal
+from tests.helpers import add_in_savepoint, add_member, grant_project_role, sign_in
 
 PROJECT_NOT_FOUND = {"detail": "Project not found", "code": "not_found"}
 

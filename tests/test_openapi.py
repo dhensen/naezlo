@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from todolist.openapi import openapi_schema, render_openapi_schema
+from naezlo.openapi import openapi_schema, render_openapi_schema
 
 SAVED_SCHEMA = Path(__file__).resolve().parent.parent / "frontend" / "openapi.json"
 

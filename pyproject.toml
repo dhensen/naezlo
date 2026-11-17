@@ -1,5 +1,5 @@
 [project]
-name = "todolist"
+name = "naezlo"
 version = "0.1.0"
 description = "A multi-tenant todolist app that humans and AI agents share"
 readme = "README.md"

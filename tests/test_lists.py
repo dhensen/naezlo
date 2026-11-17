@@ -8,8 +8,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import add_member, grant_project_role, sign_in
-from todolist.models import (
+from naezlo.models import (
     Agent,
     ListMode,
     MembershipRole,
@@ -18,9 +17,10 @@ from todolist.models import (
     ProjectRole,
     TodoList,
 )
-from todolist.permissions import effective_list_role
-from todolist.principals import Principal
-from todolist.services.lists import create_list
+from naezlo.permissions import effective_list_role
+from naezlo.principals import Principal
+from naezlo.services.lists import create_list
+from tests.helpers import add_member, grant_project_role, sign_in
 
 LIST_NOT_FOUND = {"detail": "List not found", "code": "not_found"}
 PROJECT_NOT_FOUND = {"detail": "Project not found", "code": "not_found"}

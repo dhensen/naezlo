@@ -14,13 +14,13 @@ from joserfc.jwk import RSAKey
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.app import create_app
+from naezlo.auth import safe_next_path
+from naezlo.config import Settings
+from naezlo.db import get_session
+from naezlo.google import GOOGLE_METADATA_URL, GoogleClient
+from naezlo.models import Organization, User
 from tests.helpers import sign_in
-from todolist.app import create_app
-from todolist.auth import safe_next_path
-from todolist.config import Settings
-from todolist.db import get_session
-from todolist.google import GOOGLE_METADATA_URL, GoogleClient
-from todolist.models import Organization, User
 
 CLIENT_ID = "test-client-id.apps.googleusercontent.com"
 ISSUER = "https://accounts.google.com"

@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from todolist.models import Membership, MembershipRole, Organization, User, normalize_email
+from naezlo.models import Membership, MembershipRole, Organization, User, normalize_email
 
 
 async def make_user(session: AsyncSession, email: str = "ada@example.com") -> User:

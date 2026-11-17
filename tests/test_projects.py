@@ -8,8 +8,8 @@ from httpx import AsyncClient
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.models import MembershipRole, Organization, Project, ProjectRole, User
 from tests.helpers import add_member, grant_project_role, sign_in
-from todolist.models import MembershipRole, Organization, Project, ProjectRole, User
 
 PROJECT_NOT_FOUND = {"detail": "Project not found", "code": "not_found"}
 

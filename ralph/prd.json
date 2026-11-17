@@ -8,8 +8,8 @@
       "title": "Backend scaffold",
       "description": "As a developer, I need a FastAPI project managed by uv with linting, type checking and tests so that every later story starts from working quality checks.",
       "acceptanceCriteria": [
-        "pyproject.toml at the repo root, managed by uv, requires-python >= 3.14, package in src/todolist/",
-        "FastAPI app factory create_app() in src/todolist/app.py; GET /healthz returns 200 {\"status\": \"ok\"}",
+        "pyproject.toml at the repo root, managed by uv, requires-python >= 3.14, package in src/naezlo/",
+        "FastAPI app factory create_app() in src/naezlo/app.py; GET /healthz returns 200 {\"status\": \"ok\"}",
         "Settings class based on pydantic-settings reading from environment and .env; .env is git-ignored and .env.example is committed",
         "ruff (lint + format) and pyright (strict mode for src/) configured in pyproject.toml",
         "pytest with pytest-asyncio and an httpx AsyncClient fixture; a test covers /healthz",
@@ -30,7 +30,7 @@
       "acceptanceCriteria": [
         "docker-compose.yml with a postgres:18 service, a named volume and a healthcheck; it provides two databases: todolist (dev) and todolist_test",
         "DATABASE_URL and TEST_DATABASE_URL settings with defaults that match docker compose, documented in .env.example",
-        "Async engine and session factory (SQLAlchemy 2 + asyncpg) and a get_session FastAPI dependency in src/todolist/db.py",
+        "Async engine and session factory (SQLAlchemy 2 + asyncpg) and a get_session FastAPI dependency in src/naezlo/db.py",
         "Declarative Base with a naming convention for constraints; shared mixins for a UUID primary key and created_at / updated_at",
         "Alembic configured for the async engine with autogenerate against Base.metadata; uv run alembic upgrade head works on an empty database",
         "Test fixtures: schema is migrated once per session on todolist_test, each test runs in a transaction that is rolled back, and the app's get_session is overridden to use it",
@@ -158,7 +158,7 @@
         "agents table: id, organization_id, name (unique per organization), description nullable, created_by, timestamps, cascade delete with the organization; migration applied",
         "GET /api/orgs/{org_id}/agents lists agents for any member",
         "POST /api/orgs/{org_id}/agents {name, description}, PATCH and DELETE /api/orgs/{org_id}/agents/{agent_id} are allowed for owner and admin only",
-        "A Principal value type (kind: user | agent, id, organization context) is introduced in src/todolist and documented in DECISIONS.md as the actor type for permissions and audit",
+        "A Principal value type (kind: user | agent, id, organization context) is introduced in src/naezlo and documented in DECISIONS.md as the actor type for permissions and audit",
         "Tests cover CRUD, the name uniqueness and the 403 for plain members",
         "Tests pass",
         "Typecheck passes"
@@ -190,7 +190,7 @@
       "description": "As a project admin, I want access to a project to be limited to the people and agents it was shared with so that projects in one organization can be private.",
       "acceptanceCriteria": [
         "project_grants table: id, project_id, principal_kind user | agent, user_id nullable, agent_id nullable, role viewer | editor | admin, check constraint that exactly one of user_id / agent_id matches principal_kind, unique per project and principal; migration applied",
-        "Permission service in src/todolist/permissions.py: effective_project_role(principal, project) returns admin for organization owners and admins, otherwise the grant's role, otherwise None",
+        "Permission service in src/naezlo/permissions.py: effective_project_role(principal, project) returns admin for organization owners and admins, otherwise the grant's role, otherwise None",
         "Creating a project grants its creator the admin role",
         "Project routes are enforced: no role gives 404; GET needs viewer; PATCH needs editor; DELETE needs admin; the project list returns only projects where the caller has a role",
         "A reusable dependency (for example require_project_role(\"editor\")) is used by the routes and documented in ralph/progress.txt Codebase Patterns",
@@ -260,7 +260,7 @@
       "description": "As a list editor, I want to add, edit, complete and delete items so that I can track what has to be done.",
       "acceptanceCriteria": [
         "items table: id, list_id, title, notes nullable, status enum open | done, position, created_by_kind + created_by_id, completed_by_kind + completed_by_id nullable, completed_at nullable, timestamps, cascade delete with the list; migration applied",
-        "Item operations live in a service module (src/todolist/services/items.py or similar) that takes a Principal, so the HTTP API and the MCP tools can share them",
+        "Item operations live in a service module (src/naezlo/services/items.py or similar) that takes a Principal, so the HTTP API and the MCP tools can share them",
         "GET /api/lists/{list_id}/items returns items ordered by position (viewer); POST /api/lists/{list_id}/items {title, notes} appends at the end (editor)",
         "PATCH /api/items/{item_id} updates title, notes and status (editor); setting status to done records completed_by and completed_at, reopening clears them",
         "DELETE /api/items/{item_id} (editor)",

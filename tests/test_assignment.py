@@ -8,11 +8,11 @@ from httpx import AsyncClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.models import Item, ListRole, MembershipRole, PrincipalKind, ProjectRole
 from tests.helpers import add_in_savepoint, add_member, grant_list_role, sign_in
 from tests.test_audit import all_events, last_event
 from tests.test_items import ITEM_NOT_FOUND, ada_list, create, join
 from tests.test_mcp import agent_token, grant_agent, make_list
-from todolist.models import Item, ListRole, MembershipRole, PrincipalKind, ProjectRole
 
 INVALID_ASSIGNEE = {
     "detail": "An item can only be assigned to someone who can change the items of its list",

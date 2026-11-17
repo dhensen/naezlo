@@ -9,11 +9,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.sessions import SessionMiddleware
 
+from naezlo.app import create_app
+from naezlo.config import DEV_SESSION_SECRET, Settings
+from naezlo.db import get_session
+from naezlo.models import Membership, Organization, User
 from tests.helpers import sign_in
-from todolist.app import create_app
-from todolist.config import DEV_SESSION_SECRET, Settings
-from todolist.db import get_session
-from todolist.models import Membership, Organization, User
 
 
 @pytest.fixture

@@ -4,15 +4,15 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from todolist.models import Membership, MembershipRole, Organization, User
-from todolist.services.organizations import (
+from naezlo.models import Membership, MembershipRole, Organization, User
+from naezlo.services.organizations import (
     SLUG_LOCK_KEY,
     create_organization,
     list_user_organizations,
     slugify,
     unique_slug,
 )
-from todolist.services.users import get_or_create_user
+from naezlo.services.users import get_or_create_user
 
 
 async def organizations_of(session: AsyncSession, user: User) -> list[Organization]:

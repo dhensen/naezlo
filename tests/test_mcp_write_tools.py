@@ -9,11 +9,11 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.models import AuditEvent, ListRole, PrincipalKind
 from tests.test_audit import all_events
 from tests.test_mcp import agent_token, grant_agent, make_list, mcp_client
 from tests.test_mcp_read_tools import add_item, call, error_of
 from tests.test_oauth_token import Authorized
-from todolist.models import AuditEvent, ListRole, PrincipalKind
 
 WRITE_TOOLS = (
     "add_item",

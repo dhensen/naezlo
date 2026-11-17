@@ -7,9 +7,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import add_member, grant_list_role, sign_in
-from tests.test_items import ada_list, create, join
-from todolist.models import (
+from naezlo.models import (
     Agent,
     AuditAction,
     ListRole,
@@ -17,9 +15,11 @@ from todolist.models import (
     ProjectRole,
     TodoList,
 )
-from todolist.principals import Principal
-from todolist.services.audit import action_group
-from todolist.services.items import create_item
+from naezlo.principals import Principal
+from naezlo.services.audit import action_group
+from naezlo.services.items import create_item
+from tests.helpers import add_member, grant_list_role, sign_in
+from tests.test_items import ada_list, create, join
 
 
 async def page(client: AsyncClient, url: str, **params: Any) -> dict[str, Any]:

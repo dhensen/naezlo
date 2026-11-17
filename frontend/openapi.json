@@ -1336,7 +1336,7 @@
         "type": "object"
       },
       "PrincipalKind": {
-        "description": "The two kinds of actor. `todolist.principals.Principal` carries one.",
+        "description": "The two kinds of actor. `naezlo.principals.Principal` carries one.",
         "enum": [
           "user",
           "agent"
@@ -1474,7 +1474,7 @@
         "type": "object"
       },
       "ProjectRole": {
-        "description": "Roles on a project, lowest first. Compare them with `todolist.permissions.role_at_least`.",
+        "description": "Roles on a project, lowest first. Compare them with `naezlo.permissions.role_at_least`.",
         "enum": [
           "viewer",
           "editor",
@@ -1562,7 +1562,7 @@
     }
   },
   "info": {
-    "title": "todolist",
+    "title": "Naezlo",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",

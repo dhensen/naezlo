@@ -17,9 +17,9 @@ from mcp import Client, MCPError
 from mcp.client.streamable_http import streamable_http_client
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.models import ListGrant, ListRole, PrincipalKind
 from tests.test_oauth_authorize import ISSUER
 from tests.test_oauth_token import Authorized, access_row, authorize, exchange, revoke
-from todolist.models import ListGrant, ListRole, PrincipalKind
 
 MCP_URL = f"{ISSUER}/mcp"
 METADATA_URL = f"{ISSUER}/.well-known/oauth-protected-resource/mcp"

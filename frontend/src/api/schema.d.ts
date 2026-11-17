@@ -1337,7 +1337,7 @@ export interface components {
         };
         /**
          * PrincipalKind
-         * @description The two kinds of actor. `todolist.principals.Principal` carries one.
+         * @description The two kinds of actor. `naezlo.principals.Principal` carries one.
          * @enum {string}
          */
         PrincipalKind: "user" | "agent";
@@ -1391,7 +1391,7 @@ export interface components {
         };
         /**
          * ProjectRole
-         * @description Roles on a project, lowest first. Compare them with `todolist.permissions.role_at_least`.
+         * @description Roles on a project, lowest first. Compare them with `naezlo.permissions.role_at_least`.
          * @enum {string}
          */
         ProjectRole: "viewer" | "editor" | "admin";

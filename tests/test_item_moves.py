@@ -8,11 +8,11 @@ from httpx import AsyncClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.models import Agent, Item, PrincipalKind, ProjectRole, TodoList
+from naezlo.principals import Principal
+from naezlo.services.items import delete_item, list_items, move_item
 from tests.helpers import add_in_savepoint, grant_project_role
 from tests.test_items import ITEM_NOT_FOUND, ada_list, create, join
-from todolist.models import Agent, Item, PrincipalKind, ProjectRole, TodoList
-from todolist.principals import Principal
-from todolist.services.items import delete_item, list_items, move_item
 
 INVALID_BEFORE = {
     "detail": "before_item_id is not an item of this list",

@@ -7,8 +7,8 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.models import Membership, MembershipRole, Organization
 from tests.helpers import add_member, sign_in
-from todolist.models import Membership, MembershipRole, Organization
 
 
 async def test_list_returns_my_organizations_with_role(

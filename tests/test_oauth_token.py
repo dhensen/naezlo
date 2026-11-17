@@ -14,10 +14,8 @@ from mcp.shared.auth import OAuthToken
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import add_member, sign_in
-from tests.test_oauth_authorize import CALLBACK, ISSUER, callback_params, create_agent, start
-from todolist.db import get_session
-from todolist.models import (
+from naezlo.db import get_session
+from naezlo.models import (
     Membership,
     MembershipRole,
     OAuthAccessToken,
@@ -25,8 +23,10 @@ from todolist.models import (
     OAuthRefreshToken,
     PrincipalKind,
 )
-from todolist.services.oauth import hash_token
-from todolist.services.oauth_tokens import resolve_access_token
+from naezlo.services.oauth import hash_token
+from naezlo.services.oauth_tokens import resolve_access_token
+from tests.helpers import add_member, sign_in
+from tests.test_oauth_authorize import CALLBACK, ISSUER, callback_params, create_agent, start
 
 VERIFIER = "v3rifier-" + "x" * 40
 CHALLENGE = base64.urlsafe_b64encode(hashlib.sha256(VERIFIER.encode()).digest()).rstrip(b"=")

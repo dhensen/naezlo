@@ -20,12 +20,12 @@
   `mockApi({...})` (src/test/api.ts) then `renderApp('/path')` (src/test/render.tsx).
 - E2E (since US-029): `npm --prefix frontend run e2e` is a quality check (needs `docker compose up -d`
   and once `npx --prefix frontend playwright install chromium`). It builds the frontend; Playwright
-  starts `uv run python -m todolist.e2e --port 8765` (database todolist_e2e, emptied + migrated at
+  starts `uv run python -m naezlo.e2e --port 8765` (database todolist_e2e, emptied + migrated at
   every start, dev-login on). Specs: frontend/e2e/*.spec.ts; sign in with `const user = await
   signIn(page)` from `./helpers.ts` (unique email per call, `user.organizationName`, also
   `signOut(page, user)`, `uniqueUser()`). Tests share the database: assert only on your own data.
 - Backend-owned paths are listed in frontend/src/backendPaths.ts (`BACKEND_PATHS`, dev proxy) and
-  src/todolist/frontend.py (`BACKEND_PREFIXES`, never answered by the SPA fallback); keep them equal.
+  src/naezlo/frontend.py (`BACKEND_PREFIXES`, never answered by the SPA fallback); keep them equal.
   FastAPI serves frontend/dist when it exists at startup (`FRONTEND_DIST`); tests have it off.
 - App shell (since US-030): organization pages are routes under `/o/:orgSlug` inside `AppLayout`
   (top bar with switcher + user menu, sidebar with projects, drawer below `md`). In a page use
@@ -69,18 +69,18 @@
 - Commands and conventions: root CLAUDE.md. App is built with `create_app(settings)`; tests use the `settings`, `app` and `client` fixtures in tests/conftest.py.
 - Postgres: `docker compose up -d` (host port 5435, databases todolist and todolist_test).
   Other projects' Postgres containers run on 5432-5434 on this machine; leave them alone.
-- DB in routes: `session: SessionDep` (todolist.db); commit/rollback is done by the dependency,
+- DB in routes: `session: SessionDep` (naezlo.db); commit/rollback is done by the dependency,
   services only `flush()`. DB in tests: `db_session` fixture (same session the `client` app uses,
   rolled back after each test; `commit()` inside it is only a savepoint release).
 - New model: subclass `Base` + `UUIDPrimaryKeyMixin` + `TimestampMixin`, import the module in
-  src/todolist/models/__init__.py, then `uv run alembic revision --autogenerate -m "..."` and
+  src/naezlo/models/__init__.py, then `uv run alembic revision --autogenerate -m "..."` and
   `uv run alembic upgrade head` (dev DB). Tests re-migrate todolist_test themselves.
-- Enum column: `value_enum(MyStrEnum, "pg_type_name")` (todolist.db). Add
+- Enum column: `value_enum(MyStrEnum, "pg_type_name")` (naezlo.db). Add
   `sa.Enum(name="pg_type_name").drop(op.get_bind())` to the migration's downgrade by hand.
 - Relationships are `lazy="raise"`: use `selectinload` or a join. Emails: `normalize_email()`.
-- Signed-in user in a route: `user: CurrentUser` (todolist.auth). Settings: `settings: SettingsDep`.
-  Errors: raise `AppError` / `NotFoundError` (todolist.errors), body `{"detail", "code"}`.
-- Routers: src/todolist/api/<area>.py, included in api/__init__.py. Shared logic: src/todolist/services/.
+- Signed-in user in a route: `user: CurrentUser` (naezlo.auth). Settings: `settings: SettingsDep`.
+  Errors: raise `AppError` / `NotFoundError` (naezlo.errors), body `{"detail", "code"}`.
+- Routers: src/naezlo/api/<area>.py, included in api/__init__.py. Shared logic: src/naezlo/services/.
 - Tests sign in with `await sign_in(client, email, name)` (tests/helpers.py, uses dev-login, returns
   the /api/me body). For a second user in one test, open another `AsyncClient` on the `app` fixture.
 - `obj.id` is None until the first flush: link new rows through relationships or flush first.
@@ -90,7 +90,7 @@
   calls with `httpx2.MockTransport`. Google login tests: `FakeGoogle` in tests/test_auth_google.py.
 - `Settings.public_base_url` (PUBLIC_BASE_URL) exists since US-005; build absolute URLs from it.
 - Routes opened by browser navigation redirect to `/login?error=<code>` instead of returning JSON.
-- Org-scoped route: `org: OrgContextDep` (todolist.api.deps; 404 for non-members) or
+- Org-scoped route: `org: OrgContextDep` (naezlo.api.deps; 404 for non-members) or
   `org: OrgAdminContextDep` (also 403 unless owner/admin). Role rule: `can_manage_organization`.
 - More users in a test: `other_client` / `third_client` fixtures (tests/conftest.py) and
   `add_member(db_session, org_id, user_id, role)` (tests/helpers.py).
@@ -101,7 +101,7 @@
   before `begin_nested()` fails outside the savepoint and leaves the session unusable.
 - Invitations: services/invitations.py (`invite`, `list_invitations`, `revoke_invitation`,
   `accept_pending_invitations`, called by `get_or_create_user` on every sign-in).
-- Actor type: `Principal` (todolist.principals; kind user | agent, id, organization_id, name).
+- Actor type: `Principal` (naezlo.principals; kind user | agent, id, organization_id, name).
   `org.principal` in org-scoped routes, `Principal.for_agent(agent)` for agents. Agents:
   services/agents.py (`list_agents`, `get_agent`, `create_agent`, `update_agent`, `delete_agent`).
 - 409 from a unique constraint: change + flush inside `async with session.begin_nested()`, catch
@@ -109,10 +109,10 @@
 - A PATCH that returns `updated_at` needs `await session.refresh(obj)` after the flush.
 - Projects: services/projects.py (`list_projects(session, principal)`, `create_project` (adds the
   creator's admin grant), `update_project`, `delete_project`).
-- Permissions: src/todolist/permissions.py (`effective_project_role(session, principal, project)`,
+- Permissions: src/naezlo/permissions.py (`effective_project_role(session, principal, project)`,
   `role_at_least`, `visible_projects(principal)`). Project-scoped route
   (`/api/projects/{project_id}...`): `ctx: ProjectContextDep` (viewer), `ProjectEditorContextDep` or
-  `ProjectAdminContextDep` from todolist.api.deps, all made by `require_project_role(ProjectRole.X)`:
+  `ProjectAdminContextDep` from naezlo.api.deps, all made by `require_project_role(ProjectRole.X)`:
   404 without a role, 403 when the role is too low; `ctx.project`, `ctx.role`, `ctx.user`,
   `ctx.principal`. For another minimum or a nested resource, wrap `require_project_role(...)` in
   `Annotated[ProjectContext, Depends(...)]`.
@@ -125,7 +125,7 @@
 - Lists: models/todo_list.py (`TodoList`, `ListMode`), services/lists.py (`list_lists`,
   `create_list(session, principal, project, name, description, mode=None)`, `update_list`,
   `delete_list`, `default_list_mode`), api/lists.py. List-scoped route (`/api/lists/{list_id}...`):
-  `ctx: ListContextDep` / `ListEditorContextDep` / `ListAdminContextDep` (todolist.api.deps, made by
+  `ctx: ListContextDep` / `ListEditorContextDep` / `ListAdminContextDep` (naezlo.api.deps, made by
   `require_list_role`): `ctx.todo_list`, `ctx.project`, `ctx.role`, `ctx.user`, `ctx.principal`.
   The rule is `effective_list_role(session, principal, todo_list, project)` in permissions.py.
 - List grants: models/list_grant.py (`ListGrant`, `ListRole` with `none`), services/list_grants.py,
@@ -161,7 +161,7 @@
   used. models/oauth.py, services/oauth.py (`authorization_server_metadata`,
   `protected_resource_metadata`, `register_client`, `new_token`, `hash_token`, `MCP_SCOPE`),
   api/oauth.py (`root_router`, included in app.py, paths at the root). Errors: `OAuthError`
-  (todolist.errors) gives `{"error", "error_description"}`. Issuer: `settings.oauth_issuer`;
+  (naezlo.errors) gives `{"error", "error_description"}`. Issuer: `settings.oauth_issuer`;
   MCP resource: `settings.mcp_resource_url`. Tests register a client with
   `register(client)` in tests/test_oauth_registration.py (`POST /register {"redirect_uris": [...]}`).
 - The `mcp` SDK is 2.3 (`MCPServer`, not FastMCP). Read its source in .venv and the docs at
@@ -176,7 +176,7 @@
   `resolve_access_token(session, token)` → agent `Principal` or None). Tests: tests/test_oauth_token.py
   has `authorize(client)` (sign in, agent, client, approved code), `exchange(client, authorized)`
   (gives the token response with `access_token`), `refresh` and `revoke` to import.
-- MCP server (US-023): src/todolist/mcp_server/ (`create_mcp_server`, `mcp_asgi_app`, stateless
+- MCP server (US-023): src/naezlo/mcp_server/ (`create_mcp_server`, `mcp_asgi_app`, stateless
   streamable HTTP + JSON at /mcp, bearer check by the SDK with `AgentTokenVerifier`). New tool: add
   it in `register_tools` (mcp_server/tools.py) with `async with agent_context() as ctx`
   (`ctx.principal`, `ctx.session`). Tests: tests/test_mcp.py has `agent_token`, `mcp_client`,
@@ -190,16 +190,16 @@
   (`shared_list`, `events_since`, `assert_by_agent`).
 
 ## 2026-11-14 - US-001
-- Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/todolist/`),
+- Backend scaffold: uv project (Python 3.14, `uv_build` backend, package in `src/naezlo/`),
   FastAPI app factory `create_app()` with `GET /healthz`, pydantic-settings `Settings`
   (`app_name`, `environment`), ruff lint + format, pyright (strict on `src/`), pytest with
   pytest-asyncio and an httpx `AsyncClient` fixture, tests for `/healthz` and settings.
 - Files changed: pyproject.toml, uv.lock, .python-version, .gitignore, .env.example,
-  CLAUDE.md, src/todolist/{__init__,app,config}.py, src/todolist/py.typed,
+  CLAUDE.md, src/naezlo/{__init__,app,config}.py, src/naezlo/py.typed,
   tests/{__init__,conftest,test_health,test_config}.py, ralph/prd.json, ralph/progress.txt.
   Also first commit of DECISIONS.md and ralph/ (they were untracked setup files, not leftovers
   of a story).
-- Checked by hand: `uv run uvicorn todolist.app:create_app --factory` serves /healthz with 200.
+- Checked by hand: `uv run uvicorn naezlo.app:create_app --factory` serves /healthz with 200.
 - Pushed: no (there is no remote named origin)
 - **Learnings for future iterations:**
   - Runtime deps go in with `uv add`, dev tools with `uv add --dev` (dependency group `dev`).
@@ -212,14 +212,14 @@
 
 ## 2026-11-14 - US-002
 - PostgreSQL 18 via docker compose (named volume, healthcheck, init script that creates
-  todolist_test), `DATABASE_URL` / `TEST_DATABASE_URL` settings, `src/todolist/db.py` (Base with
+  todolist_test), `DATABASE_URL` / `TEST_DATABASE_URL` settings, `src/naezlo/db.py` (Base with
   naming convention, UUID and timestamp mixins, engine, session factory, `get_session`,
   `SessionDep`), Alembic with an async env.py, test fixtures (schema reset + migrate once per
   session, per-test rolled-back transaction, `get_session` override) and tests for isolation,
   commit/rollback of the real dependency, the mixins and constraint names.
 - There is no migration file yet (no models); US-003 generates the first one.
 - Files changed: docker-compose.yml, docker/postgres/init.sql, alembic.ini, migrations/{env.py,
-  script.py.mako,versions/.gitkeep}, src/todolist/{app,config,db}.py, src/todolist/models/__init__.py,
+  script.py.mako,versions/.gitkeep}, src/naezlo/{app,config,db}.py, src/naezlo/models/__init__.py,
   tests/{conftest,test_db}.py, pyproject.toml, uv.lock, .env.example, CLAUDE.md, DECISIONS.md,
   ralph/prd.json, ralph/progress.txt.
 - Checked by hand: `uv run alembic upgrade head`, `alembic check` and an autogenerate run on the
@@ -244,7 +244,7 @@
   nullable unique), `Organization` (unique slug) and `Membership` (role enum owner | admin |
   member, unique (organization_id, user_id), ON DELETE CASCADE to both organization and user),
   the first Alembic migration, and a `value_enum` helper in db.py.
-- Files changed: src/todolist/db.py, src/todolist/models/{__init__,user,organization}.py,
+- Files changed: src/naezlo/db.py, src/naezlo/models/{__init__,user,organization}.py,
   migrations/versions/20261114_2154_3f46e4359648_add_users_organizations_and_memberships.py,
   tests/test_models_tenancy.py, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
 - Checked by hand on the dev database: `alembic upgrade head`, `alembic downgrade base`,
@@ -266,8 +266,8 @@
   (404 unless `DEV_LOGIN=true`), `POST /api/auth/logout`, `GET /api/me`, `GET /api/config`, and an
   `AppError` type with a `{"detail", "code"}` body. Settings refuse to load in production without
   `SESSION_SECRET` or with `DEV_LOGIN=true`.
-- Files changed: src/todolist/{app,config,auth,errors}.py, src/todolist/api/{__init__,auth,config,me}.py,
-  src/todolist/services/{__init__,organizations,users}.py, tests/{conftest,helpers,test_auth,
+- Files changed: src/naezlo/{app,config,auth,errors}.py, src/naezlo/api/{__init__,auth,config,me}.py,
+  src/naezlo/services/{__init__,organizations,users}.py, tests/{conftest,helpers,test_auth,
   test_services_users}.py, pyproject.toml, uv.lock (itsdangerous, pydantic[email]), .env.example,
   CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
 - Checked by hand with uvicorn on the dev database: dev-login, /api/me, logout, 401 afterwards,
@@ -305,8 +305,8 @@
   unreachable Google, 404 when not configured, /api/config.
 - Not checked against the real Google: the loop has no Google OAuth client. A human should try
   one real sign-in after setting GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET.
-- Files changed: src/todolist/{google,config,app,auth}.py, src/todolist/api/auth.py,
-  src/todolist/services/users.py, tests/test_auth_google.py, pyproject.toml, uv.lock (authlib,
+- Files changed: src/naezlo/{google,config,app,auth}.py, src/naezlo/api/auth.py,
+  src/naezlo/services/users.py, tests/test_auth_google.py, pyproject.toml, uv.lock (authlib,
   httpx2), .env.example, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
 - Pushed: no (there is no remote named origin)
 - **Learnings for future iterations:**
@@ -331,11 +331,11 @@
 - Organization API: `GET /api/orgs` (my organizations with my role), `POST /api/orgs` (201, unique
   slug, creator becomes owner), `GET /api/orgs/{org_id}` (404 for non-members and unknown ids),
   `PATCH /api/orgs/{org_id}` (owner and admin; member 403). Reusable dependencies `OrgContextDep`
-  and `OrgAdminContextDep` in `todolist/api/deps.py`, `ForbiddenError`, and the service functions
+  and `OrgAdminContextDep` in `naezlo/api/deps.py`, `ForbiddenError`, and the service functions
   `get_organization_membership`, `can_manage_organization` and `rename_organization`.
 - No schema change, so no migration.
-- Files changed: src/todolist/api/{__init__,deps,orgs}.py, src/todolist/services/organizations.py,
-  src/todolist/errors.py, tests/test_orgs.py, CLAUDE.md, DECISIONS.md, ralph/prd.json,
+- Files changed: src/naezlo/api/{__init__,deps,orgs}.py, src/naezlo/services/organizations.py,
+  src/naezlo/errors.py, tests/test_orgs.py, CLAUDE.md, DECISIONS.md, ralph/prd.json,
   ralph/progress.txt.
 - Pushed: no (there is no remote named origin)
 - **Learnings for future iterations:**
@@ -358,8 +358,8 @@
   New: `ConflictError`, service functions `list_members`, `can_change_member_role`,
   `can_remove_member`, `change_member_role`, `remove_member`.
 - No schema change, so no migration.
-- Files changed: src/todolist/api/{__init__,members}.py, src/todolist/services/organizations.py,
-  src/todolist/errors.py, tests/{conftest,helpers,test_orgs,test_org_members}.py, CLAUDE.md,
+- Files changed: src/naezlo/api/{__init__,members}.py, src/naezlo/services/organizations.py,
+  src/naezlo/errors.py, tests/{conftest,helpers,test_orgs,test_org_members}.py, CLAUDE.md,
   DECISIONS.md, ralph/prd.json, ralph/progress.txt.
 - Pushed: no (there is no remote named origin)
 - **Learnings for future iterations:**
@@ -383,8 +383,8 @@
   `get_or_create_user` turns pending invitations into memberships on sign-in, after the default
   organization. The POST response has `status` (`added` | `invited`) and a `message` that says no
   email is sent and the person joins on their next sign-in.
-- Files changed: src/todolist/models/{__init__,invitation}.py, src/todolist/services/{invitations,
-  users}.py, src/todolist/api/{__init__,invitations}.py,
+- Files changed: src/naezlo/models/{__init__,invitation}.py, src/naezlo/services/{invitations,
+  users}.py, src/naezlo/api/{__init__,invitations}.py,
   migrations/versions/20261114_2209_42f58e703737_add_invitations.py, tests/test_invitations.py,
   CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
 - Checked by hand on the dev database: `alembic upgrade head`, `downgrade base`, `upgrade head`,
@@ -408,10 +408,10 @@
   organization, `created_by` SET NULL) and its migration; `GET /api/orgs/{org_id}/agents` for any
   member; `POST` (201), `PATCH /{agent_id}` and `DELETE /{agent_id}` (204) for owner and admin
   (member 403, non-member 404); a taken name is 409 `agent_name_taken`. The `Principal` value type
-  (`todolist.principals`: kind user | agent, id, organization_id, name) with `for_user` /
+  (`naezlo.principals`: kind user | agent, id, organization_id, name) with `for_user` /
   `for_agent`, exposed as `OrgContext.principal`, documented in DECISIONS.md.
-- Files changed: src/todolist/principals.py, src/todolist/models/{__init__,agent}.py,
-  src/todolist/services/agents.py, src/todolist/api/{__init__,agents,deps}.py,
+- Files changed: src/naezlo/principals.py, src/naezlo/models/{__init__,agent}.py,
+  src/naezlo/services/agents.py, src/naezlo/api/{__init__,agents,deps}.py,
   migrations/versions/*_add_agents.py, tests/{test_agents,test_invitations,helpers}.py, CLAUDE.md,
   DECISIONS.md, ralph/prd.json, ralph/progress.txt.
 - Checked by hand on the dev database: `alembic upgrade head`, `downgrade base`, `upgrade head`,
@@ -438,8 +438,8 @@
   `GET /api/orgs/{org_id}/projects` for any organization member; `GET`, `PATCH` and `DELETE` (204)
   `/api/projects/{project_id}` through the new `ProjectContextDep`, for now limited to members of
   the project's organization. Non-members get 404 on all five routes.
-- Files changed: src/todolist/models/{__init__,project}.py, src/todolist/services/projects.py,
-  src/todolist/api/{__init__,deps,projects}.py, migrations/versions/*_add_projects.py,
+- Files changed: src/naezlo/models/{__init__,project}.py, src/naezlo/services/projects.py,
+  src/naezlo/api/{__init__,deps,projects}.py, migrations/versions/*_add_projects.py,
   tests/test_projects.py, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
 - Checked by hand on the dev database: `alembic upgrade head`, `downgrade base`, `upgrade head`,
   `alembic check` (no drift).
@@ -462,13 +462,13 @@
 ## 2026-11-14 - US-011
 - Project ACL: `project_grants` table (model `ProjectGrant`, enums `PrincipalKind` and
   `ProjectRole`) with its migration (backfills an admin grant for the creator of existing
-  projects); permission service `src/todolist/permissions.py`; `require_project_role(...)`
+  projects); permission service `src/naezlo/permissions.py`; `require_project_role(...)`
   dependency and the three aliases; project routes enforced (GET viewer, PATCH editor, DELETE
   admin, 404 without a role, list filtered); creating a project grants the creator admin;
   removing a member deletes their project grants in that organization.
-- Files changed: src/todolist/permissions.py (new), src/todolist/models/{__init__,project_grant}.py,
-  src/todolist/principals.py, src/todolist/services/{projects,organizations}.py,
-  src/todolist/api/{deps,projects}.py, migrations/versions/*_add_project_grants.py,
+- Files changed: src/naezlo/permissions.py (new), src/naezlo/models/{__init__,project_grant}.py,
+  src/naezlo/principals.py, src/naezlo/services/{projects,organizations}.py,
+  src/naezlo/api/{deps,projects}.py, migrations/versions/*_add_project_grants.py,
   tests/test_project_permissions.py (new), tests/{test_projects,helpers}.py, CLAUDE.md,
   DECISIONS.md, ralph/prd.json, ralph/progress.txt.
 - Checked by hand on the dev database: `alembic upgrade head`, `downgrade -1`, `upgrade head`,
@@ -478,7 +478,7 @@
 - **Learnings for future iterations:**
   - `effective_project_role` takes the session first; the story's signature has no session.
   - `PrincipalKind` moved to models/project_grant.py (the model needs it and principals.py
-    imports the models); `from todolist.principals import PrincipalKind` still works.
+    imports the models); `from naezlo.principals import PrincipalKind` still works.
   - US-014 (`list_grants`) and US-018 (audit actor kind) reuse the PostgreSQL type
     `principal_kind`: autogenerate will emit `sa.Enum(..., name="principal_kind")`, which tries to
     create the type again. Change it to `postgresql.ENUM(..., name="principal_kind",
@@ -497,8 +497,8 @@
   `DELETE /api/projects/{project_id}/grants/{grant_id}` (project admin only), service
   `services/project_grants.py`, rule `project_stays_administrable` in permissions.py (409
   `last_project_admin`), 422 `invalid_principal` for a user or agent outside the organization.
-- Files changed: src/todolist/api/{__init__,project_grants}.py,
-  src/todolist/services/project_grants.py, src/todolist/permissions.py,
+- Files changed: src/naezlo/api/{__init__,project_grants}.py,
+  src/naezlo/services/project_grants.py, src/naezlo/permissions.py,
   tests/test_project_grants.py, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt.
   No schema change, no migration.
 - Pushed: no (there is no remote named origin)
@@ -524,8 +524,8 @@
   when the organization has an agent, otherwise `human_only`. New in the permission service:
   `effective_list_role` (the project role for now); new dependencies `require_list_role` and the
   `List*ContextDep` aliases.
-- Files changed: src/todolist/models/{__init__,todo_list}.py, src/todolist/services/lists.py,
-  src/todolist/api/{__init__,deps,lists}.py, src/todolist/permissions.py,
+- Files changed: src/naezlo/models/{__init__,todo_list}.py, src/naezlo/services/lists.py,
+  src/naezlo/api/{__init__,deps,lists}.py, src/naezlo/permissions.py,
   migrations/versions/20261114_2227_2f48a44bfe9a_add_todo_lists.py, tests/test_lists.py, CLAUDE.md,
   DECISIONS.md, ralph/prd.json, ralph/progress.txt.
 - Checked by hand on the dev database: `alembic upgrade head`, `downgrade -1`, `upgrade head`
@@ -556,7 +556,7 @@
   role and see no list). The list shape gained `project_name`. `GET|PUT /api/lists/{id}/grants`
   and `DELETE .../grants/{grant_id}` mirror the project grants API and need list admin.
   Removing a member now deletes their list grants too.
-- Files changed: src/todolist/models/list_grant.py (new), models/__init__.py, permissions.py,
+- Files changed: src/naezlo/models/list_grant.py (new), models/__init__.py, permissions.py,
   services/list_grants.py (new), services/project_grants.py (`find_grantable_principal` shared),
   services/lists.py, services/organizations.py, api/list_grants.py (new), api/lists.py,
   api/deps.py, api/__init__.py, migrations/versions/20261114_2233_a0f9fa30f0c9_add_list_grants.py,
@@ -582,7 +582,7 @@
   `GET|POST /api/lists/{list_id}/items` and `GET|PATCH|DELETE /api/items/{item_id}` with the new
   `require_item_role` dependency (role on the item's list). Done records completed_by and
   completed_at, reopening clears them; completing a done item keeps the first completion.
-- Files changed: src/todolist/models/item.py (new), models/__init__.py, services/items.py (new),
+- Files changed: src/naezlo/models/item.py (new), models/__init__.py, services/items.py (new),
   api/items.py (new), api/deps.py, api/__init__.py,
   migrations/versions/20261114_2237_4ae9a5e8e1d8_add_items.py, tests/test_items.py (new),
   DECISIONS.md, CLAUDE.md
@@ -604,7 +604,7 @@
   another list or an unknown one. Service `move_item` takes a `Principal`. `delete_item` now closes
   the gap. Migration 7e182c993f2e renumbers existing items and replaces the `(list_id, position)`
   index with a deferred unique constraint. Decisions are in DECISIONS.md ("Item reordering").
-- Files changed: src/todolist/models/item.py, services/items.py, api/items.py,
+- Files changed: src/naezlo/models/item.py, services/items.py, api/items.py,
   migrations/versions/20261114_2242_7e182c993f2e_unique_item_positions.py,
   tests/test_item_moves.py (new), tests/helpers.py, DECISIONS.md, CLAUDE.md
 - Pushed: no (there is no remote named origin)
@@ -626,7 +626,7 @@
   `list_ai_only`, changing the list (name, description, mode) needs admin. mixed: by role.
   The list and item dependencies are now `require_list_action` / `require_item_action`; adding an
   item uses the new `ListItemEditorContextDep`. Decisions: DECISIONS.md ("List mode enforcement").
-- Files changed: src/todolist/permissions.py, api/deps.py, api/items.py, api/lists.py,
+- Files changed: src/naezlo/permissions.py, api/deps.py, api/items.py, api/lists.py,
   services/items.py and services/lists.py (docstrings), tests/test_list_modes.py (new),
   tests/test_list_grants.py, DECISIONS.md, CLAUDE.md
 - Pushed: no (there is no remote named origin)
@@ -648,7 +648,7 @@
   acting Principal (`create_project(session, principal, name, description)`, `update_project`,
   `delete_project`, `update_list`, `delete_list`, `set_*_grant` / `revoke_*_grant` with `actor`).
   Decisions (details shape, no-op = no event, cascades = one event): DECISIONS.md.
-- Files changed: src/todolist/models/{audit_event,__init__}.py, services/{audit,projects,lists,
+- Files changed: src/naezlo/models/{audit_event,__init__}.py, services/{audit,projects,lists,
   items,project_grants,list_grants}.py, api/{projects,lists,project_grants,list_grants}.py,
   migrations/versions/20261114_2253_b82bcf0756e0_add_audit_events.py, tests/test_audit.py (new),
   DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt
@@ -672,7 +672,7 @@
   default 50, max 200, `next_cursor`), filters `actor_kind`, `actor_id` and `action` (prefix).
   The project log leaves out events of lists the caller cannot see (list grant `none`) and keeps
   those of deleted lists. No schema change.
-- Files changed: src/todolist/services/audit.py, src/todolist/api/{audit,__init__}.py,
+- Files changed: src/naezlo/services/audit.py, src/naezlo/api/{audit,__init__}.py,
   tests/test_audit_api.py, DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt.
 - Pushed: yes
 - **Learnings for future iterations:**
@@ -695,8 +695,8 @@
   redirect URIs https or loopback http). Decision recorded: endpoints are hand-written, the SDK's
   authorization-server provider is not used; the SDK's metadata models and (later) its
   resource-server side are.
-- Files changed: pyproject.toml, uv.lock, src/todolist/{app,config,errors}.py,
-  src/todolist/models/{__init__,oauth}.py, src/todolist/services/oauth.py, src/todolist/api/oauth.py,
+- Files changed: pyproject.toml, uv.lock, src/naezlo/{app,config,errors}.py,
+  src/naezlo/models/{__init__,oauth}.py, src/naezlo/services/oauth.py, src/naezlo/api/oauth.py,
   migrations/versions/20261114_2304_8777c3cf118c_add_oauth_tables.py, tests/test_oauth_metadata.py,
   tests/test_oauth_registration.py, .env.example, DECISIONS.md, CLAUDE.md, ralph/prd.json,
   ralph/progress.txt.
@@ -734,8 +734,8 @@
   `POST /api/oauth/requests/{id}/approve` and `/deny`. New table `oauth_authorization_requests`
   (migration aa786329f14d). Permission rules `can_authorize_agent` and `authorizable_agents`.
   Authorization responses carry `iss`; the metadata advertises it. `OptionalCurrentUser` dependency.
-- Files changed: src/todolist/{auth,permissions}.py, src/todolist/models/{__init__,oauth}.py,
-  src/todolist/services/oauth.py, src/todolist/api/{__init__,oauth}.py,
+- Files changed: src/naezlo/{auth,permissions}.py, src/naezlo/models/{__init__,oauth}.py,
+  src/naezlo/services/oauth.py, src/naezlo/api/{__init__,oauth}.py,
   migrations/versions/20261114_2310_aa786329f14d_add_oauth_authorization_requests.py,
   tests/test_oauth_authorize.py, tests/test_oauth_metadata.py, DECISIONS.md, CLAUDE.md,
   ralph/prd.json, ralph/progress.txt.
@@ -766,8 +766,8 @@
   Reusing a code or a rotated refresh token is `invalid_grant` and revokes the token family.
   Tokens, refresh and code exchange stop working when the approving user may no longer authorize
   the agent (decision recorded in DECISIONS.md). No migration was needed.
-- Files changed: src/todolist/services/oauth_tokens.py (new), src/todolist/services/oauth.py
-  (`find_client`), src/todolist/api/oauth.py, src/todolist/errors.py (`oauth_error_response`),
+- Files changed: src/naezlo/services/oauth_tokens.py (new), src/naezlo/services/oauth.py
+  (`find_client`), src/naezlo/api/oauth.py, src/naezlo/errors.py (`oauth_error_response`),
   tests/test_oauth_token.py (new), DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt.
 - Pushed: yes
 - **Learnings for future iterations:**
@@ -798,8 +798,8 @@
 - Tool handlers get the agent `Principal` and a session through `agent_context()`; tool `whoami`
   (agent, organization, number of accessible lists). New permission query `accessible_lists`.
 - DNS rebinding protection: /mcp only answers for the host of PUBLIC_BASE_URL (+ loopback outside production).
-- Files: src/todolist/mcp_server/{__init__,server,context,tools}.py (new), src/todolist/app.py,
-  src/todolist/db.py (`transaction`, `SessionScope`), src/todolist/permissions.py, tests/conftest.py,
+- Files: src/naezlo/mcp_server/{__init__,server,context,tools}.py (new), src/naezlo/app.py,
+  src/naezlo/db.py (`transaction`, `SessionScope`), src/naezlo/permissions.py, tests/conftest.py,
   tests/test_mcp.py (new), DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt
 - Checked by hand: uvicorn starts, `POST /mcp` without a token answers the 401 challenge, shutdown is clean.
 - Pushed: yes
@@ -828,8 +828,8 @@
   `list_items(..., include_done=)`.
 - `agent_context()` turns an `AppError` into the SDK's `ToolError`, so an unknown or inaccessible
   id is a readable tool error (`is_error`), not a crash.
-- Files: src/todolist/mcp_server/{tools,context}.py, src/todolist/permissions.py,
-  src/todolist/services/{items,lists,projects}.py, tests/test_mcp_read_tools.py (new),
+- Files: src/naezlo/mcp_server/{tools,context}.py, src/naezlo/permissions.py,
+  src/naezlo/services/{items,lists,projects}.py, tests/test_mcp_read_tools.py (new),
   tests/test_mcp.py, DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt
 - Pushed: yes
 - **Learnings for future iterations:**
@@ -855,7 +855,7 @@
 - `ItemTitle` / `ItemNotes` moved to services/items.py so the API and the tools validate the same.
 - Tests: each tool, bad input, the viewer case for every tool, hidden items (404 message), the
   audit events with actor_kind agent (in the database and through `GET /api/lists/{id}/audit`).
-- Files: src/todolist/mcp_server/tools.py, src/todolist/services/items.py, src/todolist/api/items.py,
+- Files: src/naezlo/mcp_server/tools.py, src/naezlo/services/items.py, src/naezlo/api/items.py,
   tests/test_mcp_write_tools.py (new), DECISIONS.md, CLAUDE.md, ralph/prd.json, ralph/progress.txt
 - Pushed: yes
 - **Learnings for future iterations:**
@@ -906,14 +906,14 @@
   with one component test (`src/pages/HomePage.test.tsx`).
 - The Vite dev server proxies /api, /authorize, /token, /register, /revoke, /.well-known and /mcp
   to http://localhost:8000.
-- Backend: setting `FRONTEND_DIST` and `src/todolist/frontend.py` (`install_frontend`): when the
+- Backend: setting `FRONTEND_DIST` and `src/naezlo/frontend.py` (`install_frontend`): when the
   build exists at startup, a last GET/HEAD route serves its files and falls back to index.html,
   never for backend paths. `tests/test_frontend.py` covers the fallback, assets, cache headers,
   path traversal, that /api/unknown stays a JSON 404 and that the API, OAuth, well-known and MCP
   routes are not shadowed. Also checked by hand: built the frontend, started uvicorn, and /login
   gave index.html, the hashed script was served, /api/unknown a JSON 404.
 - No browser check of the page was done (a one-heading placeholder); Playwright comes with US-029.
-- Files: frontend/ (new), src/todolist/frontend.py (new), src/todolist/app.py, src/todolist/config.py,
+- Files: frontend/ (new), src/naezlo/frontend.py (new), src/naezlo/app.py, src/naezlo/config.py,
   tests/test_frontend.py (new), tests/conftest.py, .env.example, CLAUDE.md, DECISIONS.md,
   ralph/prd.json, ralph/progress.txt
 - Pushed: yes
@@ -938,7 +938,7 @@
 ---
 
 ## 2026-11-15 00:05 - US-028
-- Generated API types: `npm --prefix frontend run gen:api` (`python -m todolist.openapi` →
+- Generated API types: `npm --prefix frontend run gen:api` (`python -m naezlo.openapi` →
   frontend/openapi.json → openapi-typescript → frontend/src/api/schema.d.ts, both committed);
   tests/test_openapi.py fails when the saved schema is behind the backend.
 - Typed fetch wrapper: openapi-fetch client `api` + `unwrap()` / `ApiError` (src/api/client.ts).
@@ -956,7 +956,7 @@
 - Files: frontend/package.json, package-lock.json, openapi.json, eslint.config.js, vite.config.ts,
   tsconfig.node.json, src/{App,main}.tsx, src/backendPaths.ts, src/api/*, src/auth/*,
   src/components/*, src/pages/{Login,NotFound,Home}Page*, src/test/{api.ts,render.tsx};
-  src/todolist/openapi.py, tests/test_openapi.py, tests/test_frontend.py, CLAUDE.md, DECISIONS.md,
+  src/naezlo/openapi.py, tests/test_openapi.py, tests/test_frontend.py, CLAUDE.md, DECISIONS.md,
   ralph/prd.json, ralph/progress.txt
 - Pushed: yes
 - **Learnings for future iterations:**
@@ -980,8 +980,8 @@
 ## 2026-11-15 00:15 - US-029
 - Playwright harness: `@playwright/test` 1.65 in frontend/ (Chromium only, headless),
   `npm --prefix frontend run e2e` = `npm run build && playwright test`. Playwright's `webServer`
-  starts `uv run python -m todolist.e2e --port 8765` from the repo root (never reuses a server).
-- `src/todolist/e2e.py`: creates the database todolist_e2e when missing, empties and migrates it,
+  starts `uv run python -m naezlo.e2e --port 8765` from the repo root (never reuses a server).
+- `src/naezlo/e2e.py`: creates the database todolist_e2e when missing, empties and migrates it,
   serves the app with dev-login and the built frontend. New setting `e2e_database_url`
   (`E2E_DATABASE_URL`, in .env.example); only a database named `*_e2e` is ever emptied.
   docker/postgres/init.sql also creates it on a fresh volume.
@@ -992,7 +992,7 @@
 - Playwright output (frontend/test-results, playwright-report, blob-report) is git-ignored.
 - Checks: 675 pytest, 29 vitest, 1 e2e, lint/typecheck/ruff/pyright clean.
 - No separate visual check with browser tools this time; the spec covers the flow in Chromium.
-- Files: src/todolist/e2e.py, src/todolist/config.py, tests/test_e2e.py, .env.example, .gitignore,
+- Files: src/naezlo/e2e.py, src/naezlo/config.py, tests/test_e2e.py, .env.example, .gitignore,
   docker/postgres/init.sql, frontend/{package.json,package-lock.json,playwright.config.ts,
   tsconfig.node.json,vite.config.ts,eslint.config.js}, frontend/e2e/*, frontend/src/pages/HomePage*,
   CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt
@@ -1023,12 +1023,12 @@
 - User menu and switcher close through the new `useDismiss` hook (the blur handler broke clicks
   in Safari).
 - Checks: ruff, pyright, 676 pytest, eslint, tsc, 42 vitest, 3 Playwright tests (run 5 times).
-- Browser check done with Chrome DevTools against `python -m todolist.e2e --port 8766`: sign-in →
+- Browser check done with Chrome DevTools against `python -m naezlo.e2e --port 8766`: sign-in →
   /o/grace-hopper, switcher menu, dialog and creation at phone width, drawer open. Looked right.
 - Files: frontend/src/{App.tsx, components/{AppLayout,OrganizationSwitcher,NewOrganizationDialog,
   Sidebar,UserMenu}.tsx, components/useDismiss.ts, components/AppLayout.test.tsx, orgs/{hooks,paths}.ts,
   pages/{HomePage,OrganizationPage}.tsx, pages/HomePage.test.tsx, test/{api.ts,setup.ts}},
-  frontend/e2e/{shell,auth}.spec.ts, src/todolist/services/organizations.py,
+  frontend/e2e/{shell,auth}.spec.ts, src/naezlo/services/organizations.py,
   tests/test_services_users.py, CLAUDE.md, DECISIONS.md, ralph/prd.json, ralph/progress.txt
 - Pushed: yes
 - **Learnings for future iterations:**
@@ -1054,7 +1054,7 @@
 - No backend change; the existing routes were enough.
 - Checks: ruff, pyright, 676 pytest, eslint, tsc, 54 vitest (12 new), 5 Playwright tests (2 new:
   rename + invite + second browser context + role change + remove; revoke + leave).
-- Browser check done with Chrome DevTools against `python -m todolist.e2e --port 8766`: the page as
+- Browser check done with Chrome DevTools against `python -m naezlo.e2e --port 8766`: the page as
   an owner with a second member and a pending invitation, at desktop width and at a narrow width.
   Looked right. (The DevTools window does not go below 500 px, so 390 px was not seen.)
 - Files: frontend/src/pages/OrganizationSettingsPage{,.test}.tsx, frontend/src/orgs/hooks.ts,
@@ -1083,7 +1083,7 @@
 - Backend: `ProjectOut.role` (the caller's effective role; `effective_project_roles` in
   permissions.py) and `ListOut.open_item_count` on every project / list route. No schema change.
 - Sidebar project links moved from `/projects/<id>` to `/p/<id>` (the story's path; DECISIONS.md).
-- Files changed: src/todolist/api/projects.py, api/lists.py, permissions.py, tests/test_projects.py,
+- Files changed: src/naezlo/api/projects.py, api/lists.py, permissions.py, tests/test_projects.py,
   tests/test_lists.py, frontend/openapi.json + src/api/schema.d.ts (generated),
   frontend/src/projects/hooks.ts, pages/ProjectPage.tsx (+ test), components/Dialog.tsx,
   NewProjectDialog.tsx, NewOrganizationDialog.tsx (now on `Dialog`), Sidebar.tsx, App.tsx,
@@ -1098,9 +1098,9 @@
     loop (pyright strict accepts the unpacked row types).
   - A dialog opened from the sidebar must not be rendered inside the `<aside>`: the drawer is
     `absolute z-10`, so the sticky header (z-20) would cover the dialog's backdrop at phone width.
-  - Visual check without Playwright: `uv run python -m todolist.e2e --port 8766 &`, open
+  - Visual check without Playwright: `uv run python -m naezlo.e2e --port 8766 &`, open
     `http://localhost:8766/login`, sign in with `fetch('/api/auth/dev-login', ...)` from the page.
-    Stop it afterwards (`pkill -f "todolist.e2e --port 8766"`).
+    Stop it afterwards (`pkill -f "naezlo.e2e --port 8766"`).
   - `userEvent.keyboard('{Escape}')` closes a dialog in vitest only while the focus is inside it
     (the `autoFocus` input takes care of that).
   - Next is US-033 (lists in the UI): the list rows on the project page are plain rows; the hooks
@@ -1123,7 +1123,7 @@
      navigations as transitions, so the cache change rendered before the navigation ->
      `useTransitions={false}` and `useSignOut` hands `forget` to the caller.
   `npx playwright test --repeat-each 6` (60 runs) passes; before, 2-4 of 40 failed.
-- Files changed: src/todolist/api/lists.py, api/projects.py, permissions.py, tests/test_lists.py,
+- Files changed: src/naezlo/api/lists.py, api/projects.py, permissions.py, tests/test_lists.py,
   test_list_modes.py, test_projects.py, frontend/openapi.json + src/api/schema.d.ts (generated),
   frontend/src/lists/{modes,hooks}.ts, components/ModeBadge.tsx, components/ListDialogs.tsx,
   pages/ProjectPage.tsx (+ test), pages/ProjectLists.test.tsx, api/queryClient.ts, auth/hooks.ts,
@@ -1143,7 +1143,7 @@
     use `exact: true` when row buttons carry the same word.
   - Stress the e2e suite with `npx playwright test --repeat-each 5` (in frontend/, after a build)
     to find races that a single run hides.
-  - `pkill -f "todolist.e2e --port 8766"` must be its own command: in a chain it kills the shell
+  - `pkill -f "naezlo.e2e --port 8766"` must be its own command: in a chain it kills the shell
     that runs it (the pattern is in that shell's command line).
   - Next is US-034 (list view with items): the list rows are not links yet; `ListOut.actions` has
     `change_items` for the item controls.
@@ -1160,7 +1160,7 @@
   carry a marker. The list names on the project page are links now.
 - Backend: `ListOut.organization_id` (no schema change); nothing else was needed, the item API of
   US-015/016 was enough.
-- Files changed: src/todolist/api/lists.py, tests/test_lists.py, frontend/openapi.json +
+- Files changed: src/naezlo/api/lists.py, tests/test_lists.py, frontend/openapi.json +
   src/api/schema.d.ts (generated), frontend/src/items/hooks.ts (new), pages/ListPage.tsx (new) +
   ListPage.test.tsx (new), pages/ProjectPage.tsx, lists/hooks.ts, orgs/paths.ts, App.tsx,
   test/api.ts, e2e/items.spec.ts (new), DECISIONS.md, CLAUDE.md
@@ -1182,7 +1182,7 @@
   - The list page has no "Edit list" / "Delete list" / grants controls (no story asked for them
     there; they are on the project page). `ItemOut` has no actor names, so the marker says
     "an agent"; a later story that wants names needs them in the API.
-  - Stop a background `todolist.e2e --port 8766` with its own `pkill -f` command (exit code 144
+  - Stop a background `naezlo.e2e --port 8766` with its own `pkill -f` command (exit code 144
     of that command is expected).
   - Look at `git status --short` before `git add -A`: a local `.envrc` with a token (not made by
     this iteration) appeared during the work and was staged; GitHub's push protection refused the
@@ -1200,7 +1200,7 @@
 - Backend: `GET /api/lists/{list_id}/grants/inherited` (list admin) gives the project's grants, so a
   list admin without a project role can see the inherited access. `_grant_out` in
   api/project_grants.py became public (`grant_out`). No schema change.
-- Files changed: src/todolist/api/list_grants.py, api/project_grants.py, tests/test_list_grants.py,
+- Files changed: src/naezlo/api/list_grants.py, api/project_grants.py, tests/test_list_grants.py,
   frontend/openapi.json + src/api/schema.d.ts (generated), frontend/src/sharing/hooks.ts (new),
   components/ShareDialogs.tsx (new) + ShareDialogs.test.tsx (new), components/Dialog.tsx (`wide`,
   scrolls when taller than the window), pages/ProjectPage.tsx, pages/ListPage.tsx, test/api.ts,
@@ -1238,7 +1238,7 @@
   the limits of that check are in DECISIONS.md. The doc pages came through a fetch tool that
   summarizes long pages, so the commands were confirmed against the CLIs' help, the surrounding
   wording was not compared letter by letter. None of the three tools was actually connected.
-- Files changed: src/todolist/api/agents.py, api/config.py, services/agents.py, tests/test_agents.py,
+- Files changed: src/naezlo/api/agents.py, api/config.py, services/agents.py, tests/test_agents.py,
   tests/test_auth.py, frontend/openapi.json + src/api/schema.d.ts (generated), frontend/src/agents/
   (new: hooks.ts, connect.ts), components/AgentDialogs.tsx, ConnectAgentDialog.tsx, CopyButton.tsx
   (new), pages/AgentsPage.tsx + AgentsPage.test.tsx (new), components/Sidebar.tsx, App.tsx,
@@ -1257,7 +1257,7 @@
     matches both; use `{ exact: true }`.
   - Escape only closes a `<Dialog>` while the focus is inside it; after a `selectOption` + click in
     Playwright press the dialog's own "Done" button instead.
-  - Don't put `pkill -f "todolist.e2e --port 8766"` in the same command as other work: it also
+  - Don't put `pkill -f "naezlo.e2e --port 8766"` in the same command as other work: it also
     kills the shell that runs it (exit 144) and the rest never runs.
   - `claude` and `codex` are installed here; their `mcp add --help` is the quickest check of the syntax.
   - There is still no UI for the audit log.
@@ -1308,7 +1308,7 @@
   filter cannot express it. Project events are in `lists`.
 - README.md: sections for local setup, running the app, running all checks, Google login and
   connecting an agent over MCP, below the unchanged feature list.
-- Files: src/todolist/services/audit.py, api/audit.py, tests/test_audit_api.py, frontend/openapi.json
+- Files: src/naezlo/services/audit.py, api/audit.py, tests/test_audit_api.py, frontend/openapi.json
   + src/api/schema.d.ts (generated), frontend/src/audit/ (new: hooks.ts, describe.ts,
   describe.test.ts), components/ActivityLog.tsx + Tabs.tsx (new), sharing/roles.ts (new, `ROLE_LABELS`
   moved out of ShareDialogs.tsx), pages/ListPage.tsx, ProjectPage.tsx, pages/Activity.test.tsx (new),

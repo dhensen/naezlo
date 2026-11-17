@@ -12,9 +12,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from todolist.app import create_app
-from todolist.config import Settings
-from todolist.db import get_session
+from naezlo.app import create_app
+from naezlo.config import Settings
+from naezlo.db import get_session
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

@@ -59,7 +59,7 @@ start with it when `ENVIRONMENT=production`.
 For development, run the backend and the Vite dev server next to each other:
 
 ```sh
-uv run uvicorn todolist.app:create_app --factory --reload   # API on http://localhost:8000
+uv run uvicorn naezlo.app:create_app --factory --reload   # API on http://localhost:8000
 npm --prefix frontend run dev                               # UI on http://localhost:5173
 ```
 
@@ -70,7 +70,7 @@ Without the dev server, build the frontend once and let the backend serve it:
 
 ```sh
 npm --prefix frontend run build      # writes frontend/dist
-uv run uvicorn todolist.app:create_app --factory
+uv run uvicorn naezlo.app:create_app --factory
 ```
 
 Leave `PUBLIC_BASE_URL=http://localhost:8000` and open http://localhost:8000. This is also the

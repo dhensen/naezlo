@@ -9,9 +9,9 @@ from httpx import AsyncClient
 from mcp import Client
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.models import ListRole
 from tests.helpers import sign_in
 from tests.test_mcp import agent_token, grant_agent, make_list, mcp_client
-from todolist.models import ListRole
 
 READ_TOOLS = ("list_projects", "list_lists", "get_list")
 

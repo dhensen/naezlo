@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from todolist.e2e import _ensure_database, e2e_settings
+from naezlo.e2e import _ensure_database, e2e_settings
 
 
 def test_e2e_settings_use_the_e2e_database_and_dev_login(monkeypatch: pytest.MonkeyPatch) -> None:

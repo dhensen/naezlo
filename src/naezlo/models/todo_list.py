@@ -1,0 +1,38 @@
+"""Lists: a todo list belongs to one project and says who works on it (its mode)."""
+
+import enum
+import uuid
+
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, false
+from sqlalchemy.orm import Mapped, mapped_column
+
+from naezlo.db import Base, TimestampMixin, UUIDPrimaryKeyMixin, value_enum
+
+
+class ListMode(enum.StrEnum):
+    """Who works on a list: only people, only AI agents, or both."""
+
+    HUMAN_ONLY = "human_only"
+    AI_ONLY = "ai_only"
+    MIXED = "mixed"
+
+
+class TodoList(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "todo_lists"
+    __table_args__ = (Index("ix_todo_lists_project_id", "project_id"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
+    mode: Mapped[ListMode] = mapped_column(value_enum(ListMode, "list_mode"))
+    # When set, an item can only be completed by its assignee: someone picks an item up (or
+    # is given it) before working on it, so a person and an agent never do the same item.
+    assignment_required: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+    # Order of the lists within their project, lowest first. Not necessarily gap-free.
+    position: Mapped[int] = mapped_column(Integer)
+    # The user who created the list; empty when that user no longer exists.
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )

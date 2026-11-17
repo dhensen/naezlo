@@ -13,10 +13,10 @@ from mcp.shared.auth import OAuthMetadata
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.auth import safe_next_path
+from naezlo.models import MembershipRole, OAuthAuthorizationCode, OAuthAuthorizationRequest
+from naezlo.services.oauth import hash_token
 from tests.helpers import add_member, sign_in
-from todolist.auth import safe_next_path
-from todolist.models import MembershipRole, OAuthAuthorizationCode, OAuthAuthorizationRequest
-from todolist.services.oauth import hash_token
 
 CALLBACK = "http://localhost:33418/callback"
 ISSUER = "http://localhost:8000"

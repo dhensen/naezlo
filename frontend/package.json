@@ -11,7 +11,7 @@
     "test": "vitest run",
     "e2e": "npm run build && playwright test",
     "preview": "vite preview",
-    "gen:api": "uv run --project .. python -m todolist.openapi > openapi.json && openapi-typescript openapi.json -o src/api/schema.d.ts"
+    "gen:api": "uv run --project .. python -m naezlo.openapi > openapi.json && openapi-typescript openapi.json -o src/api/schema.d.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.107.1",

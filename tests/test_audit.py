@@ -7,9 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.helpers import sign_in
-from tests.test_items import ada_list, create, join
-from todolist.models import (
+from naezlo.models import (
     Agent,
     AuditAction,
     AuditEvent,
@@ -21,10 +19,12 @@ from todolist.models import (
     TodoList,
     User,
 )
-from todolist.principals import Principal
-from todolist.services.audit import changes, record_event
-from todolist.services.items import create_item, update_item
-from todolist.services.lists import create_list
+from naezlo.principals import Principal
+from naezlo.services.audit import changes, record_event
+from naezlo.services.items import create_item, update_item
+from naezlo.services.lists import create_list
+from tests.helpers import sign_in
+from tests.test_items import ada_list, create, join
 
 
 async def all_events(session: AsyncSession) -> list[AuditEvent]:

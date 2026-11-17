@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from todolist.app import create_app
-from todolist.config import Settings
-from todolist.frontend import is_backend_path
+from naezlo.app import create_app
+from naezlo.config import Settings
+from naezlo.frontend import is_backend_path
 
 INDEX_HTML = '<!doctype html><html><body><div id="root"></div></body></html>'
 SCRIPT = "console.log('app')"

@@ -10,9 +10,9 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.models import Agent, MembershipRole, Organization, User
+from naezlo.principals import Principal, PrincipalKind
 from tests.helpers import add_in_savepoint, add_member, sign_in
-from todolist.models import Agent, MembershipRole, Organization, User
-from todolist.principals import Principal, PrincipalKind
 
 
 async def ada_org(client: AsyncClient) -> tuple[str, str]:

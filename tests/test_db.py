@@ -11,9 +11,9 @@ from sqlalchemy import MetaData, String, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from todolist.app import create_app
-from todolist.config import Settings
-from todolist.db import (
+from naezlo.app import create_app
+from naezlo.config import Settings
+from naezlo.db import (
     NAMING_CONVENTION,
     Base,
     SessionDep,

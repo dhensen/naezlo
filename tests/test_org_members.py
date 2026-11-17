@@ -8,8 +8,8 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from naezlo.models import Membership, MembershipRole
 from tests.helpers import add_member, sign_in
-from todolist.models import Membership, MembershipRole
 
 OWNER, ADMIN, MEMBER = MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MEMBER
 

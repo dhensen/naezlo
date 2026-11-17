@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from todolist.models import (
+from naezlo.models import (
     ListGrant,
     ListRole,
     Membership,

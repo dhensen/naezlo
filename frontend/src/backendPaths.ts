@@ -1,6 +1,6 @@
 // Everything the backend serves itself: the JSON API, the OAuth endpoints for MCP clients,
 // the well-known metadata documents and the MCP endpoint. All other paths belong to the SPA.
-// Keep this in step with `BACKEND_PREFIXES` in src/todolist/frontend.py.
+// Keep this in step with `BACKEND_PREFIXES` in src/naezlo/frontend.py.
 export const BACKEND_PATHS = [
   '/api',
   '/authorize',
