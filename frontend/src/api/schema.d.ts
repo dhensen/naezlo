@@ -528,6 +528,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/invitations/{invitation_id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Invitation Route
+         * @description Email a pending invitation again, in the name of whoever asks for it.
+         */
+        post: operations["resend_invitation_route_api_orgs__org_id__invitations__invitation_id__send_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{org_id}/members": {
         parameters: {
             query?: never;
@@ -952,6 +972,8 @@ export interface components {
         ConfigOut: {
             /** Dev Login Enabled */
             dev_login_enabled: boolean;
+            /** Email Enabled */
+            email_enabled: boolean;
             /** Google Login Enabled */
             google_login_enabled: boolean;
             /** Mcp Url */
@@ -1070,9 +1092,12 @@ export interface components {
         /**
          * InviteResultOut
          * @description `status` tells which of the two happened: `added` comes with `member`, `invited` with
-         *     `invitation`. `message` says it in words; no email is sent.
+         *     `invitation`. `email_sent` tells whether the person was emailed about it (never when
+         *     email is not configured); `message` says all of it in words.
          */
         InviteResultOut: {
+            /** Email Sent */
+            email_sent: boolean;
             invitation?: components["schemas"]["InvitationOut"] | null;
             member?: components["schemas"]["MemberOut"] | null;
             /** Message */
@@ -2597,6 +2622,36 @@ export interface operations {
         };
     };
     revoke_invitation_route_api_orgs__org_id__invitations__invitation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_invitation_route_api_orgs__org_id__invitations__invitation_id__send_post: {
         parameters: {
             query?: never;
             header?: never;

@@ -27,9 +27,12 @@ test('rename the organization, invite someone, change their role and remove them
   const guest = uniqueUser('Grace Hopper')
   await page.getByLabel('Email address').fill(guest.email)
   await page.getByRole('button', { name: 'Invite' }).click()
-  await expect(page.getByText(`${guest.email} joins ${newName} the next time they sign in.`)).toBeVisible()
+  await expect(page.getByText(`An invitation was emailed to ${guest.email}.`)).toBeVisible()
   const pending = page.getByRole('list', { name: 'Pending invitations' })
   await expect(pending.getByText(guest.email)).toBeVisible()
+  // The email can be sent again while the invitation is pending.
+  await pending.getByRole('button', { name: `Resend invitation to ${guest.email}` }).click()
+  await expect(page.getByText(`The invitation was emailed to ${guest.email} again.`)).toBeVisible()
   await expect(members.getByText(guest.email)).toBeHidden()
 
   // The invited person signs in, in a browser of their own, and sees the organization.

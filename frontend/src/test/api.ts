@@ -135,7 +135,13 @@ export function item(
 export const MCP_URL = 'https://todos.example.com/mcp'
 
 export function config(overrides: Partial<AppConfig> = {}): Response {
-  return json({ dev_login_enabled: false, google_login_enabled: false, mcp_url: MCP_URL, ...overrides })
+  return json({
+    dev_login_enabled: false,
+    google_login_enabled: false,
+    mcp_url: MCP_URL,
+    email_enabled: false,
+    ...overrides,
+  })
 }
 
 export const GRACE: Schemas['MemberOut'] = {

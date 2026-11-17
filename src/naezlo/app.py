@@ -15,6 +15,7 @@ from naezlo.db import create_engine, create_session_factory, transaction
 from naezlo.errors import install_error_handlers
 from naezlo.frontend import install_frontend
 from naezlo.google import GoogleClient
+from naezlo.mailer import create_mailer
 from naezlo.mcp_server import create_mcp_server, mcp_asgi_app
 from naezlo.mcp_server.server import MCP_PATH
 
@@ -60,6 +61,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if settings.google_client_id and settings.google_client_secret
         else None
     )
+    # None when Mailgun is not configured; nothing is emailed then.
+    app.state.mailer = create_mailer(settings)
     # Signed cookie session. Starlette always sets HttpOnly on it.
     app.add_middleware(
         SessionMiddleware,

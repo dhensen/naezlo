@@ -5,7 +5,7 @@ Stack, domain model and rules: `DECISIONS.md` (it wins over personal preference)
 
 ## Layout
 
-- `src/naezlo/`: backend package (`app.py` has the `create_app()` factory, `config.py` the
+- `src/naezlo/`: backend package (`app.py` has the `create_app()` factory, `mailer.py` the Mailgun client, `config.py` the
   `Settings`, `db.py` the SQLAlchemy `Base`, mixins, engine and `get_session`, `models/` the ORM models,
   `services/` the domain logic, `permissions.py` the permission service, `principals.py` the `Principal` actor type, `api/` the routers under `/api`, `auth.py` the session helpers and
   `current_user`, `google.py` the Google OpenID Connect client, `errors.py` the API errors,
@@ -128,6 +128,14 @@ itself when it exists at startup (`FRONTEND_DIST`), so `build` + uvicorn is the 
   `add_member(db_session, org_id, user_id, role)` from `tests/helpers.py`.
 - Invitations live in `services/invitations.py`; `get_or_create_user` accepts the pending ones on
   every sign-in. An enum that is a subset of another (`InvitationRole`) gets its own PostgreSQL type.
+- Email goes through `naezlo.mailer.Mailer` (Mailgun's HTTP API; `app.state.mailer`, `None` while
+  `MAILGUN_API_KEY`, `MAILGUN_API_URL` or `MAIL_FROM` is missing) and a route takes it as
+  `mailer: MailerDep`. What a mail says is a function that returns a `Mail` (`services/invitation_mails.py`:
+  text and HTML from the same paragraphs, names escaped, the product name from `Settings.app_name`, links
+  from `Settings.public_base_url`). Send with `try_send(mailer, mail)`, after the change is flushed: a mail
+  that fails never undoes what it is about, and the answer says whether it went out (`email_sent`).
+  Tests put a `Mailer(..., transport=httpx2.MockTransport(...))` on `app.state.mailer` (the `mailgun`
+  fixture in `tests/test_invitation_mails.py`); the e2e backend has one that accepts everything.
 - Testing a constraint: `begin_nested()` flushes pending objects before the savepoint starts, so add
   the bad row inside it (use `add_in_savepoint` from `tests/helpers.py`).
 - The actor type is `naezlo.principals.Principal` (kind `user | agent`, id, organization_id, name).

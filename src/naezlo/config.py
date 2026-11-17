@@ -48,6 +48,19 @@ class Settings(BaseSettings):
     google_client_id: str | None = None
     google_client_secret: str | None = None
 
+    # Mailgun, for the emails about invitations. Email is on when all three are set.
+    mailgun_api_key: str | None = None
+    # The messages endpoint of the sending domain:
+    # https://api.eu.mailgun.net/v3/<domain>/messages (api.mailgun.net for a US domain).
+    mailgun_api_url: str | None = None
+    # The From line: `Naezlo <no-reply@<domain>>`.
+    mail_from: str | None = None
+
+    @property
+    def email_enabled(self) -> bool:
+        """Email needs the API key, the endpoint of the sending domain and a sender."""
+        return bool(self.mailgun_api_key and self.mailgun_api_url and self.mail_from)
+
     @property
     def session_cookie_secure(self) -> bool:
         """The session cookie is HTTPS-only everywhere except local development and tests."""

@@ -192,6 +192,7 @@ async def test_config_is_public(client: AsyncClient, settings: Settings) -> None
         "dev_login_enabled": True,
         "google_login_enabled": False,
         "mcp_url": f"{settings.public_base_url.rstrip('/')}/mcp",
+        "email_enabled": False,
     }
 
 

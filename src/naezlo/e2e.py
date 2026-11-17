@@ -10,6 +10,7 @@ import argparse
 import asyncio
 from pathlib import Path
 
+import httpx2
 import uvicorn
 from alembic import command
 from alembic.config import Config
@@ -19,6 +20,7 @@ from sqlalchemy.pool import NullPool
 
 from naezlo.app import create_app
 from naezlo.config import Settings
+from naezlo.mailer import Mailer
 
 # Only a database with this ending is ever emptied, whatever E2E_DATABASE_URL says.
 E2E_DATABASE_SUFFIX = "_e2e"
@@ -33,6 +35,7 @@ def e2e_settings(port: int) -> Settings:
         public_base_url=f"http://localhost:{port}",
         google_client_id=None,
         google_client_secret=None,
+        mailgun_api_key=None,
     )
     return base.model_copy(update={"database_url": base.e2e_database_url})
 
@@ -79,6 +82,21 @@ def prepare_database(database_url: str) -> None:
     command.upgrade(config, "head")
 
 
+def accepting_mailer() -> Mailer:
+    """A mailer whose Mailgun accepts everything and sends nothing: the browser tests see the
+    app as it is with email on, and no mail leaves the machine."""
+
+    def accept(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json={"message": "Queued."})
+
+    return Mailer(
+        "e2e",
+        "https://mailgun.invalid/v3/e2e/messages",
+        "Naezlo <no-reply@example.com>",
+        transport=httpx2.MockTransport(accept),
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
@@ -92,7 +110,9 @@ def main() -> None:
         raise SystemExit(f"No frontend build in {dist}: run `npm --prefix frontend run build`.")
 
     prepare_database(settings.database_url)
-    uvicorn.run(create_app(settings), host="127.0.0.1", port=port)
+    app = create_app(settings)
+    app.state.mailer = accepting_mailer()
+    uvicorn.run(app, host="127.0.0.1", port=port)
 
 
 if __name__ == "__main__":

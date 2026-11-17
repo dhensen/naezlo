@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { expect, test } from 'vitest'
 
 import type { Me, Schemas } from '../api/client'
-import { ACME, ADA_IN_ORGS, apiError, BETA, json, mockApi } from '../test/api'
+import { ACME, ADA_IN_ORGS, apiError, BETA, config, json, mockApi } from '../test/api'
 import { renderApp } from '../test/render'
 
 type Member = Schemas['MemberOut']
@@ -37,6 +37,7 @@ function me(role: Schemas['MembershipRole']): Me {
 function routes(role: Schemas['MembershipRole'] = 'owner', members: Member[] = [ADA_MEMBER, GRACE]): Routes {
   return {
     'GET /api/me': json(me(role)),
+    'GET /api/config': config(),
     [`GET /api/orgs/${ACME.id}/projects`]: json([]),
     [`GET /api/orgs/${BETA.id}/projects`]: json([]),
     [`GET /api/orgs/${ACME.id}/members`]: json(members.map((m) => (m === ADA_MEMBER ? { ...m, role } : m))),
@@ -208,6 +209,7 @@ test('inviting shows the note about the next sign-in and the pending invitation'
         {
           status: 'invited',
           message: 'No email is sent. kay@example.com joins Acme the next time they sign in.',
+          email_sent: false,
           member: null,
           invitation: invited,
         },
@@ -227,6 +229,50 @@ test('inviting shows the note about the next sign-in and the pending invitation'
   expect(sent).toEqual({ email: 'kay@example.com', role: 'member' })
   expect(await within(list).findByText('kay@example.com')).toBeInTheDocument()
   expect(screen.getByLabelText('Email address')).toHaveValue('')
+})
+
+test('a pending invitation is sent again where the server sends email', async () => {
+  const asked: string[] = []
+  const send = `POST /api/orgs/${ACME.id}/invitations/${INVITATION.id}/send`
+  mockApi({
+    ...routes(),
+    'GET /api/config': config({ email_enabled: true }),
+    [send]: (request) => {
+      asked.push(new URL(request.url).pathname)
+      return new Response(null, { status: 204 })
+    },
+  })
+  renderApp('/o/acme/settings')
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Resend invitation to new@example.com' }))
+
+  expect(await screen.findByText('The invitation was emailed to new@example.com again.')).toBeInTheDocument()
+  expect(asked).toEqual([`/api/orgs/${ACME.id}/invitations/${INVITATION.id}/send`])
+})
+
+test('a failed resend shows what the server says', async () => {
+  mockApi({
+    ...routes(),
+    'GET /api/config': config({ email_enabled: true }),
+    [`POST /api/orgs/${ACME.id}/invitations/${INVITATION.id}/send`]: apiError(
+      502,
+      'email_failed',
+      'The email could not be sent. Try again later.',
+    ),
+  })
+  renderApp('/o/acme/settings')
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Resend invitation to new@example.com' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('The email could not be sent. Try again later.')
+})
+
+test('there is no "Resend" where the server sends no email', async () => {
+  mockApi(routes())
+  renderApp('/o/acme/settings')
+
+  expect(await screen.findByRole('button', { name: 'Revoke invitation for new@example.com' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Resend/ })).not.toBeInTheDocument()
 })
 
 test('an invitation error is shown', async () => {

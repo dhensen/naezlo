@@ -1,7 +1,8 @@
 """Invitations: invite an email address to an organization, list, revoke, accept on sign-in.
 
-No email is sent in v1. Someone who already has an account becomes a member right away;
-anyone else gets a pending invitation that turns into a membership on their next sign-in.
+Someone who already has an account becomes a member right away; anyone else gets a pending
+invitation that turns into a membership on their next sign-in. The emails about it are in
+`services/invitation_mails.py`; the routes send them, and nothing here depends on one.
 """
 
 import uuid
@@ -85,10 +86,10 @@ async def list_invitations(
     return [(invitation, user) for invitation, user in rows]
 
 
-async def revoke_invitation(
+async def get_invitation(
     session: AsyncSession, organization_id: uuid.UUID, invitation_id: uuid.UUID
-) -> None:
-    """Delete a pending invitation; 404 when the organization has no such invitation."""
+) -> Invitation:
+    """A pending invitation; 404 when the organization has no such invitation."""
     invitation = await session.scalar(
         select(Invitation).where(
             Invitation.id == invitation_id, Invitation.organization_id == organization_id
@@ -96,6 +97,14 @@ async def revoke_invitation(
     )
     if invitation is None:
         raise NotFoundError("Invitation not found")
+    return invitation
+
+
+async def revoke_invitation(
+    session: AsyncSession, organization_id: uuid.UUID, invitation_id: uuid.UUID
+) -> None:
+    """Delete a pending invitation; 404 when the organization has no such invitation."""
+    invitation = await get_invitation(session, organization_id, invitation_id)
     await session.delete(invitation)
     await session.flush()
 

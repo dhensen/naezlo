@@ -170,6 +170,18 @@ export function useInvite(organizationId: string) {
   })
 }
 
+/** Email a pending invitation again; only offered when the server sends email. */
+export function useResendInvitation(organizationId: string) {
+  return useMutation({
+    mutationFn: (invitation: Invitation) =>
+      unwrap(
+        api.POST('/api/orgs/{org_id}/invitations/{invitation_id}/send', {
+          params: { path: { org_id: organizationId, invitation_id: invitation.id } },
+        }),
+      ),
+  })
+}
+
 export function useRevokeInvitation(organizationId: string) {
   const queryClient = useQueryClient()
   return useMutation({

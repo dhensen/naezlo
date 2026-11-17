@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 
 import type { Schemas } from '../api/client'
-import { useMe } from '../auth/hooks'
+import { useAppConfig, useMe } from '../auth/hooks'
 import { ErrorMessage } from '../components/ErrorMessage'
 import {
   useChangeMemberRole,
@@ -14,6 +14,7 @@ import {
   useMembers,
   useRemoveMember,
   useRenameOrganization,
+  useResendInvitation,
   useRevokeInvitation,
 } from '../orgs/hooks'
 import type { Member, Organization } from '../orgs/hooks'
@@ -260,6 +261,9 @@ function InvitationsSection({ organization }: { organization: Organization }) {
   const invitations = useInvitations(organization.id, true)
   const invite = useInvite(organization.id)
   const revoke = useRevokeInvitation(organization.id)
+  const resend = useResendInvitation(organization.id)
+  // Without email there is nothing to send again: the button is left out.
+  const emailEnabled = useAppConfig().data?.email_enabled ?? false
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Schemas['InvitationRole']>('member')
   const roleId = useId()
@@ -320,6 +324,12 @@ function InvitationsSection({ organization }: { organization: Organization }) {
       )}
       <ErrorMessage error={invitations.error} />
       <ErrorMessage error={revoke.error} />
+      <ErrorMessage error={resend.error} />
+      {resend.isSuccess && (
+        <p role="status" className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700">
+          The invitation was emailed to {resend.variables.email} again.
+        </p>
+      )}
       {invitations.data?.length === 0 && <p className="text-sm text-ink-500">No pending invitations.</p>}
       {invitations.data && invitations.data.length > 0 && (
         <ul aria-label="Pending invitations" className="divide-y divide-ink-100 border-t border-ink-200 text-sm">
@@ -329,15 +339,28 @@ function InvitationsSection({ organization }: { organization: Organization }) {
                 {invitation.email}
                 <span className="text-ink-500"> · {ROLE_LABELS[invitation.role]}</span>
               </span>
-              <button
-                type="button"
-                aria-label={`Revoke invitation for ${invitation.email}`}
-                disabled={revoke.isPending}
-                className={SMALL_BUTTON}
-                onClick={() => revoke.mutate(invitation.id)}
-              >
-                Revoke
-              </button>
+              <span className="flex shrink-0 gap-2">
+                {emailEnabled && (
+                  <button
+                    type="button"
+                    aria-label={`Resend invitation to ${invitation.email}`}
+                    disabled={resend.isPending}
+                    className={SMALL_BUTTON}
+                    onClick={() => resend.mutate(invitation)}
+                  >
+                    Resend
+                  </button>
+                )}
+                <button
+                  type="button"
+                  aria-label={`Revoke invitation for ${invitation.email}`}
+                  disabled={revoke.isPending}
+                  className={SMALL_BUTTON}
+                  onClick={() => revoke.mutate(invitation.id)}
+                >
+                  Revoke
+                </button>
+              </span>
             </li>
           ))}
         </ul>

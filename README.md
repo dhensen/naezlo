@@ -139,3 +139,22 @@ of the organization the tool acts as. There are no API keys to copy.
 The agent then has tools to read projects, lists and items and to add, change, complete, move and
 delete items. Everything it does is in the "Activity" tab of the list and of the project, which
 their admins can open.
+
+# Configuring invitation emails
+
+Without this, inviting someone works but sends nothing: they join the next time they sign in.
+
+1. In [Mailgun](https://app.mailgun.com/), add a sending domain (for example `mg.example.com`)
+   and set the DNS records it asks for.
+2. Create a sending API key for that domain.
+3. Put these in `.env` and restart the backend:
+
+   ```sh
+   MAILGUN_API_KEY=...
+   # api.eu.mailgun.net for a domain in the EU region, api.mailgun.net for the US region
+   MAILGUN_API_URL=https://api.eu.mailgun.net/v3/mg.example.com/messages
+   MAIL_FROM=Naezlo <no-reply@mg.example.com>
+   ```
+
+The organization settings then say that an invitation was emailed, and a pending invitation
+gets a "Resend" button.
