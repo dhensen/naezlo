@@ -4,10 +4,12 @@ interface CopyButtonProps {
   text: string
   /** What is copied, for the accessible name: "Copy <label>". */
   label: string
+  /** Inside the dark field of the text it copies, instead of next to it. */
+  embedded?: boolean
 }
 
 /** Copies a text to the clipboard and says so for a moment. */
-export function CopyButton({ text, label }: CopyButtonProps) {
+export function CopyButton({ text, label, embedded = false }: CopyButtonProps) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
 
   useEffect(() => {
@@ -35,7 +37,11 @@ export function CopyButton({ text, label }: CopyButtonProps) {
     <button
       type="button"
       aria-label={`Copy ${label}`}
-      className="shrink-0 rounded-lg border border-ink-300 bg-white px-2.5 py-2 text-sm sm:py-1 font-medium text-ink-700 hover:bg-ink-50"
+      className={
+        embedded
+          ? 'min-h-9 shrink-0 rounded-md bg-white/10 px-2.5 text-xs font-semibold text-white hover:bg-white/20 focus-visible:outline-white sm:min-h-7'
+          : 'shrink-0 rounded-lg border border-ink-300 bg-white px-2.5 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 sm:py-1'
+      }
       onClick={copy}
     >
       <span aria-live="polite">{state === 'copied' ? 'Copied' : state === 'failed' ? 'Select it to copy' : 'Copy'}</span>

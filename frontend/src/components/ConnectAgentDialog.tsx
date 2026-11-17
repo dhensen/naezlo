@@ -24,15 +24,16 @@ function Code({ label, text }: { label: string; text: string }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs font-medium text-ink-500">{label}</span>
-      <div className="flex items-start gap-2">
+      {/* One dark field with the copy button in it; a long command wraps instead of running out. */}
+      <div className="flex items-start gap-2 rounded-lg bg-ink-900 py-1.5 pr-1.5 pl-3">
         <pre
           aria-label={label}
           tabIndex={0}
-          className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-ink-900 px-3 py-2 text-xs leading-5 break-all whitespace-pre-wrap text-ink-100 sm:break-normal sm:whitespace-pre"
+          className="min-w-0 flex-1 py-1 text-xs leading-5 wrap-anywhere whitespace-pre-wrap text-ink-100"
         >
           <code>{text}</code>
         </pre>
-        <CopyButton text={text} label={label} />
+        <CopyButton text={text} label={label} embedded />
       </div>
     </div>
   )
