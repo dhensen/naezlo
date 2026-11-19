@@ -3,6 +3,14 @@
 A multi-tenant todolist app that humans and AI agents share. Features: `README.md`.
 Stack, domain model and rules: `DECISIONS.md` (it wins over personal preference).
 
+## Public repository
+
+This repository is public. Everything specific to running the hosted service (servers,
+accounts, deploy details, and anything taken from using the app, including our own lists)
+lives in a separate private repository; here a change gets only its generic outcome (a
+decision in `DECISIONS.md`, a convention below). When unsure whether something is specific
+to the hosted service, ask before committing.
+
 ## Layout
 
 - `src/naezlo/`: backend package (`app.py` has the `create_app()` factory, `mailer.py` the Mailgun client, `config.py` the
